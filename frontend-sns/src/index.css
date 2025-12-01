@@ -1,0 +1,17 @@
+/* ------------------------------------------- */
+/* Tailwind CSS Layers */
+/* Tailwind CSSを有効化するために必須のディレクティブ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------- */
+/* Global Styles */
+/* 基本的なスタイルリセットとフォント設定 */
+body {
+    /* Tailwind CSSのフォント設定を使用（ここでは Inter を想定） */
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    /* アプリケーション全体が min-h-screen で定義されているため、bodyはシンプルに保つ */
+}
