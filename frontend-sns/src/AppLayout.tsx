@@ -1,22 +1,14 @@
-// frontend-sns/src/AppLayout.tsx (全体を置き換え)
+// frontend-sns/src/AppLayout.tsx
 
 import React, { useState, useEffect } from 'react';
 import UserProfile from './components/UserProfile.tsx';
 import HomeFeed from './components/HomeFeed.tsx';
-// 💡 api.tsから必要なものをインポート
 import { authApi, UserProfile as UserProfileType } from './api.ts';
-import FriendManager from './components/FriendManager.tsx'; // 💡 新しく追加
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import FriendManager from './components/FriendManager.tsx';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import CommunityList from './components/CommunityList.tsx'; // ✅ 追加
+import CommunityDetail from './components/CommunityDetail.tsx';
 
-// --- 定数定義
-const PAGE = {
-    HOME: 'home',
-    COMMUNITY: 'community',
-    MYPAGE: 'mypage',
-    FRIEND_MANAGER: 'friend_manager', // 💡 新しく追加
-};
-
-// 💡 UserProfileの型とinitialProfileはapi.tsからインポート/流用を想定
 const initialProfile: UserProfileType = {
     id: 0,
     username: 'loading',
@@ -31,20 +23,16 @@ const initialProfile: UserProfileType = {
     x_url: null,
     instagram_url: null,
     note_url: null,
-    threads_url: null, // 💡 Threads URL用のプロパティを追加
+    threads_url: null,
     is_member_count_visible: true,
     is_mood_visible: true,
     current_mood: 'neutral', 
     current_mood_comment: null,
+    mood_updated_at: null, // ✅ 追加
 };
 
-// AppLayout.tsx の Header 部分を修正
-import { Link, useLocation } from 'react-router-dom'; // 💡 useLocationを追加
-
 const Header: React.FC = () => {
-    const location = useLocation(); // 💡 現在のURLを取得
-    
-    // 現在のパスが一致しているか判定する関数
+    const location = useLocation();
     const isActive = (path: string) => location.pathname === path;
 
     return (
@@ -54,7 +42,6 @@ const Header: React.FC = () => {
                     推し道 (Osidou.com)
                 </Link>
                 <nav className="space-x-4">
-                    {/* 💡 setPageの代わりに Link to="..." を使う */}
                     <Link
                         to="/"
                         className={`text-gray-600 hover:text-pink-600 ${isActive('/') ? 'font-bold border-b-2 border-pink-600' : ''}`}
@@ -85,7 +72,6 @@ const Header: React.FC = () => {
     );
 };
 
-// --- フッターコンポーネント (変更なし)
 const Footer: React.FC = () => (
     <footer className="bg-gray-800 text-white mt-12">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm">
@@ -95,18 +81,14 @@ const Footer: React.FC = () => (
     </footer>
 );
 
-// --- AppLayoutのメインコンポーネント
 const AppLayout: React.FC = () => {
-    // 💡 Profile Stateを AppLayout に移動
     const [profile, setProfile] = useState<UserProfileType>(initialProfile);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     
-    // 💡 Profile Fetching Logicを AppLayout に移動
     const fetchProfile = async () => {
         setLoading(true);
         try {
-            // ユーザー情報とカテゴリ情報はここで一括で取得せず、プロフィール情報のみを取得
             const response = await authApi.get<UserProfileType>('/users/me');
             setProfile(response.data);
             setError(null);
@@ -118,67 +100,46 @@ const AppLayout: React.FC = () => {
         }
     };
 
-    // 💡 useEffectも AppLayout に移動
-useEffect(() => {
-        // 🚨 ここに最新の有効なトークンを挿入します
-        // このトークンは、AppLayoutが子コンポーネントにデータを渡す前に設定されます。
-        localStorage.setItem('access_token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjExQHN0cmluZy5jb20iLCJleHAiOjE3NjY5OTU3Mzl9.8IH7-eQzDxDbBQRC3t5Uoj1PtYalmDLnhEcIk2OxW8c'); 
-        
+    useEffect(() => {
+        localStorage.setItem('access_token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiZXhwIjoxNzY3MDE3OTk0fQ.W_UidpWLuli_TG9FcNwhPhTY253P9bQfHT3u8Rs3044'); 
         fetchProfile();
     }, []);
 
-
-    // 現在のページに応じて表示するコンポーネントを切り替える関数
     const renderContent = () => {
         if (loading) return <div className="p-8 text-center text-gray-500">全体を読み込み中...</div>;
         if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
 
         return (
             <Routes>
-                {/* 💡 URL: / (ホーム) */}
                 <Route path="/" element={<HomeFeed profile={profile} />} />
-
-                {/* 💡 URL: /friends (友達管理) */}
                 <Route path="/friends" element={<FriendManager />} />
-
-                {/* 💡 URL: /mypage (自分自身のプロフィール) */}
                 <Route path="/mypage" element={
                     <UserProfile 
                         profile={profile} 
                         fetchProfile={fetchProfile} 
                     />
                 } />
-
-                {/* 💡 URL: /profile/4 (相手のプロフィール) */}
-                <Route path="/profile/:userId" element={<UserProfile />} />
-
-                {/* 💡 URL: /community (コミュニティ作成・カテゴリ選択) */}
-                <Route path="/community" element={
-                    <div className="py-12 px-4 sm:px-6 lg:px-8">
-                        <h2 className="text-3xl font-extrabold text-gray-900">コミュニティ（カテゴリ選択）画面</h2>
-                        <p className="mt-4 text-lg text-gray-600">
-                            現在、カテゴリ機能の実装準備中です。
-                        </p>
-                    </div>
+                <Route path="/profile/:userId" element={
+                    <UserProfile 
+                        profile={profile} 
+                        fetchProfile={fetchProfile} 
+                    />
                 } />
-
-                {/* 💡 どこにも当てはまらないURLの場合はホームへ */}
+                <Route path="/community" element={<CommunityList />} /> // ← さっき作った検索機能付きの「本物の画面」
+                <Route path="/community/:categoryId" element={<CommunityDetail />} /> {/* ✅ 追加 */}
                 <Route path="*" element={<HomeFeed profile={profile} />} />
             </Routes>
         );
     };
 
     return (
-    <div className="min-h-screen bg-gray-100 font-sans pt-20">
-        {/* 💡 引数を消してシンプルに */}
-        <Header /> 
-        
-        <main className="container mx-auto">
-            {renderContent()}
-        </main>
-
-        <Footer />
-    </div>
+        <div className="min-h-screen bg-gray-100 font-sans pt-20">
+            <Header /> 
+            <main className="container mx-auto">
+                {renderContent()}
+            </main>
+            <Footer />
+        </div>
     );
 };
 

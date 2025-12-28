@@ -10,7 +10,7 @@ from ..schemas.hobbies import HobbyCategoryResponse, HobbySearchParams # 💡 Ho
 from .auth import get_current_user # ユーザー認証用
 
 router = APIRouter(
-    prefix="/hobbies",
+    prefix="/hobby-categories",  # 💡 "/hobbies" から "/hobby-categories" に変更
     tags=["hobbies"],
     responses={404: {"description": "Not found"}},
 )
@@ -62,7 +62,7 @@ def build_category_tree(
 # --------------------------------------------------
 
 @router.get(
-    "/categories", 
+    "",  # 💡 "/categories" を消して空文字にする
     response_model=List[HobbyCategoryResponse],
     summary="全趣味カテゴリーを階層構造（ツリー）で取得"
 )

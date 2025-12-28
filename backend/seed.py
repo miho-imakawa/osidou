@@ -1,304 +1,176 @@
 import os
 import sys
+import string
+import random
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
 
-# 🚨 【重要】ルートディレクトリから実行することを前提としたパス設定
-# app/ フォルダをPythonのパスに追加
+# パス設定
 current_dir = os.path.dirname(os.path.abspath(__file__))
-if 'app' not in current_dir: # seed.py が app/ の外にあることを想定
+if 'app' not in current_dir:
     sys.path.append(os.path.join(current_dir, 'app'))
 
 from app import models
-from app.database import Base, engine # engine, Base を直接インポート
-from app.models import HobbyRoleType # 👈 HobbyRoleType をインポート
-from app.utils.security import get_password_hash # 👈 パスワードハッシュ化関数をインポート
+from app.database import Base, engine
+from app.utils.security import get_password_hash
 
-# --- [都道府県・県庁所在地データ] ---
-PREFECTURE_CAPITALS = {
-    "北海道": "札幌市", "青森県": "青森市", "岩手県": "盛岡市", "宮城県": "仙台市",
-    "秋田県": "秋田市", "山形県": "山形市", "福島県": "福島市", "茨城県": "水戸市",
-    "栃木県": "宇都宮市", "群馬県": "前橋市", "埼玉県": "さいたま市", "千葉県": "千葉市",
-    "東京都": "新宿区", "神奈川県": "横浜市", "新潟県": "新潟市", "富山県": "富山市",
-    "石川県": "金沢市", "福井県": "福井市", "山梨県": "甲府市", "長野県": "長野市",
-    "岐阜県": "岐阜市", "静岡県": "静岡市", "愛知県": "名古屋市", "三重県": "津市",
-    "滋賀県": "大津市", "大津市": "大津市", "京都府": "京都市", "大阪府": "大阪市",
-    "兵庫県": "神戸市", "奈良県": "奈良市", "和歌山県": "和歌山市", "鳥取県": "鳥取市",
-    "島根県": "松江市", "岡山県": "岡山市", "広島県": "広島市", "山口県": "山口市",
-    "徳島県": "徳島市", "香川県": "高松市", "愛媛県": "松山市", "高知県": "高知市",
-    "福岡県": "福岡市", "佐賀県": "佐賀市", "長崎県": "長崎市", "熊本県": "熊本市",
-    "大分県": "大分市", "宮崎県": "宮崎市", "鹿児島県": "鹿児島市", "沖縄県": "那覇市",
-}
+# --- [1. 識別コード生成関数] ---
+def generate_code(length=7, prefix=""):
+    # 大文字 + 小文字 + 数字 (62種類)
+    chars = string.ascii_letters + string.digits
+    random_len = length - len(prefix)
+    random_str = ''.join(random.choice(chars) for _ in range(random_len))
+    return f"{prefix}{random_str}"
 
-# --- [街づくりカテゴリの動的生成] ---
-def generate_machizukuri_hierarchy():
-    children = []
-    for pref, city in PREFECTURE_CAPITALS.items():
-        children.append({
-            "name": pref, # Depth 1 (都道府県)
+# --- [2. 地域データの定義] ---
+TOKYO_23_WARDS = [
+    "千代田区 (Chiyoda-ku)", "中央区 (Chuo-ku)", "港区 (Minato-ku)", "新宿区 (Shinjuku-ku)",
+    "文京区 (Bunkyo-ku)", "台東区 (Taito-ku)", "墨田区 (Sumida-ku)", "江東区 (Koto-ku)",
+    "品川区 (Shinagawa-ku)", "目黒区 (Meguro-ku)", "大田区 (Ota-ku)", "世田谷区 (Setagaya-ku)",
+    "渋谷区 (Shibuya-ku)", "中野区 (Nakano-ku)", "杉並区 (Suginami-ku)", "豊島区 (Toshima-ku)",
+    "北区 (Kita-ku)", "荒川区 (Arakawa-ku)", "板橋区 (Itabashi-ku)", "練馬区 (Nerima-ku)",
+    "足立区 (Adachi-ku)", "葛飾区 (Katsushika-ku)", "江戸川区 (Edogawa-ku)"
+]
+
+JAPAN_REGIONS_DATA = [
+    {"name": "北海道 (Hokkaido)", "cities": ["札幌市 (Sapporo)"]},
+    {"name": "青森県 (Aomori)", "cities": ["青森市 (Aomori City)"]},
+    {"name": "岩手県 (Iwate)", "cities": ["盛岡市 (Morioka)"]},
+    {"name": "宮城県 (Miyagi)", "cities": ["仙台市 (Sendai)"]},
+    {"name": "秋田県 (Akita)", "cities": ["秋田市 (Akita City)"]},
+    {"name": "山形県 (Yamagata)", "cities": ["山形市 (Yamagata City)"]},
+    {"name": "福島県 (Fukushima)", "cities": ["福島市 (Fukushima City)"]},
+    {"name": "茨城県 (Ibaraki)", "cities": ["水戸市 (Mito)"]},
+    {"name": "栃木県 (Tochigi)", "cities": ["宇都宮市 (Utsunomiya)"]},
+    {"name": "群馬県 (Gunma)", "cities": ["前橋市 (Maebashi)"]},
+    {"name": "埼玉県 (Saitama)", "cities": ["さいたま市 (Saitama City)"]},
+    {"name": "千葉県 (Chiba)", "cities": ["千葉市 (Chiba City)"]},
+    {"name": "東京都 (Tokyo)", "cities": TOKYO_23_WARDS},
+    {"name": "神奈川県 (Kanagawa)", "cities": ["横浜市 (Yokohama)"]},
+    {"name": "新潟県 (Niigata)", "cities": ["新潟市 (Niigata City)"]},
+    {"name": "富山県 (Toyama)", "cities": ["富山市 (Toyama City)"]},
+    {"name": "石川県 (Ishikawa)", "cities": ["金沢市 (Kanazawa)"]},
+    {"name": "福井県 (Fukui)", "cities": ["福井市 (Fukui City)"]},
+    {"name": "山梨県 (Yamanashi)", "cities": ["甲府市 (Kofu)"]},
+    {"name": "長野県 (Nagano)", "cities": ["長野市 (Nagano City)"]},
+    {"name": "岐阜県 (Gifu)", "cities": ["岐阜市 (Gifu City)"]},
+    {"name": "静岡県 (Shizuoka)", "cities": ["静岡市 (Shizuoka City)"]},
+    {"name": "愛知県 (Aichi)", "cities": ["名古屋市 (Nagoya)"]},
+    {"name": "三重県 (Mie)", "cities": ["津市 (Tsu)"]},
+    {"name": "滋賀県 (Shiga)", "cities": ["大津市 (Otsu)"]},
+    {"name": "京都府 (Kyoto)", "cities": ["京都市 (Kyoto City)"]},
+    {"name": "大阪府 (Osaka)", "cities": ["大阪市 (Osaka City)"]},
+    {"name": "兵庫県 (Hyogo)", "cities": ["神戸市 (Kobe)"]},
+    {"name": "奈良県 (Nara)", "cities": ["奈良市 (Nara City)"]},
+    {"name": "和歌山県 (Wakayama)", "cities": ["和歌山市 (Wakayama City)"]},
+    {"name": "鳥取県 (Tottori)", "cities": ["鳥取市 (Tottori City)"]},
+    {"name": "島根県 (Shimane)", "cities": ["松江市 (Matsue)"]},
+    {"name": "岡山県 (Okayama)", "cities": ["岡山市 (Okayama City)"]},
+    {"name": "広島県 (Hiroshima)", "cities": ["広島市 (Hiroshima City)"]},
+    {"name": "山口県 (Yamaguchi)", "cities": ["山口市 (Yamaguchi City)"]},
+    {"name": "徳島県 (Tokushima)", "cities": ["徳島市 (Tokushima City)"]},
+    {"name": "香川県 (Kagawa)", "cities": ["高松市 (Takamatsu)"]},
+    {"name": "愛媛県 (Ehime)", "cities": ["松山市 (Matsuyama)"]},
+    {"name": "高知県 (Kochi)", "cities": ["高知市 (Kochi City)"]},
+    {"name": "福岡県 (Fukuoka)", "cities": ["福岡市 (Fukuoka City)"]},
+    {"name": "佐賀県 (Saga)", "cities": ["佐賀市 (Saga City)"]},
+    {"name": "長崎県 (Nagasaki)", "cities": ["長崎市 (Nagasaki City)"]},
+    {"name": "熊本県 (Kumamoto)", "cities": ["熊本市 (Kumamoto City)"]},
+    {"name": "大分県 (Oita)", "cities": ["大分市 (Oita City)"]},
+    {"name": "宮崎県 (Miyazaki)", "cities": ["宮崎市 (Miyazaki City)"]},
+    {"name": "鹿児島県 (Kagoshima)", "cities": ["鹿児島市 (Kagoshima City)"]},
+    {"name": "沖縄県 (Okinawa)", "cities": ["那覇市 (Naha)"]}
+]
+
+# --- [3. 階層データの構築ロジック] ---
+def build_hierarchy():
+    japan_children = []
+    for pref in JAPAN_REGIONS_DATA:
+        cities = []
+        for city in pref["cities"]:
+            city_item = {"name": city, "prefix": "R", "children": []}
+            if "豊島区" in city:
+                city_item["children"].append({"name": "千川エリア (Senkawa Area)", "prefix": "R"})
+            cities.append(city_item)
+        japan_children.append({"name": pref["name"], "prefix": "R", "children": cities})
+
+    return [
+        {
+            "name": "MUSIC", "prefix": "M",
             "children": [
-                {
-                    "name": city, # Depth 2 (県庁所在地の市区町村)
-                    "children": [], 
-                },
-            ],
-        })
-    return {
-        "name": "街づくり・地方創生",
-        "children": children
-    }
+                {"name": "DOer (演奏)", "role_type": models.HobbyRoleType.DOERS, "children": [
+                    {"name": "J-POP", "children": [{"name": "Band (バンド)", "children": [{"name": "Bass"}, {"name": "Drums"}, {"name": "Guitar"}]}]},
+                    {"name": "J-ROCK", "children": [{"name": "Band (バンド)", "children": [{"name": "Bass"}, {"name": "Drums"}, {"name": "Guitar"}]}]},
+                    {"name": "JAZZ"}, {"name": "POP"}, {"name": "ROCK"}
+                ]},
+                {"name": "FANs (推し)", "role_type": models.HobbyRoleType.FANS, "children": [
+                    {"name": "J-POP", "children": [{"name": "Mr.Children"}, {"name": "スピッツ (SPITZ)"}, {"name": "平井 堅 (Ken Hirai)"}]},
+                    {"name": "J-ROCK", "children": [{"name": "B'z"}]},
+                    {"name": "JAZZ"}, {"name": "POP"}, {"name": "ROCK"}
+                ]}
+            ]
+        },
+        {
+            "name": "SPORT (スポーツ)", "prefix": "S",
+            "children": [
+                {"name": "DOer (する人)", "role_type": models.HobbyRoleType.DOERS, "children": [{"name": "Baseball (野球)"}, {"name": "Basketball (バスケ)"}, {"name": "Soccer (サッカー)"}]},
+                {"name": "FANs (観る人)", "role_type": models.HobbyRoleType.FANS, "children": [{"name": "Baseball", "children": [{"name": "大谷 翔平 (Shohei Otani)"}]}, {"name": "Basketball"}, {"name": "Soccer"}]}
+            ]
+        },
+        {
+            "name": "REGIONS (地域)", "prefix": "R",
+            "children": [
+                {"name": "日本 (Japan)", "children": japan_children},
+                {"name": "France (フランス)"}, {"name": "USA (アメリカ)"}
+            ]
+        }
+    ]
 
-# --- [データ定義の修正] ---
-INITIAL_HOBBY_HIERARCHY_DATA = [
-    # 💡 音楽カテゴリ (Fans と Doers の両方を定義)
-    {
-        "name": "音楽",
-        "children": [
-            # --- 1. Fans (見る人/聞く人) ---
-            {
-                "name": "Fans",
-                "role_type": models.HobbyRoleType.FANS, 
-                "children": [
-                    {
-                        "name": "J-POP",
-                        "children": [
-                            {"name": "Mr.Children"},
-                            {"name": "米津玄師"},
-                            {"name": "Mrs. GREEN APPLE"},
-                            {"name": "藤井風"},
-                        ],
-                    },
-                ],
-            },
-            # --- 2. Doers (する人/演奏する人) ---
-            {
-                "name": "する人",
-                "role_type": models.HobbyRoleType.DOERS, 
-                "children": [
-                    {
-                        "name": "楽器",
-                        "children": [
-                            {"name": "ギター"}, # 👈 ここに Guitar を追加
-                            {"name": "ドラム"},
-                            {"name": "ピアノ"},
-                        ],
-                    },
-                    {"name": "歌唱 (カラオケ/バンド)"},
-                ],
-            },
-        ],
-    },
-    # 💡 趣味カテゴリ (スポーツ, 文化・芸術) (既存)
-    {
-        "name": "スポーツ",
-        "children": [
-            {
-                "name": "する人",
-                "role_type": models.HobbyRoleType.DOERS, 
-                "children": [
-                    {
-                        "name": "サッカー",
-                        "children": [
-                            {"name": "フットサル"},
-                        ],
-                    },
-                ],
-            },
-        ],
-    },
-    {
-        "name": "文化・芸術",
-        "children": [
-            {
-                "name": "する人",
-                "role_type": models.HobbyRoleType.DOERS, 
-                "children": [
-                    {
-                        "name": "絵画",
-                        "children": [
-                            {"name": "水彩画"},
-                        ],
-                    },
-                ],
-            },
-        ],
-    },
-    # 💡 街づくりカテゴリ (既存)
-    generate_machizukuri_hierarchy()
-]
-
-INITIAL_USER_DATA = [
-    {
-        "email": "test1@example.com",
-        "password": "password123", # プレーンテキストで用意
-        "username": "tanaka_fs",
-        "nickname": "田中_フットサル好き",
-        "prefecture": "東京都",
-        "city": "渋谷区",
-        "town": "宇田川町",
-        "is_active": True,
-        "bio": "フットサルと地元の街おこしに情熱を燃やしています！",
-        "oshi_page_url": None, # 入推しリンクなし
-        "facebook_url": "https://facebook.com/tanaka_fs", 
-        "x_url": None, 
-        "instagram_url": None,
-        "note_url": None,
-    },
-    {
-        "email": "test2@example.com",
-        "password": "password123",
-        "username": "sato_painter",
-        "nickname": "佐藤_水彩画",
-        "prefecture": "大阪府",
-        "city": "大阪市",
-        "town": "堂島",
-        "is_active": True,
-        "bio": "水彩画を描いています。気分ログはいつもONです。",
-        "oshi_page_url": None,
-        "facebook_url": None,
-        "x_url": None,
-        "instagram_url": "https://instagram.com/sato_art",
-        "note_url": None,
-    },
-    # 💡 新規追加ユーザー (鈴木ミスチルファン)
-    {
-        "email": "suzuki@mr-children.com",
-        "password": "password123",
-        "username": "suzuki_mrchildren",
-        "nickname": "鈴木_桜井さん推し",
-        "prefecture": "神奈川県",
-        "city": "横浜市",
-        "town": "西区",
-        "is_active": True,
-        "bio": "Mr.Childrenを20年推しています。人生のサウンドトラックはミスチル一択！",
-        # 💡 入推しリンクを設定
-        "oshi_page_url": "https://www.mrchildren.jp/", 
-        "facebook_url": None,
-        "x_url": "https://x.com/suzuki_oshi",
-        "instagram_url": "https://instagram.com/suzuki_mrchildren",
-        "note_url": None,
-    },
-]
-
-# --- [ヘルパー関数] ---
-
-def insert_category_recursively(db: Session, data: dict, parent_id: Optional[int] = None, current_depth: int = 0):
-    """HobbyCategoryを再帰的に挿入する。"""
-    category_name = data.get("name")
-    
-    # HobbyCategory の新しいインスタンスを作成
-    new_category = models.HobbyCategory(
-        name=category_name,
+# --- [4. 再帰挿入関数] ---
+def insert_category(db: Session, data: dict, parent_id: Optional[int] = None, depth: int = 0, default_prefix: str = ""):
+    prefix = data.get("prefix", default_prefix)
+    new_cat = models.HobbyCategory(
+        name=data["name"],
         parent_id=parent_id,
-        depth=current_depth, 
-        role_type=data.get("role_type") if "role_type" in data else None,
-        # description がデータに存在しない場合は None を設定
-        description=data.get("description", None) 
+        depth=depth,
+        role_type=data.get("role_type"),
+        unique_code=generate_code(prefix=prefix)
     )
-    db.add(new_category); db.flush()
-    print(f"  -> Category: {category_name} (ID: {new_category.id}, Parent ID: {parent_id}, Depth: {current_depth})")
-    
-    # 子要素を再帰的に処理
+    db.add(new_cat); db.flush()
     if "children" in data:
-        for child_data in data["children"]:
-            insert_category_recursively(db, child_data, new_category.id, current_depth + 1)
+        for child in data["children"]:
+            insert_category(db, child, new_cat.id, depth + 1, prefix)
 
-    return new_category.id
-
-# --- [データ投入ロジック] ---
-
+# --- [5. 実行メインロジック] ---
 def create_initial_data(db: Session):
-    print("--- データベースの初期化 ---")
+    print("--- DBリセット中 ---")
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    print("テーブルを再作成しました。")
     
-    print("\n--- 趣味階層データ (HobbyCategory) の投入 ---")
+    print("--- カテゴリ投入中 (日本全国・併記・コード付与) ---")
+    hierarchy = build_hierarchy()
+    for item in hierarchy:
+        insert_category(db, item)
     
-    # 階層データを再帰的に投入
-    for cat_data in INITIAL_HOBBY_HIERARCHY_DATA:
-        insert_category_recursively(db, cat_data, current_depth=0)
-
+    print("--- 初期ユーザー作成中 ---")
+    test_user = models.User(
+        email="test@example.com",
+        username="senkawa_user",
+        nickname="千川っ子",
+        public_code=generate_code(),
+        hashed_password=get_password_hash("password123")
+    )
+    db.add(test_user)
     db.commit()
-
-
-    # 初期ユーザーデータの投入
-    print("\n--- 初期ユーザーデータの投入 ---")
-    user_map = {}
-    for user_data in INITIAL_USER_DATA:
-        # プレーンパスワードを取得し、ハッシュ化
-        password = user_data["password"]
-        
-        # パスワード長を72バイトに制限 (bcryptの制限回避)
-        if len(password.encode('utf-8')) > 72:
-            password = password[:72] 
-        
-        # 修正済みのsecurity.py (sha256_crypt優先) を使用
-        hashed_password = get_password_hash(password)
-        
-        # Userモデルのインスタンスを作成 (辞書展開で全フィールドを投入)
-        user = models.User(
-             # username, email, nickname, 住所, SNSリンクなどが一度に渡される
-             **{k: v for k, v in user_data.items() if k not in ["password"]}
-        )
-        user.hashed_password = hashed_password # ハッシュ化されたパスワードをセット
-        
-        db.add(user)
-        db.flush() 
-        user_map[user.nickname] = user
-        print(f"  -> User: {user.nickname} ({user.email}) - Oshi Link: {user.oshi_page_url}")
-
-    db.commit()
-
-    # ユーザーとカテゴリの関連付け (テスト用)
-    print("\n--- ユーザーとカテゴリの関連付け (UserHobbyLink) ---")
-    
-    # 1. 田中さん -> フットサル
-    user1 = user_map.get("田中_フットサル好き")
-    category_futsal = db.query(models.HobbyCategory).filter(models.HobbyCategory.name == "フットサル").first()
-    if user1 and category_futsal:
-        link = models.UserHobbyLink(user_id=user1.id, hobby_category_id=category_futsal.id)
-        db.add(link)
-        print(f"  -> {user1.nickname} を Category: {category_futsal.name} にリンク。")
-        
-    # 2. 佐藤さん -> 大阪市 (街づくり)
-    user2 = user_map.get("佐藤_水彩画")
-    category_osaka_city = db.query(models.HobbyCategory).filter(
-        models.HobbyCategory.name == "大阪市",
-        models.HobbyCategory.depth == 2,
-    ).first()
-    if user2 and category_osaka_city:
-        link = models.UserHobbyLink(user_id=user2.id, hobby_category_id=category_osaka_city.id)
-        db.add(link)
-        print(f"  -> {user2.nickname} を Category: {category_osaka_city.name} にリンク。")
-
-    # 3. 鈴木さん -> Mr.Children (新しい推し)
-    user3 = user_map.get("鈴木_桜井さん推し")
-    category_mrchildren = db.query(models.HobbyCategory).filter(models.HobbyCategory.name == "Mr.Children").first()
-    if user3 and category_mrchildren:
-        link = models.UserHobbyLink(user_id=user3.id, hobby_category_id=category_mrchildren.id)
-        db.add(link)
-        print(f"  -> {user3.nickname} を Category: {category_mrchildren.name} (入推し) にリンク。")
-
-
-    db.commit() 
-    print("\n✅ 初期データ投入が完了しました。")
-
+    print("✅ 全ての初期設定が完了しました！")
 
 if __name__ == "__main__":
     db = Session(bind=engine)
-    
-    # 💡 最初にパスワードハッシュ化関数が app.utils.security に存在することを確認してください
-    if 'get_password_hash' not in locals():
-        print("\n🚨 エラー: パスワードハッシュ化関数 (get_password_hash) が見つかりません。")
-        print("   utils/security.py が存在し、この関数が定義されていることを確認してください。")
-        sys.exit(1)
-        
     try:
-            create_initial_data(db)
+        create_initial_data(db)
     except Exception as e:
         db.rollback()
-        print(f"\n❌ エラーが発生しました: {e}")
+        print(f"❌ エラー発生: {e}")
     finally:
         db.close()

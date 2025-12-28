@@ -59,49 +59,50 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                     </div>
                 )}
 
-                <div className="space-y-2"> {/* リストの間隔を狭くしました */}
+                <div className="space-y-2">
                     {friendMoods.map((friendMood) => {
-                        const moodInfo = MOOD_TYPES[friendMood.current_mood] || { 
-                            label: '不明', 
-                            emoji: '🤔' 
-                        };
+                        // 気分データの詳細を取得
+                        const moodDetail = MOOD_TYPES[friendMood.current_mood] || 
+                            { label: '不明', emoji: '🤔' };
                         
                         return (
                             <div 
                                 key={friendMood.user_id} 
-                                className="bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-100 hover:border-pink-200 transition duration-150"
+                                className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-150"
                             >
-                                {/* 💡 横一列（flex）に配置 */}
-                                <div className="flex items-center gap-3 text-sm md:text-base">
-                                    
-                                    {/* 1. 名前（メモ）: 絵文字 */}
-                                    <span className="font-bold text-gray-800 shrink-0">
-                                        {(() => {
-                                            const name = friendMood.nickname || (friendMood.email ? friendMood.email.split('@')[0] : 'ユーザー');
-                                            const memo = friendMood.friend_note ? `（${friendMood.friend_note}）` : "";
-                                            return `${name}${memo}`;
-                                        })()}
-                                        <span className="ml-1">: {moodInfo.emoji}</span>
+                                <div className="flex items-center overflow-hidden flex-1">
+                                    {/* 1. 日付（マイページに合わせて一番左へ） */}
+                                    <span className="text-xs text-gray-500 mr-4 shrink-0">
+                                        {friendMood.mood_updated_at && new Date(friendMood.mood_updated_at).toLocaleString('ja-JP', {
+                                            month: 'numeric',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}
                                     </span>
 
-                                    {/* 2. 気分のラベル */}
-                                    <span className="text-gray-600 shrink-0 font-medium">
-                                        {moodInfo.label}
-                                    </span>
-
-                                    {/* 3. コメント（あれば） */}
-                                    {friendMood.current_mood_comment && (
-                                        <span className="text-gray-500 truncate italic border-l pl-3 hidden sm:inline">
-                                            {friendMood.current_mood_comment}
+                                    {/* 2. ユーザー名・気分・コメントを1列に */}
+                                    <p className="text-sm font-medium text-gray-800 flex items-center min-w-0 truncate">
+                                        {/* 名前（メモ） */}
+                                        <span className="shrink-0 font-bold mr-2">
+                                            {(() => {
+                                                const name = friendMood.nickname || (friendMood.email ? friendMood.email.split('@')[0] : 'ユーザー');
+                                                const memo = friendMood.friend_note ? `（${friendMood.friend_note}）` : "";
+                                                return `${name}${memo}`;
+                                            })()}
                                         </span>
-                                    )}
 
-                                    {/* 4. 更新時間（右端に小さく） */}
-                                    {friendMood.mood_updated_at && (
-                                        <span className="text-[10px] text-gray-300 ml-auto shrink-0">
-                                            {new Date(friendMood.mood_updated_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
-                                    )}
+                                        {/* 気分絵文字とラベル */}
+                                        <span className="text-lg mr-2 shrink-0">{moodDetail.emoji}</span>
+                                        <span className="shrink-0">{moodDetail.label}</span>
+
+                                        {/* コメント */}
+                                        {friendMood.current_mood_comment && (
+                                            <span className="text-sm text-gray-600 ml-2 truncate">
+                                                : {friendMood.current_mood_comment}
+                                            </span>
+                                        )}
+                                    </p>
                                 </div>
                             </div>
                         );

@@ -58,6 +58,7 @@ class HobbyCategory(Base):
     depth = Column(Integer, nullable=False) # 👈 階層番号 (0: Root/Category, 4: Mrs.GREEN APPLE)
     
     # 💡 新規追加: role_type カラムを追加
+    unique_code = Column(String(7), unique=True, index=True)
     role_type = Column(SQLEnum(HobbyRoleType), nullable=True)
     
     # 既存の fields を保持
@@ -370,6 +371,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     
     # 基本情報
+    public_code = Column(String(7), unique=True, index=True)
     username = Column(String(50), unique=True, index=True)
     email = Column(String(120), unique=True, index=True)
     hashed_password = Column(String(255))

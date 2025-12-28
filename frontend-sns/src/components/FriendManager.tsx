@@ -19,7 +19,8 @@ const UserSearch: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [results, setResults] = useState<UserProfileType[]>([]);
     const [loading, setLoading] = useState(false);
-    const [status, setStatus] = useState<Record<number, 'sent' | 'pending'>>();
+    // ✅ 型を修正
+    const [status, setStatus] = useState<Record<number, 'sent' | 'pending'>>({});
 
     const handleSearch = async () => {
         if (!searchQuery.trim()) return;
@@ -33,14 +34,16 @@ const UserSearch: React.FC = () => {
     };
 
     const handleSend = async (id: number, name: string) => {
-        if (status?.[id]) return;
+        if (status[id]) return;
         setStatus({ ...status, [id]: 'pending' });
         try {
             await sendFriendRequest(id);
             setStatus({ ...status, [id]: 'sent' });
             alert(`${name} に申請しました`);
         } catch {
-            setStatus({ ...status, [id]: undefined });
+            const newStatus = { ...status };
+            delete newStatus[id];
+            setStatus(newStatus);
             alert('送信に失敗しました');
         }
     };
@@ -69,10 +72,10 @@ const UserSearch: React.FC = () => {
                         </div>
                         <button
                             onClick={() => handleSend(u.id, u.nickname || u.username)}
-                            disabled={!!status?.[u.id]}
+                            disabled={!!status[u.id]}  // <- u.id に修正
                             className="bg-pink-100 px-3 py-1 rounded"
                         >
-                            {status?.[u.id] === 'sent' ? '申請済み' : 'フレンド申請'}
+                            {status[u.id] === 'sent' ? '申請済み' : 'フレンド申請'}
                         </button>
                     </li>
                 ))}
@@ -119,7 +122,6 @@ const RequestList: React.FC = () => {
 ====================== */
 const FriendList: React.FC = () => {
     const [friends, setFriends] = useState<any[]>([]);
-    // 💡 編集中のメモを一時保存する状態
     const [editingNotes, setEditingNotes] = useState<Record<number, string>>({});
 
     const load = async () => {
@@ -152,9 +154,7 @@ const FriendList: React.FC = () => {
                             {(() => {
                                 const fInfo = f.friend;
                                 if (!fInfo) return "読み込み中...";
-                                // 💡 1. ニックネームがあれば最優先
                                 if (fInfo.nickname) return fInfo.nickname;
-                                // 💡 2. なければメールアドレスの @ より前を表示
                                 if (fInfo.email) return fInfo.email.split('@')[0];
                                 return fInfo.username;
                             })()}
@@ -170,7 +170,6 @@ const FriendList: React.FC = () => {
                                     [f.id]: e.target.value
                                 })}
                             />
-                            {/* 💡 保存ボタンを設置 */}
                             <button 
                                 onClick={() => handleSaveNote(f.id)}
                                 className="bg-blue-500 text-white text-xs px-2 py-1 rounded hover:bg-blue-600"

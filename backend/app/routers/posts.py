@@ -4,7 +4,7 @@ from sqlalchemy import func
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
-from .. import models
+from .. import models, schemas
 from ..database import get_db
 from .auth import get_current_user
 # 💡 修正点: create_region_notifications_for_post をインポート
@@ -19,7 +19,11 @@ from ..schemas.posts import (
     AllPostCreate
 )
 
-router = APIRouter(tags=["posts"])
+router = APIRouter(
+    # prefix="/posts" をもし書いていたら、消すか確認してください。
+    # main.py側で app.include_router(posts.router) と呼んでいる場合
+    tags=["posts"]
+)
 
 # ==========================================
 # 💡 共通スキーマ
@@ -210,6 +214,19 @@ def get_hobby_posts(
     
     return posts
 
+# backend/app/routers/posts.py 内の追加した関数
+@router.get("/posts/category/{category_id}", response_model=List[schemas.HobbyPostResponse])
+def get_posts_by_category(category_id: int, db: Session = Depends(get_db)):
+    posts = db.query(models.HobbyPost).filter(
+        models.HobbyPost.hobby_category_id == category_id
+    ).order_by(models.HobbyPost.created_at.desc()).all()
+    
+    for post in posts:
+        user = db.query(models.User).filter(models.User.id == post.user_id).first()
+        post.author_nickname = user.nickname if user else "Unknown"
+        post.public_code = user.public_code if user else "-------" # ✅ これで表示される
+    return posts
+
 @router.get("/posts/{post_id}", response_model=HobbyPostResponse, tags=["posts"])
 def get_hobby_post_detail(post_id: int, db: Session = Depends(get_db)):
     """投稿の詳細"""
@@ -305,3 +322,4 @@ def get_post_responses(post_id: int, db: Session = Depends(get_db)):
         res.author_nickname = user.nickname if user else "Unknown"
         
     return responses
+
