@@ -1,13 +1,15 @@
+// frontend-sns/src/main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-// 💡 修正: AppLayout.tsxのパスを './AppLayout.tsx' から絶対パス './AppLayout.tsx' へ変更
+import { BrowserRouter } from 'react-router-dom'; // 💡 追加
 import AppLayout from './AppLayout.tsx'; 
-// Tailwind CSSのベーススタイルを読み込み 
 import './index.css'; 
 
-// ReactアプリケーションをHTMLの 'root' 要素にマウントする
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AppLayout />
+    {/* 💡 BrowserRouter で AppLayout を囲む */}
+    <BrowserRouter>
+      <AppLayout />
+    </BrowserRouter>
   </React.StrictMode>,
 );
