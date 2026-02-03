@@ -9,22 +9,24 @@ from datetime import datetime
 # ==========================================
 
 class HobbyCategoryBase(BaseModel):
-    """全階層（Category, Role, Genre, Group）で共通のベーススキーマ"""
+    """全階層で共通のベーススキーマ"""
     id: int
     name: str
     parent_id: Optional[int]
-    # depth はシードで 0, 1, 2, 3 の値が設定されています
+    
+    # 💡 街の戦略：マスターIDを追加
+    # これにより、分身（エイリアス）から本尊（マスター）への道筋がフロントに伝わります
+    master_id: Optional[int] = None 
+    
     depth: int 
-    
-    # Level 1 (Role)でのみ使用される role_type を追加
     role_type: Optional[str] = None 
-    
     description: Optional[str] = None
     created_at: datetime
-    
-    # 参加人数（計算で取得するフィールドとして定義）
     member_count: Optional[int] = 0
     
+    # 💡 unique_code もフロントで表示に使っているので追加しておきましょう
+    unique_code: Optional[str] = None 
+
     class Config:
         from_attributes = True
 

@@ -2,7 +2,7 @@ import enum
 from typing import Optional
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, ForeignKey, Float, Date, Text, 
-    Enum as SQLEnum, PrimaryKeyConstraint, 
+    Enum as SQLEnum, PrimaryKeyConstraint, Boolean, 
     UniqueConstraint 
 )
 from sqlalchemy.orm import relationship
@@ -49,24 +49,43 @@ class FriendRequestStatus(str, enum.Enum):
 # ==========================================
 
 # 【多層ツリー構造】Category, Role, Genre, HobbyGroup を統合
+# backend/app/models.py
+
 class HobbyCategory(Base):
     __tablename__ = "hobby_categories"
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), index=True) 
-    parent_id = Column(Integer, ForeignKey('hobby_categories.id'), nullable=True) # 👈 親ノードへの参照
-    depth = Column(Integer, nullable=False) # 👈 階層番号 (0: Root/Category, 4: Mrs.GREEN APPLE)
+    parent_id = Column(Integer, ForeignKey('hobby_categories.id'), nullable=True)
+    depth = Column(Integer, nullable=False)
     
-    # 💡 新規追加: role_type カラムを追加
+    # 💡 1. マスター（本尊）へのリンクを追加
+    # これにより「ブランチ（出張所）」が「マスター（本尊）」を指せるようになります
+    master_id = Column(Integer, ForeignKey('hobby_categories.id'), nullable=True)
+    
     unique_code = Column(String(7), unique=True, index=True)
     role_type = Column(SQLEnum(HobbyRoleType), nullable=True)
     
-    # 既存の fields を保持
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # リレーション
-    parent = relationship("HobbyCategory", remote_side=[id], backref="children", uselist=False)
+    parent = relationship(
+        "HobbyCategory", 
+        remote_side=[id], 
+        backref="children", 
+        uselist=False,
+        foreign_keys=[parent_id]  # 👈 親子関係にはこれを使うと明示
+    )
+    
+    # 💡 2. マスター情報を取得するためのリレーションを追加
+    # remote_side=[id] を使うことで、自分自身のテーブル内で親子やマスターを表現できます
+    master = relationship(
+        "HobbyCategory", 
+        remote_side=[id], 
+        foreign_keys=[master_id], # 👈 マスターリンクにはこれを使うと明示
+        backref="aliases"
+    )
     
     # 以前の HobbyGroup に相当するリレーション
     members = relationship("UserHobbyLink", back_populates="hobby_category", cascade="all, delete-orphan")
@@ -178,32 +197,51 @@ class FriendRequest(Base):
 # ==========================================
 
 # 趣味グループへの投稿
+# ==========================================
+# 💡 3. 投稿機能 (修正版)
+# ==========================================
+
 class HobbyPost(Base):
     __tablename__ = "hobby_posts"
     
     id = Column(Integer, primary_key=True, index=True)
     content = Column(Text, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    
-    # 【修正】hobby_group_id を hobby_category_id に変更
     hobby_category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"))
+    is_system = Column(Boolean, default=False)
     
-    # 地域タグ（投稿者の居住地を自動付与）
+    # 地域タグ
     region_tag_pref = Column(String(50), index=True, nullable=True)
     region_tag_city = Column(String(100), index=True, nullable=True)
     
-    # Meet upイベント用フラグ
+    # --- 既存の Meet up用 ---
     is_meetup = Column(Boolean, default=False)
     meetup_date = Column(DateTime, nullable=True)
     meetup_location = Column(String(200), nullable=True)
     meetup_capacity = Column(Integer, nullable=True)
     
+    # MeetUpの詳細情報を格納するカラムを追加
+    meetup_fee_info = Column(Text, nullable=True)   # "施設代: 500円/人数" などのテキスト
+    meetup_status = Column(String(20), default="open") # 募集状況 (open/closed)
+    
+    # --- 💡 新規追加: 広告用 ---
+    is_ad = Column(Boolean, default=False)          # 有料広告フラグ
+    ad_end_date = Column(DateTime, nullable=True)   # 広告の掲載終了期限
+    
+    # --- 💡 新規追加: リポスト用 ---
+    # 自分自身のテーブル(hobby_posts)のIDを指す自己参照
+    original_post_id = Column(Integer, ForeignKey("hobby_posts.id"), nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
+    # リレーション
     user = relationship("User", back_populates="hobby_posts")
-    # 【修正】hobby_group を hobby_category に変更
     hobby_category = relationship("HobbyCategory", back_populates="posts")
     responses = relationship("PostResponse", back_populates="post", cascade="all, delete-orphan")
+    
+    # リポスト元の投稿を取得するためのリレーション
+    original_post = relationship("HobbyPost", remote_side=[id], backref="reposts")
+
 
 # 投稿への返信（PostResponse）
 class PostResponse(Base):
@@ -378,6 +416,16 @@ class User(Base):
     is_company = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     
+    # 生まれ年月 (統計用: 差別防止のため「日」は持たない)
+    birth_year_month = Column(String(7), nullable=True)  # 例: "1990-01"
+
+    # 性別 (統計用: 多様性に配慮)
+    # ここにEnumを定義するか、Stringで持つ
+    gender = Column(String(20), nullable=True)  # "male", "female", "other", "no_answer"
+    
+    # 統計グラフ公開への同意フラグ（任意）
+    is_stats_visible = Column(Boolean, default=True)
+    
     # SNS用プロフィール
     nickname = Column(String(100), unique=True, index=True, nullable=True) 
     prefecture = Column(String(50), index=True, nullable=True)
@@ -420,6 +468,10 @@ class User(Base):
     is_town_visible = Column(Boolean, default=True)          # Townの公開
     is_notification_visible = Column(Boolean, default=True)  # 通知情報の公開 (関わっている通知)
     
+    # 💡 安全機能用のカラム
+    is_restricted = Column(Boolean, default=False) # 通報累計などで自動的にTrueにする用
+    report_count = Column(Integer, default=0)      # 被通報合計数
+
     # 現在の感情状態（最新のMood Logから自動更新）
     current_mood = Column(SQLEnum(MoodType), default=MoodType.NEUTRAL) 
     current_mood_comment = Column(String(200), nullable=True)
@@ -450,4 +502,27 @@ class User(Base):
     
     # 感情ログ（最新3ヶ月/1000件まで保持）
     mood_logs = relationship("MoodLog", back_populates="user", order_by="desc(MoodLog.created_at)")
+
+# ==========================================
+# 💡 9. 安全機能 (Report / Block)
+# ==========================================
+
+class PostReport(Base):
+    __tablename__ = "post_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reporter_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=False)
     
+    # 通報理由（任意）
+    reason = Column(String(200), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # リレーション
+    reporter = relationship("User", foreign_keys=[reporter_id])
+    post = relationship("HobbyPost")
+
+    # 同じ人が同じ投稿を何度も通報できないようにする
+    __table_args__ = (
+        UniqueConstraint('reporter_id', 'post_id', name='unique_report_per_user'),
+    )

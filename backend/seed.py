@@ -96,48 +96,113 @@ def build_hierarchy():
         japan_children.append({"name": pref["name"], "prefix": "R", "children": cities})
 
     return [
+        # --- 1. MUSIC (グローバル・ブランド戦略) ---
         {
-            "name": "MUSIC", "prefix": "M",
+            "name": "MUSIC (音楽)", "prefix": "M",
             "children": [
-                {"name": "DOer (演奏)", "role_type": models.HobbyRoleType.DOERS, "children": [
-                    {"name": "J-POP", "children": [{"name": "Band (バンド)", "children": [{"name": "Bass"}, {"name": "Drums"}, {"name": "Guitar"}]}]},
-                    {"name": "J-ROCK", "children": [{"name": "Band (バンド)", "children": [{"name": "Bass"}, {"name": "Drums"}, {"name": "Guitar"}]}]},
-                    {"name": "JAZZ"}, {"name": "POP"}, {"name": "ROCK"}
+                {"name": "DOer (演奏者)", "role_type": models.HobbyRoleType.DOERS, "children": [
+                    {"name": "Instrumental (楽器)", "children": [{"name": "Piano"}, {"name": "Guitar"}, {"name": "Drums"}]},
+                    {"name": "Composer (作曲・DTM)"}
                 ]},
                 {"name": "FANs (推し)", "role_type": models.HobbyRoleType.FANS, "children": [
-                    {"name": "J-POP", "children": [{"name": "Mr.Children"}, {"name": "スピッツ (SPITZ)"}, {"name": "平井 堅 (Ken Hirai)"}]},
-                    {"name": "J-ROCK", "children": [{"name": "B'z"}]},
-                    {"name": "JAZZ"}, {"name": "POP"}, {"name": "ROCK"}
+                    {"name": "J-POP / Idol", "children": [
+                        {"name": "DOMOTO (KinKi Kids)", "children": [{"name": "堂本光一"}, {"name": "堂本剛"}]},
+                        {"name": "Southern All Stars", "children": [{"name": "桑田佳祐"}]},
+                        {"name": "Mr.Children"}, {"name": "Snow Man"}
+                    ]},
+                    {"name": "J-ROCK", "children": [{"name": "B'z"}, {"name": "GLAY"}, {"name": "ONE OK ROCK"}]},
+                    {"name": "Global Styles", "children": [{"name": "ROCK"}, {"name": "POP"}, {"name": "JAZZ"}, {"name": "K-POP"}]}
                 ]}
             ]
         },
+# seed.py の build_hierarchy 内、VIDEO & ENT セクション
+
+        # --- 2. VIDEO & ENTERTAINMENT (映像・コンテンツ) ---
         {
-            "name": "SPORT (スポーツ)", "prefix": "S",
+            "name": "VIDEO & ENT (映像・発信)", "prefix": "V",
             "children": [
-                {"name": "DOer (する人)", "role_type": models.HobbyRoleType.DOERS, "children": [{"name": "Baseball (野球)"}, {"name": "Basketball (バスケ)"}, {"name": "Soccer (サッカー)"}]},
-                {"name": "FANs (観る人)", "role_type": models.HobbyRoleType.FANS, "children": [{"name": "Baseball", "children": [{"name": "大谷 翔平 (Shohei Otani)"}]}, {"name": "Basketball"}, {"name": "Soccer"}]}
+                {"name": "DOer (制作・演劇)", "role_type": models.HobbyRoleType.DOERS, "children": [
+                    {"name": "Acting (演技・舞台)"}, {"name": "Video Making (制作・配信)"}
+                ]},
+                {"name": "FANs (推し)", "role_type": models.HobbyRoleType.FANS, "children": [
+                    # 💡 戦略ポイント：先に「人(本尊)」を定義する
+                    {"name": "Performers (出演・発信者)", "children": [
+                        {"name": "岡田斗司夫 (Toshio Okada)"}, # 👈 ここが自動的に ID:1 (本尊) になる
+                        {"name": "Robert De Niro"}, 
+                        {"name": "Tatsuya Fujiwara (藤原竜也)"},
+                        {"name": "佐藤健 (Takeru Sato)"}
+                    ]},
+                    
+                    # その後に「番組(分身)」を定義する
+                    {"name": "Programs (作品・番組)", "children": [
+                        {"name": "Movies (映画)"}, 
+                        {"name": "TV / Drama", "children": [
+                            {"name": "るろうに剣心", "children": [{"name": "佐藤健 (Takeru Sato)"}]} # 👈 自動で本尊へリンク
+                        ]}, 
+                        {
+                            "name": "YouTube / Online", 
+                            "children": [
+                                {
+                                    "name": "OTAKING", 
+                                    "children": [{"name": "岡田斗司夫 (Toshio Okada)"}] # 👈 自動で本尊へリンク
+                                }
+                            ]
+                        }
+                    ]}
+                ]}
             ]
         },
+        # --- 3. ANIME & MANGA (ジブリの独立) ---
         {
-            "name": "REGIONS (地域)", "prefix": "R",
+            "name": "ANIME & MANGA", "prefix": "A",
             "children": [
-                {"name": "日本 (Japan)", "children": japan_children},
-                {"name": "France (フランス)"}, {"name": "USA (アメリカ)"}
+                {"name": "Studio Ghibli (ジブリ)", "children": [{"name": "宮崎 駿 作品"}, {"name": "高畑 勲 作品"}]},
+                {"name": "Popular Works", "children": [{"name": "One Piece"}, {"name": "NARUTO"}, {"name": "Demon Slayer"}]}
             ]
-        }
+        },
+        # --- 4. LIFESTYLE (ファッション・グルメ) ---
+        {
+            "name": "LIFESTYLE", "prefix": "L",
+            "children": [
+                {"name": "Fashion", "children": [{"name": "Luxury Brands (CHANEL/DIOR)"}, {"name": "Handmade (ハンドメイド)"}]},
+                {"name": "Gourmet (グルメ)"}, {"name": "Travel (旅行)"}
+            ]
+        },
+        # --- 5~8. 他 (GAMES, SPORT, REGIONS, FESTIVALS) ---
+        # ※既存の構成を維持、FESTIVALSを独立させるのが今後の戦略です
+        { "name": "GAMES", "prefix": "G", "children": [{"name": "eSports"}, {"name": "Pokemon"}] },
+        { "name": "SPORT", "prefix": "S", "children": [{"name": "Baseball (Shohei Ohtani)"}, {"name": "Soccer"}] },
+        { "name": "REGIONS (地域)", "prefix": "R", "children": japan_children },
+        { "name": "FESTIVALS (お祭り)", "prefix": "F", "children": [{"name": "Traditional (伝統祭り)"}, {"name": "Events (イベント)"}] }
     ]
 
-# --- [4. 再帰挿入関数] ---
+# --- [4. リンク対応・再帰挿入関数] ---
+# 💡 名前とIDの対応を一時的に保持するメモ
+name_to_id_map = {}
+
 def insert_category(db: Session, data: dict, parent_id: Optional[int] = None, depth: int = 0, default_prefix: str = ""):
+    global name_to_id_map
     prefix = data.get("prefix", default_prefix)
+    name = data["name"]
+
+    # 💡 街の戦略：同じ名前が既に登録されていれば、それをマスターとする
+    master_id = name_to_id_map.get(name)
+
     new_cat = models.HobbyCategory(
-        name=data["name"],
+        name=name,
         parent_id=parent_id,
+        master_id=master_id,  # 👈 ここでマスターを紐付け
         depth=depth,
         role_type=data.get("role_type"),
         unique_code=generate_code(prefix=prefix)
     )
-    db.add(new_cat); db.flush()
+    db.add(new_cat)
+    db.flush()
+
+    # 💡 初めて登録した名前なら、自分のIDをメモに残す
+    if name not in name_to_id_map:
+        name_to_id_map[name] = new_cat.id
+
     if "children" in data:
         for child in data["children"]:
             insert_category(db, child, new_cat.id, depth + 1, prefix)
@@ -148,8 +213,13 @@ def create_initial_data(db: Session):
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     
-    print("--- カテゴリ投入中 (日本全国・併記・コード付与) ---")
+    print("--- カテゴリ投入中 (日本全国・リンク対応) ---")
     hierarchy = build_hierarchy()
+    
+    # グローバルなメモをリセット
+    global name_to_id_map
+    name_to_id_map = {}
+    
     for item in hierarchy:
         insert_category(db, item)
     

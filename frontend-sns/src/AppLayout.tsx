@@ -1,14 +1,13 @@
-// frontend-sns/src/AppLayout.tsx
-
 import React, { useState, useEffect } from 'react';
-import UserProfile from './components/UserProfile.tsx';
-import HomeFeed from './components/HomeFeed.tsx';
-import { authApi, UserProfile as UserProfileType } from './api.ts';
-import FriendManager from './components/FriendManager.tsx';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import CommunityList from './components/CommunityList.tsx'; // ✅ 追加
-import CommunityDetail from './components/CommunityDetail.tsx';
+import UserProfile from './components/UserProfile';
+import HomeFeed from './components/HomeFeed';
+import FriendManager from './components/FriendManager';
+import CommunityList from './components/CommunityList';
+import CommunityDetail from './components/CommunityDetail';
+import { authApi, UserProfile as UserProfileType } from './api';
 
+// 💡 TypeScriptのエラー を防ぐための完全な初期値
 const initialProfile: UserProfileType = {
     id: 0,
     username: 'loading',
@@ -28,7 +27,10 @@ const initialProfile: UserProfileType = {
     is_mood_visible: true,
     current_mood: 'neutral', 
     current_mood_comment: null,
-    mood_updated_at: null, // ✅ 追加
+    mood_updated_at: null,
+    // 💡 以下の2行を追加することで api.ts との不整合を解消
+    birth_year_month: null,
+    gender: null
 };
 
 const Header: React.FC = () => {
@@ -41,31 +43,11 @@ const Header: React.FC = () => {
                 <Link to="/" className="text-2xl font-extrabold text-pink-600 tracking-wider">
                     推し道 (Osidou.com)
                 </Link>
-                <nav className="space-x-4">
-                    <Link
-                        to="/"
-                        className={`text-gray-600 hover:text-pink-600 ${isActive('/') ? 'font-bold border-b-2 border-pink-600' : ''}`}
-                    >
-                        ホーム
-                    </Link>
-                    <Link
-                        to="/community"
-                        className={`text-gray-600 hover:text-pink-600 ${isActive('/community') ? 'font-bold border-b-2 border-pink-600' : ''}`}
-                    >
-                        コミュニティ
-                    </Link>
-                    <Link
-                        to="/friends"
-                        className={`text-gray-600 hover:text-pink-600 ${isActive('/friends') ? 'font-bold border-b-2 border-pink-600' : ''}`}
-                    >
-                        ともだち
-                    </Link>
-                    <Link
-                        to="/mypage"
-                        className={`text-gray-600 hover:text-pink-600 ${isActive('/mypage') ? 'font-bold border-b-2 border-pink-600' : ''}`}
-                    >
-                        マイページ
-                    </Link>
+                <nav className="space-x-4 text-sm sm:text-base">
+                    <Link to="/" className={`text-gray-600 hover:text-pink-600 ${isActive('/') ? 'font-bold border-b-2 border-pink-600' : ''}`}>HOME</Link>
+                    <Link to="/community" className={`text-gray-600 hover:text-pink-600 ${isActive('/community') ? 'font-bold border-b-2 border-pink-600' : ''}`}>コミュニティ</Link>
+                    <Link to="/friends" className={`text-gray-600 hover:text-pink-600 ${isActive('/friends') ? 'font-bold border-b-2 border-pink-600' : ''}`}>ともだち</Link>
+                    <Link to="/mypage" className={`text-gray-600 hover:text-pink-600 ${isActive('/mypage') ? 'font-bold border-b-2 border-pink-600' : ''}`}>MY PAGE</Link>
                 </nav>
             </div>
         </header>
@@ -100,9 +82,25 @@ const AppLayout: React.FC = () => {
         }
     };
 
+// frontend-sns/src/AppLayout.tsx
+
     useEffect(() => {
-        localStorage.setItem('access_token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiZXhwIjoxNzY3MDE3OTk0fQ.W_UidpWLuli_TG9FcNwhPhTY253P9bQfHT3u8Rs3044'); 
-        fetchProfile();
+        const initializeApp = async () => {
+            // 💡 開発用の強制トークンセット
+            // 先ほど取得した access_token をここに貼り付けます
+            const devToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiZXhwIjoxNzcwMjA2MTk4fQ.oqpXLkP1aicDcInpJ0SbKlbx7fIQfV3WP-haTZ7hEf4";
+
+            if (devToken) {
+                // api.ts が見に行く 'access_token' というキー名で保存
+                localStorage.setItem('access_token', devToken);
+                console.log("🛠️ 開発用トークンをセットしました");
+            }
+
+            // トークンがセットされた後にプロフィールを取得
+            await fetchProfile();
+        };
+
+        initializeApp();
     }, []);
 
     const renderContent = () => {
@@ -113,20 +111,10 @@ const AppLayout: React.FC = () => {
             <Routes>
                 <Route path="/" element={<HomeFeed profile={profile} />} />
                 <Route path="/friends" element={<FriendManager />} />
-                <Route path="/mypage" element={
-                    <UserProfile 
-                        profile={profile} 
-                        fetchProfile={fetchProfile} 
-                    />
-                } />
-                <Route path="/profile/:userId" element={
-                    <UserProfile 
-                        profile={profile} 
-                        fetchProfile={fetchProfile} 
-                    />
-                } />
-                <Route path="/community" element={<CommunityList />} /> // ← さっき作った検索機能付きの「本物の画面」
-                <Route path="/community/:categoryId" element={<CommunityDetail />} /> {/* ✅ 追加 */}
+                <Route path="/mypage" element={<UserProfile profile={profile} fetchProfile={fetchProfile} />} />
+                <Route path="/profile/:userId" element={<UserProfile profile={profile} fetchProfile={fetchProfile} />} />
+                <Route path="/community" element={<CommunityList />} />
+                <Route path="/community/:categoryId" element={<CommunityDetail />} />
                 <Route path="*" element={<HomeFeed profile={profile} />} />
             </Routes>
         );
@@ -135,7 +123,7 @@ const AppLayout: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-100 font-sans pt-20">
             <Header /> 
-            <main className="container mx-auto">
+            <main className="container mx-auto px-4">
                 {renderContent()}
             </main>
             <Footer />

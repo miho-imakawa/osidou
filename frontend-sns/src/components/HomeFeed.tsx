@@ -25,29 +25,29 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     }, []);
     
     const MOOD_TYPES: Record<string, { label: string; emoji: string }> = {
-        'motivated': { label: 'やる気', emoji: '🔥' },
-        'excited': { label: 'ワクワク', emoji: '🤩' },
-        'happy': { label: 'ハッピー', emoji: '😊' },
-        'calm': { label: '落ち着き', emoji: '😌' },
-        'neutral': { label: '普通', emoji: '😐' },
-        'anxious': { label: '不安', emoji: '😟' },
-        'tired': { label: '疲労困憊', emoji: '😥' },
-        'sad': { label: '悲しい', emoji: '😭' },
-        'angry': { label: 'イライラ', emoji: '😠' },
-        'grateful': { label: '感謝', emoji: '🙏' },
+        'motivated': { label: 'メラメラ', emoji: '🔥' },
+        'excited':   { label: 'ワクワク', emoji: '🤩' },
+        'happy':     { label: 'ルンルン', emoji: '😊' },
+        'calm':      { label: 'ホッコリ', emoji: '😌' },
+        'neutral':   { label: 'ボチボチ', emoji: '😐' },
+        'anxious':   { label: 'モヤモヤ', emoji: '😟' },
+        'tired':     { label: 'ヘトヘト', emoji: '😥' },
+        'sad':       { label: 'ショボーン', emoji: '😭' },
+        'angry':     { label: 'プンプン', emoji: '😠' },
+        'grateful':  { label: 'ホロリ', emoji: '🙏' },
     };
 
     return (
         <div className="max-w-2xl mx-auto p-4 md:p-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-6">
-                ✨ ようこそ、{profile.nickname || profile.username}さん！
+                ✨ハロー、{profile.nickname || profile.username}
             </h1>
             
             <MoodInput onSuccess={loadMoods} />
 
             <div className="mt-8 space-y-8">
                 <h2 className="text-2xl font-semibold text-gray-800 border-b pb-2">
-                    ともだちのログ
+                    ともだち's LOG
                 </h2>
                 
                 {loading && <p className="text-gray-500">読み込み中...</p>}

@@ -59,6 +59,7 @@ export interface HobbyCategory {
     name: string;
     description: string | null;
     parent_id: number | null;
+    master_id?: number | null;
     depth: number;
     member_count: number;
     children: HobbyCategory[]; 
@@ -105,6 +106,8 @@ export interface UserProfile {
     prefecture: string | null;
     city: string | null;
     town: string | null;
+    birth_year_month: string | null; 
+    gender: string | null;           
 }
 
 // ✅ FriendRequest 型を追加
@@ -149,7 +152,8 @@ export interface UserMoodResponse {
 // ----------------------------------------------------
 
 export const fetchMyCategories = async (): Promise<HobbyCategory[]> => {
-    const response = await authApi.get<HobbyCategory[]>('/hobbies/my-categories');
+    // 💡 エンドポイントを /hobby-categories/my-communities に合わせる
+    const response = await authApi.get<HobbyCategory[]>('/hobby-categories/my-communities');
     return response.data;
 };
 
@@ -207,7 +211,10 @@ export const fetchMyFriends = async (): Promise<Friendship[]> => {
 
 // api.ts に追加
 
+// frontend-sns/src/api.ts
+
 export interface Post {
+    is_system: any;
     id: number;
     content: string;
     user_id: number;
@@ -215,19 +222,35 @@ export interface Post {
     author_nickname: string;
     public_code?: string;
     created_at: string;
-    response_count?: number;
-    participation_count?: number;
+    is_meetup: boolean;
+    is_ad: boolean;
+    meetup_date?: string;
+    meetup_location?: string;  // 追加
+    meetup_fee_info?: string;     // 💡 これを追記！
+    meetup_status?: string;       // 💡 ついでにステータスも追記しておくと安心です
+    meetup_capacity?: number;  // 追加
+    author_id?: number;          // 投稿者のID（CommunityChatの非表示機能で必要）
+    ad_end_date?: string;
+    response_count?: number;   // 追加
+    participation_count?: number; // 追加
+    region_tag_pref?: string;  // 追加
+    region_tag_city?: string;  // 追加
 }
 
 export interface PostCreate {
     content: string;
     hobby_category_id: number;
     is_meetup?: boolean;
+    is_ad?: boolean;      // 💡 追加
     meetup_date?: string;
-    meetup_location?: string;
-    meetup_capacity?: number;
+    ad_end_date?: string; // 💡 追加
+    is_system: boolean;
 }
 
+// --- 💡 参加状態用の型を新規追加 ---
+export interface JoinStatus {
+    is_joined: boolean;
+}
 // 投稿を作成する関数
 export const createPost = async (data: PostCreate): Promise<Post> => {
     const response = await authApi.post<Post>('/posts', data);
@@ -237,5 +260,72 @@ export const createPost = async (data: PostCreate): Promise<Post> => {
 // カテゴリの投稿一覧を取得する関数
 export const fetchPostsByCategory = async (categoryId: number): Promise<Post[]> => {
     const response = await authApi.get<Post[]>(`/posts/category/${categoryId}`);
+    return response.data;
+};
+
+// コミュニティに参加する
+export const joinCommunity = async (categoryId: number): Promise<void> => {
+    await authApi.post(`/hobby-categories/join/${categoryId}`);
+};
+
+// 参加状態を確認する
+export const fetchJoinStatus = async (categoryId: number): Promise<JoinStatus> => {
+    const response = await authApi.get<JoinStatus>(`/hobby-categories/check-join/${categoryId}`);
+    return response.data;
+};
+
+// 自分が参加しているコミュニティ一覧を取得する
+export const fetchMyCommunities = async (): Promise<HobbyCategory[]> => {
+    const response = await authApi.get<HobbyCategory[]>('/hobby-categories/my-communities');
+    return response.data;
+};
+
+// 投稿を通報する
+export const reportPost = async (postId: number): Promise<{ message: string }> => {
+    const response = await authApi.post(`/posts/${postId}/report`);
+    return response.data;
+};
+
+// コミュニティを退会する
+export const leaveCommunity = async (categoryId: number): Promise<void> => {
+    await authApi.delete(`/hobby-categories/leave/${categoryId}`);
+};
+
+// ----------------------------------------------------
+// 📌 住所・地域統計関連
+// ----------------------------------------------------
+
+export interface Prefecture {
+    id: number;
+    name: string;
+}
+
+export interface City {
+    id: number;
+    name: string;
+}
+
+export interface MemberCountResponse {
+    count: number;
+}
+
+// 都道府県一覧を取得
+export const fetchPrefectures = async (): Promise<Prefecture[]> => {
+    // 認証不要な場合は publicApi、必要な場合は authApi を使用
+    const response = await authApi.get<Prefecture[]>('/admin/address/prefectures');
+    return response.data;
+};
+
+// 市区町村一覧を取得
+export const fetchCities = async (prefectureId: number): Promise<City[]> => {
+    const response = await authApi.get<City[]>(`/admin/address/cities/${prefectureId}`);
+    return response.data;
+};
+
+// 地域メンバー数を取得
+export const fetchMemberCount = async (prefecture: string, city: string): Promise<MemberCountResponse> => {
+    const response = await authApi.get<MemberCountResponse>('/admin/address/member-count', {
+        params: { prefecture, city }
+    });
     return response.data;
 };

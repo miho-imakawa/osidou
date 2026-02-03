@@ -1,7 +1,7 @@
 // frontend-sns/src/components/MoodInput.tsx
 
 import React, { useState } from 'react';
-import { authApi } from '../api.ts'; // パスを修正
+import { authApi } from './api.ts'; // パスを修正
 import { Send, Smile } from 'lucide-react';
 
 const MOOD_TYPES = [

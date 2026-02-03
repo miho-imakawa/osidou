@@ -1,612 +1,292 @@
 import React, { useState, useEffect } from 'react';
-import { authApi, UserProfile as UserProfileType, fetchMyCategories, HobbyCategory, fetchMyMoodHistory, MoodLog } from '../api.ts';
-import MoodInput from './MoodInput.tsx';
-import { Mail, User, MapPin, Globe, Facebook, Twitter, Instagram, Bookmark, Edit, MessageSquare, AtSign, Clock, Heart } from 'lucide-react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
+import { 
+  User, Globe, Twitter, Facebook, Instagram, BookOpen,
+  Edit, MessageSquare, Heart, Download, Save, X, Eye, EyeOff, AtSign, MapPin, Clock
+} from 'lucide-react';
+
+import { 
+  authApi, 
+  fetchMyCategories, 
+  HobbyCategory, 
+  fetchMyMoodHistory, 
+  MoodLog 
+} from '../api'; 
 
 interface UserProfileProps {
-  profile: UserProfileType;
+  profile: any; 
   fetchProfile: () => void;
 }
 
-const MOOD_TYPES = [
-  { type: 'happy', label: 'ハッピー', emoji: '😊' },
-  { type: 'excited', label: 'ワクワク', emoji: '🤩' },
-  { type: 'calm', label: '落ち着き', emoji: '😌' },
-  { type: 'tired', label: '疲労困憊', emoji: '😥' },
-  { type: 'sad', label: '悲しい', emoji: '😭' },
-  { type: 'anxious', label: '不安', emoji: '😟' },
-  { type: 'angry', label: 'イライラ', emoji: '😠' },
-  { type: 'neutral', label: '普通', emoji: '😐' },
-  { type: 'grateful', label: '感謝', emoji: '🙏' },
-  { type: 'motivated', label: 'やる気', emoji: '🔥' },
-];
-
 const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProfile: fetchMyProfile }) => {
   const { userId } = useParams<{ userId: string }>();
+  const location = useLocation();
   
-  // 表示するプロフィール情報
-  const [displayProfile, setDisplayProfile] = useState<UserProfileType | null>(null);
+  const [displayProfile, setDisplayProfile] = useState<any>(null);
   const [isMe, setIsMe] = useState(true);
   const [loading, setLoading] = useState(true);
-  
-  // 編集モード
   const [isEditing, setIsEditing] = useState(false);
-  const [tempProfile, setTempProfile] = useState<UserProfileType | null>(null);
-  
-  // コミュニティ・履歴
+  const [tempProfile, setTempProfile] = useState<any>(null);
   const [myCategories, setMyCategories] = useState<HobbyCategory[]>([]);
-  const [moodHistory, setMoodHistory] = useState<MoodLog[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  
-  // フォロー状態
-  const [isFollowing, setIsFollowing] = useState(false);
-  
-  // 💡 追加: フレンド申請状態
-  const [incomingRequest, setIncomingRequest] = useState<any>(null);
-  const [friendStatus, setFriendStatus] = useState<'none' | 'friend' | 'muted' | 'hidden'>('none');
+  const [moodLogs, setMoodLogs] = useState<MoodLog[]>([]);
 
-  // 特定ユーザーのプロフィール取得
-  const fetchTargetUserProfile = async (id: string) => {
-    try {
-      setLoading(true);
-      const response = await authApi.get(`/users/${id}`);
-      setDisplayProfile(response.data);
-      setIsMe(false);
-      
-      // フォロー状態の確認（必要に応じてAPIを追加）
-      try {
-        const followResponse = await authApi.get(`/users/${id}/follow-status`);
-        setIsFollowing(followResponse.data.is_following || false);
-      } catch (err) {
-        console.log("フォロー状態の取得をスキップ");
-      }
-    } catch (err) {
-      console.error("ユーザー情報の取得に失敗しました", err);
-      setDisplayProfile(null);
-    } finally {
-      setLoading(false);
-    }
+  const getRankClasses = (count: number) => {
+    if (count >= 10000) return "bg-yellow-50 text-yellow-700 border-yellow-300 shadow-sm";
+    if (count >= 500) return "bg-pink-50 text-pink-700 border-pink-200";
+    return "bg-gray-50 text-gray-500 border-gray-100";
   };
 
-  // 初期ロード: URLパラメータに応じて自分 or 他人のプロフィールを表示
+  const getDynamicXIcon = (url: string | null) => {
+    const isThreads = url?.includes('threads.net');
+    return {
+      Icon: isThreads ? AtSign : Twitter,
+      label: isThreads ? 'Threads' : 'Twitter (X)',
+      classes: isThreads 
+        ? "bg-gray-800 text-white hover:bg-black" 
+        : "bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white"
+    };
+  };
+
   useEffect(() => {
     if (userId) {
-      // 他人のページ
-      fetchTargetUserProfile(userId);
+      const fetchTarget = async (id: string) => {
+        try {
+          setLoading(true);
+          const response = await authApi.get(`/users/${id}`);
+          setDisplayProfile(response.data);
+          setIsMe(false);
+        } finally { setLoading(false); }
+      };
+      fetchTarget(userId);
     } else {
-      // 自分のページ
       setDisplayProfile(myProfile);
-      setTempProfile({
-        ...myProfile,
-        is_mood_visible: myProfile.is_mood_visible ?? true,
-        is_member_count_visible: myProfile.is_member_count_visible ?? true
-      });
+      setTempProfile({ ...myProfile });
       setIsMe(true);
       setLoading(false);
     }
   }, [userId, myProfile]);
 
-  // コミュニティとログ履歴の取得
   useEffect(() => {
     if (!displayProfile?.id) return;
-    
     const loadData = async () => {
-      // コミュニティ取得（自分の場合のみ）
-      if (isMe) {
-        try {
-          const categories = await fetchMyCategories();
-          setMyCategories(categories);
-        } catch (err) {
-          console.error("Failed to fetch user categories:", err);
-        }
-      }
-      
-      // 気分ログ履歴取得
-      setHistoryLoading(true);
       try {
-        if (isMe) {
-          // 自分のログは全件取得
-          const history = await fetchMyMoodHistory();
-          const sortedHistory = history.sort((a, b) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-          setMoodHistory(sortedHistory);
-        } else {
-          // 他人のログは公開分のみ取得（APIで制御されている前提）
-          try {
-            const response = await authApi.get(`/users/${displayProfile.id}/mood-history`);
-            const sortedHistory = response.data.sort((a: MoodLog, b: MoodLog) => 
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            );
-            setMoodHistory(sortedHistory);
-          } catch (err) {
-            console.log("他人のログ履歴を取得できませんでした");
-            setMoodHistory([]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch mood history:", err);
-      } finally {
-        setHistoryLoading(false);
-      }
+        const categories = await fetchMyCategories();
+        const uniqueMap = new Map();
+        categories.forEach(cat => {
+          const key = cat.master_id || cat.id;
+          if (!uniqueMap.has(key)) { uniqueMap.set(key, cat); }
+        });
+        setMyCategories(Array.from(uniqueMap.values()));
+        const logs = await fetchMyMoodHistory();
+        setMoodLogs(logs);
+      } catch (err) { console.error(err); }
     };
-    
     loadData();
-  }, [displayProfile?.id, isMe]);
+  }, [displayProfile?.id, isMe, location.pathname]);
 
-  // 編集モードの変更を検知してログをリロード
-  useEffect(() => {
-    if (!isEditing && displayProfile?.id) {
-      const reloadHistory = async () => {
-        setHistoryLoading(true);
-        try {
-          const history = await fetchMyMoodHistory();
-          const sortedHistory = history.sort((a, b) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-          setMoodHistory(sortedHistory);
-        } catch (err) {
-          console.error("Failed to reload mood history:", err);
-        } finally {
-          setHistoryLoading(false);
-        }
-      };
-      reloadHistory();
-    }
-  }, [isEditing, displayProfile?.id]);
+  const groupedLogs = moodLogs.reduce((acc: any, log) => {
+    const date = new Date(log.created_at);
+    const monthKey = `${date.getFullYear()} - ${String(date.getMonth() + 1).padStart(2, '0')}`;
+    if (!acc[monthKey]) acc[monthKey] = [];
+    acc[monthKey].push(log);
+    return acc;
+  }, {});
 
-  // フォロー/アンフォロー
-  const handleFollowToggle = async () => {
-    if (!displayProfile?.id) return;
-    
-    try {
-      const response = await authApi.post(`/users/${displayProfile.id}/follow`);
-      const status = response.data.status;
-      setIsFollowing(status === 'followed');
-      fetchMyProfile();
-    } catch (error) {
-      console.error("フォロー操作に失敗しました:", error);
-    }
-  };
-  
-  // 💡 追加: フレンド申請の承認
-  const handleAcceptRequest = async () => {
-    if (!incomingRequest) return;
-    
-    try {
-      await authApi.put(`/friend_requests/${incomingRequest.id}/status`, {
-        status: 'accepted'
-      });
-      alert('フレンド申請を承認しました！');
-      setIncomingRequest(null);
-      setFriendStatus('friend');
-      fetchMyProfile();
-    } catch (error) {
-      console.error("承認に失敗しました:", error);
-      alert('承認に失敗しました');
-    }
-  };
-  
-  // 💡 追加: フレンド申請の拒否
-  const handleRejectRequest = async () => {
-    if (!incomingRequest) return;
-    
-    try {
-      await authApi.put(`/friend_requests/${incomingRequest.id}/status`, {
-        status: 'rejected'
-      });
-      alert('フレンド申請を拒否しました');
-      setIncomingRequest(null);
-    } catch (error) {
-      console.error("拒否に失敗しました:", error);
-      alert('拒否に失敗しました');
-    }
-  };
-  
-  // 💡 追加: 友達の非表示（友達解除）
-  const handleHideFriend = async () => {
-    if (!displayProfile?.id) return;
-    if (!confirm('この友達を非表示にしますか？（ホームから気分ログが消えます）')) return;
-    
-    try {
-      await authApi.put(`/users/${displayProfile.id}/friend-status`, {
-        action: 'hide'
-      });
-      setFriendStatus('hidden');
-      alert('友達を非表示にしました');
-      fetchMyProfile();
-    } catch (error) {
-      console.error("非表示に失敗しました:", error);
-      alert('非表示に失敗しました');
-    }
-  };
-  
-  // 💡 追加: 友達の更新停止（ミュート）
-  const handleMuteFriend = async () => {
-    if (!displayProfile?.id) return;
-    if (!confirm('この友達をミュートしますか？（気分ログの更新が停止します）')) return;
-    
-    try {
-      await authApi.put(`/users/${displayProfile.id}/friend-status`, {
-        action: 'mute'
-      });
-      setFriendStatus('muted');
-      alert('友達をミュートしました');
-      fetchMyProfile();
-    } catch (error) {
-      console.error("ミュートに失敗しました:", error);
-      alert('ミュートに失敗しました');
-    }
-  };
-  
-  // 💡 追加: 友達の通常状態に戻す
-  const handleUnmuteFriend = async () => {
-    if (!displayProfile?.id) return;
-    
-    try {
-      await authApi.put(`/users/${displayProfile.id}/friend-status`, {
-        action: 'unmute'
-      });
-      setFriendStatus('friend');
-      alert('ミュートを解除しました');
-      fetchMyProfile();
-    } catch (error) {
-      console.error("ミュート解除に失敗しました:", error);
-      alert('ミュート解除に失敗しました');
-    }
+  const toggleEdit = () => {
+    setTempProfile({ ...displayProfile });
+    setIsEditing(!isEditing);
   };
 
-  // プロフィール更新
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
     if (!tempProfile) return;
-    
     try {
-      const updateData = Object.fromEntries(
-        Object.entries(tempProfile)
-          .filter(([key, v]) => v !== null && v !== undefined)
-          .filter(([key]) => !['id', 'username', 'email', 'prefecture', 'city'].includes(key))
-      );
-      await authApi.put('/users/me', updateData);
-      setIsEditing(false);
+      await authApi.put('/users/me', tempProfile);
       fetchMyProfile();
-      console.log('プロフィールを更新しました！');
-    } catch (err) {
-      console.error('プロフィールの更新に失敗しました:', err);
-    }
-  };
-
-  const SNS_FIELDS = [
-    { key: 'x_url' as keyof UserProfileType, icon: Twitter, color: 'text-gray-900', label: 'X (Twitter)' },
-    { key: 'instagram_url' as keyof UserProfileType, icon: Instagram, color: 'text-pink-600', label: 'Instagram' },
-    { key: 'facebook_url' as keyof UserProfileType, icon: Facebook, color: 'text-blue-600', label: 'Facebook' },
-    { key: 'note_url' as keyof UserProfileType, icon: Globe, color: 'text-green-600', label: 'note' },
-    { key: 'threads_url' as keyof UserProfileType, icon: AtSign, color: 'text-gray-600', label: 'Threads' },
-  ];
-
-  const toggleEdit = () => setIsEditing(!isEditing);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const options: Intl.DateTimeFormatOptions = { 
-      year: 'numeric', 
-      month: 'numeric', 
-      day: 'numeric', 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    };
-    return date.toLocaleString('ja-JP', options);
+      setIsEditing(false);
+      alert("プロフィールを更新しました！");
+    } catch (err) { alert("更新に失敗しました。"); }
   };
 
   if (loading) return <div className="text-center py-10">読み込み中...</div>;
-  if (!displayProfile) return <div className="text-center py-10">ユーザーが見つかりません。</div>;
+  if (!displayProfile) return <div className="text-center py-10 text-gray-400">ユーザーが見つかりません。</div>;
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* ヘッダー */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <User className="text-pink-600" />
-          {displayProfile.nickname || displayProfile.username} のページ
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      {/* 🏰 Header */}
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
+          <User className="text-pink-600" size={32} />
+          {displayProfile.nickname || displayProfile.username} 's PAGE
         </h1>
-        
-        <div className="flex space-x-2">
-          {!isMe ? (
-            <>
-              {/* 💡 フレンド申請が届いている場合 */}
-              {incomingRequest && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleAcceptRequest}
-                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center gap-2 font-semibold"
-                  >
-                    承認
-                  </button>
-                  <button
-                    onClick={handleRejectRequest}
-                    className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg flex items-center gap-2 font-semibold"
-                  >
-                    拒否
-                  </button>
-                </div>
-              )}
-              
-              {/* 💡 友達の場合：管理ボタン */}
-              {friendStatus === 'friend' && !incomingRequest && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleMuteFriend}
-                    className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm"
-                  >
-                    ミュート
-                  </button>
-                  <button
-                    onClick={handleHideFriend}
-                    className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm"
-                  >
-                    非表示
-                  </button>
-                </div>
-              )}
-              
-              {/* 💡 ミュート中の場合 */}
-              {friendStatus === 'muted' && (
-                <button
-                  onClick={handleUnmuteFriend}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold"
-                >
-                  ミュート解除
-                </button>
-              )}
-              
-              {/* 💡 非表示中の場合 */}
-              {friendStatus === 'hidden' && (
-                <span className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg font-semibold">
-                  非表示中
-                </span>
-              )}
-              
-              {/* 💡 通常のフォローボタン（友達でない場合） */}
-              {friendStatus === 'none' && !incomingRequest && (
-                <button
-                  onClick={handleFollowToggle}
-                  className={`px-4 py-2 rounded-lg transition duration-150 flex items-center gap-2 text-white font-semibold ${
-                    isFollowing ? 'bg-gray-500 hover:bg-gray-600' : 'bg-red-500 hover:bg-red-600'
-                  }`}
-                >
-                  <Heart size={20} className={isFollowing ? 'text-white' : 'text-white fill-current'} />
-                  {isFollowing ? 'フォロー中' : 'フォローする'}
-                </button>
-              )}
-            </>
-          ) : (
-            <button
-              onClick={toggleEdit}
-              className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 flex items-center gap-2"
-            >
-              <Edit size={20} />
-              {isEditing ? '編集を終了' : 'プロフィール編集'}
-            </button>
-          )}
-        </div>
+        {isMe && (
+          <button onClick={toggleEdit} className="px-5 py-2.5 bg-pink-600 text-white rounded-2xl flex items-center gap-2 transition-all hover:bg-pink-700 shadow-md font-bold active:scale-95">
+            {isEditing ? <><X size={20}/> 戻る</> : <><Edit size={20}/> プロフィール編集</>}
+          </button>
+        )}
       </div>
 
-      {/* 編集モード */}
-      {isEditing && isMe && tempProfile ? (
-        <form onSubmit={handleUpdate} className="space-y-6 bg-white p-6 rounded-lg shadow">
-          <div className="border-b pb-4">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">基本情報</h2>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">
-                登録メールアドレス（変更不可）
-              </label>
-              <div className="mt-1 block w-full border border-gray-300 bg-gray-100 rounded-md shadow-sm p-2 text-gray-600">
-                {displayProfile.email}
+      {isEditing && tempProfile ? (
+        /* 🛠️ EDIT MODE */
+        <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 space-y-8 animate-in fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Nickname</label>
+                <input type="text" className="w-full p-4 bg-gray-50 rounded-[20px] border-none focus:ring-2 focus:ring-pink-500 font-bold" value={tempProfile.nickname || ''} onChange={e => setTempProfile({...tempProfile, nickname: e.target.value})} />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                {[
+                  { id: 'x', label: 'Twitter or Threads', urlKey: 'x_url', visibleKey: 'is_x_visible' },
+                  { id: 'facebook', label: 'Facebook', icon: Facebook, urlKey: 'facebook_url', visibleKey: 'is_facebook_visible' },
+                  { id: 'instagram', label: 'Instagram', icon: Instagram, urlKey: 'instagram_url', visibleKey: 'is_instagram_visible' },
+                  { id: 'note', label: 'note', icon: BookOpen, urlKey: 'note_url', visibleKey: 'is_note_visible' },
+                ].map((sns) => {
+                  const xConfig = sns.id === 'x' ? getDynamicXIcon(tempProfile.x_url) : null;
+                  const IconComp = sns.icon || xConfig?.Icon || Globe;
+                  return (
+                    <div key={sns.id} className="space-y-2">
+                      <div className="flex justify-between items-center px-1">
+                        <label className="text-[9px] font-bold text-gray-400 uppercase">{sns.id === 'x' ? xConfig?.label : sns.label}</label>
+                        <button type="button" onClick={() => setTempProfile({...tempProfile, [sns.visibleKey]: !tempProfile[sns.visibleKey]})} className={`flex items-center gap-1.5 text-[9px] font-bold px-2.5 py-1 rounded-full transition-colors ${tempProfile[sns.visibleKey] ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-400'}`}>
+                          {tempProfile[sns.visibleKey] ? <><Eye size={10}/> 公開</> : <><EyeOff size={10}/> 非公開</>}
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><IconComp size={16} /></div>
+                        <input type="text" placeholder={`https://...`} className="w-full p-3.5 pl-12 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-pink-500" value={tempProfile[sns.urlKey] || ''} onChange={e => setTempProfile({...tempProfile, [sns.urlKey]: e.target.value})} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">ニックネーム</label>
-              <input
-                type="text"
-                value={tempProfile.nickname || ''}
-                onChange={(e) => setTempProfile({ ...tempProfile, nickname: e.target.value })}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">自己紹介</label>
-              <textarea
-                value={tempProfile.bio || ''}
-                onChange={(e) => setTempProfile({ ...tempProfile, bio: e.target.value })}
-                rows={4}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-              ></textarea>
-            </div>
-          </div>
-          
-          <div className="border-b pb-4">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">SNSリンク</h2>
-            {SNS_FIELDS.map(({ key, label }) => (
-              <div key={key} className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">{label} URL</label>
-                <input
-                  type="url"
-                  value={(tempProfile[key] as string) || ''}
-                  onChange={(e) => setTempProfile({ ...tempProfile, [key]: e.target.value })}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                />
-              </div>
-            ))}
-          </div>
-
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 mb-4">公開設定</h2>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={tempProfile.is_mood_visible || false}
-                  onChange={(e) => setTempProfile({ ...tempProfile, is_mood_visible: e.target.checked })}
-                  className="h-4 w-4 text-pink-600 border-gray-300 rounded"
-                />
-                <span className="text-sm text-gray-700">今日の気分ログを他のユーザーに公開する</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={tempProfile.is_member_count_visible || false}
-                  onChange={(e) => setTempProfile({ ...tempProfile, is_member_count_visible: e.target.checked })}
-                  className="h-4 w-4 text-pink-600 border-gray-300 rounded"
-                />
-                <span className="text-sm text-gray-700">参加カテゴリの人数情報（地域人数など）を公開する</span>
-              </label>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-pink-600 text-white py-2 rounded-lg hover:bg-pink-700 font-semibold"
-          >
-            変更を保存
-          </button>
-        </form>
-      ) : (
-        // 表示モード
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2 bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">自己紹介</h2>
-              <p className="text-gray-700 whitespace-pre-wrap">
-                {displayProfile.bio || 'まだ自己紹介がありません。'}
-              </p>
-            </div>
-
-            <div className="md:col-span-1 bg-pink-50 p-6 rounded-lg shadow">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Bookmark className="text-pink-600" />
-                公開設定
-              </h2>
-              <div className="space-y-2 text-sm text-gray-700">
-                <p className="flex items-center gap-2">
-                  <span className="font-semibold">気分ログ:</span>
-                  <span className={displayProfile.is_mood_visible ? 'text-green-600' : 'text-gray-500'}>
-                    {displayProfile.is_mood_visible ? '公開中' : '非公開'}
-                  </span>
-                </p>
-              </div>
-              {isMe && (
-                <p className="text-xs text-gray-500 mt-4">
-                  メールアドレスや所在地情報はプロフィール編集画面でのみ確認できます。
-                </p>
-              )}
-            </div>
-          </div>
-
-          {isMe && (
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <MessageSquare className="text-pink-600" />
-                参加コミュニティ (Chat/掲示板)
-              </h2>
-              {myCategories.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {myCategories.map(cat => (
-                    <span key={cat.id} className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm">
-                      {cat.name}
-                    </span>
-                  ))}
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Birth</label>
+                  <input type="text" placeholder="1990-01" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" value={tempProfile.birth_year_month || ''} onChange={e => setTempProfile({...tempProfile, birth_year_month: e.target.value})} />
                 </div>
-              ) : (
-                <p className="text-gray-500 text-sm">
-                  まだ参加しているコミュニティはありません。
-                </p>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Gender</label>
+                  <select className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" value={tempProfile.gender || ''} onChange={e => setTempProfile({...tempProfile, gender: e.target.value})}>
+                    <option value="">未設定</option>
+                    <option value="male">男性</option>
+                    <option value="female">女性</option>
+                    <option value="other">その他</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1"><MapPin size={10} /> Residence Location</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input placeholder="Pref" className="p-3.5 bg-gray-50 rounded-2xl border-none text-xs focus:ring-2 focus:ring-pink-500" value={tempProfile.prefecture || ''} onChange={e => setTempProfile({...tempProfile, prefecture: e.target.value})} />
+                  <input placeholder="City" className="p-3.5 bg-gray-50 rounded-2xl border-none text-xs focus:ring-2 focus:ring-pink-500" value={tempProfile.city || ''} onChange={e => setTempProfile({...tempProfile, city: e.target.value})} />
+                  <input placeholder="Town" className="p-3.5 bg-gray-50 rounded-2xl border-none text-xs focus:ring-2 focus:ring-pink-500" value={tempProfile.town || ''} onChange={e => setTempProfile({...tempProfile, town: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Bio</label>
+                <textarea className="w-full p-5 bg-gray-50 rounded-[32px] border-none text-sm h-32 focus:ring-2 focus:ring-pink-500" value={tempProfile.bio || ''} onChange={e => setTempProfile({...tempProfile, bio: e.target.value})} />
+              </div>
+
+              <div className="pt-4 border-t border-gray-50">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" className="hidden" checked={tempProfile.is_mood_visible} onChange={e => setTempProfile({...tempProfile, is_mood_visible: e.target.checked})} />
+                  <div className={`p-2 rounded-xl transition-all ${tempProfile.is_mood_visible ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-400'}`}>
+                    {tempProfile.is_mood_visible ? <Eye size={18}/> : <EyeOff size={18}/>}
+                  </div>
+                  <span className="text-xs font-bold text-gray-500">Activity Logs を表示する</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <button onClick={handleSave} className="w-full py-5 bg-gray-900 text-white rounded-[24px] font-bold flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-[0.98]"><Save size={20} /> プロフィールを保存</button>
+        </div>
+      ) : (
+        /* 🏰 VIEW MODE */
+        <div className="space-y-6">
+          <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
+            <div className="flex flex-wrap gap-4 mb-6">
+              {displayProfile.x_url && displayProfile.is_x_visible !== false && (
+                <a href={displayProfile.x_url} target="_blank" rel="noopener noreferrer" className={`p-3 rounded-full transition-all shadow-sm ${getDynamicXIcon(displayProfile.x_url).classes}`}>{React.createElement(getDynamicXIcon(displayProfile.x_url).Icon, { size: 20 })}</a>
               )}
+              {displayProfile.facebook_url && displayProfile.is_facebook_visible !== false && (
+                <a href={displayProfile.facebook_url} target="_blank" rel="noopener noreferrer" className="p-3 bg-blue-50 rounded-full text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Facebook size={20} /></a>
+              )}
+              {displayProfile.instagram_url && displayProfile.is_instagram_visible !== false && (
+                <a href={displayProfile.instagram_url} target="_blank" rel="noopener noreferrer" className="p-3 bg-pink-50 rounded-full text-pink-600 hover:bg-pink-600 hover:text-white transition-all shadow-sm"><Instagram size={20} /></a>
+              )}
+              {displayProfile.note_url && displayProfile.is_note_visible !== false && (
+                <a href={displayProfile.note_url} target="_blank" rel="noopener noreferrer" className="p-3 bg-green-50 rounded-full text-green-600 hover:bg-green-600 hover:text-white transition-all shadow-sm"><BookOpen size={20} /></a>
+              )}
+            </div>
+            <div className="space-y-4">
+              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-base">{displayProfile.bio || '自己紹介はまだありません。'}</p>
+              {(displayProfile.prefecture || displayProfile.city) && (
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-300 uppercase tracking-widest border-t border-gray-50 pt-4"><MapPin size={12} /> {displayProfile.prefecture} {displayProfile.city} {displayProfile.town}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
+            <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]"><MessageSquare className="text-pink-600" size={14}/> Communities</h2>
+            <div className="flex flex-wrap gap-2">
+              {myCategories.length > 0 ? myCategories.map(cat => (
+                <Link key={cat.id} to={`/community/${cat.id}`} className={`px-4 py-1.5 rounded-full text-xs border flex items-center gap-3 font-bold shadow-sm transition-all hover:scale-105 ${getRankClasses(cat.member_count || 0)}`}>
+                  <span>{cat.name}</span>
+                  <div className="flex items-center gap-1 opacity-60 text-[10px] tabular-nums"><User size={10} strokeWidth={3} /><span>{(cat.member_count || 0).toLocaleString()}</span></div>
+                </Link>
+              )) : <p className="text-gray-400 text-xs italic">未参加</p>}
+            </div>
+          </div>
+
+          {/* 💓 Activity Logs (顔の色を出し、月表示を大きく) */}
+          {displayProfile.is_mood_visible && (
+            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-2"> {/* space-y-6 から 2 に変更 */}
+                <div className="flex justify-between items-center border-b border-gray-50 pb-2 mb-2"> {/* pb-4 mb-6 から変更 */}
+                  <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
+                    <Heart className="text-pink-600" size={14}/> Activity Logs
+                  </h2>
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm" onClick={() => alert("DL準備中")}>
+                          <Download size={14} /> <span>DL-200JPY</span>
+                        </button>
+                      </div>
+              
+            <div className="space-y-10"> {/* ここは月の間の余白なのでそのままか、お好みで調整 */}
+                  {Object.keys(groupedLogs).sort().reverse().map(month => (
+                    <div key={month} className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <div className="px-4 py-1.5 bg-gray-900 text-white text-[12px] font-black rounded-xl border border-gray-900 tracking-tight shadow-sm">{month}</div>
+                        <div className="flex-1 h-px bg-gray-100"></div>
+                      </div>
+                    <div className="space-y-4 pl-1">
+                      {groupedLogs[month].map((log: any) => {
+                        const date = new Date(log.created_at);
+                        const moodMap: any = { motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌', neutral: '😐', anxious: '😟', tired: '😥', sad: '😭', angry: '😠', grateful: '🙏' };
+                        return (
+                          <div key={log.id} className="flex items-center gap-5 text-sm">
+                            <div className="flex items-center gap-1 w-24 flex-shrink-0">
+                              <span className="text-[12px] font-black text-gray-800 tabular-nums">{String(date.getDate()).padStart(2, '0')}</span>
+                              <span className="text-[10px] font-bold text-gray-400 tabular-nums flex items-center gap-1 opacity-80"><Clock size={10} strokeWidth={3} />{date.getHours()}:{String(date.getMinutes()).padStart(2, '0')}</span>
+                            </div>
+                            {/* 💡 顔の色をグレースケール解除して可愛く */}
+                            <span className="text-xl transform hover:scale-125 transition-transform cursor-default">
+                              {moodMap[log.mood_type] || '✨'}
+                            </span>
+                            <p className="text-gray-500 font-semibold flex-1 truncate">{log.comment}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Globe className="text-pink-600" />
-              SNSリンク
-            </h2>
-            <div className="space-y-2">
-              {SNS_FIELDS.map(({ key, icon: Icon, color, label }) => {
-                const url = displayProfile[key] as string | null | undefined;
-                if (!url) return null;
-                return (
-                  <a
-                    key={key}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-blue-600 hover:underline"
-                  >
-                    <Icon size={20} className={color} />
-                    {label}
-                  </a>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            {isMe && !displayProfile.is_mood_visible && (
-              <div className="mb-4 text-sm text-center text-red-500 bg-red-50 p-4 rounded-lg">
-                現在、気分ログ履歴は非公開設定です。他のユーザーには表示されません。
-              </div>
-            )}
-
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Clock className="w-5 h-5 mr-2 text-pink-500" /> 
-              {isMe ? '自分の気分ログ履歴' : `${displayProfile.nickname || displayProfile.username}の気分ログ履歴`}
-            </h2>
-            
-            {historyLoading && <p className="text-gray-500">履歴を読み込み中...</p>}
-            
-            {!historyLoading && moodHistory.length === 0 && (
-              <p className="text-gray-500 italic">
-                {isMe ? 'まだ気分ログの投稿履歴がありません。' : '公開されている気分ログがありません。'}
-              </p>
-            )}
-
-            <div className="space-y-2">
-              {moodHistory.map(log => {
-                const moodDetail = MOOD_TYPES.find(m => m.type === log.mood_type) || 
-                  { type: 'neutral', label: '普通', emoji: '😐' };
-
-                return (
-                  <div 
-                    key={log.id} 
-                    className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-150"
-                  >
-                    <div className="flex items-center overflow-hidden flex-1">
-                      <span className="text-xs text-gray-500 mr-4 shrink-0">
-                        {formatDate(log.created_at)}
-                      </span>
-                      <p className="text-sm font-medium text-gray-800 flex items-center">
-                        <span className="text-lg mr-2 shrink-0">{moodDetail.emoji}</span>
-                        <span className="shrink-0">{moodDetail.label}</span>
-                        {log.comment && (
-                          <span className="text-sm text-gray-600 ml-2 truncate">
-                            : {log.comment}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    {isMe && !displayProfile.is_mood_visible && (
-                      <span className="text-xs font-semibold text-red-500 shrink-0 border border-red-300 px-2 py-0.5 rounded-full ml-2">
-                        非公開
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </div>
       )}
     </div>

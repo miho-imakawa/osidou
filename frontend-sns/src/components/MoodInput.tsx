@@ -3,16 +3,16 @@ import { postMoodLog, MoodPostPayload } from '../api.ts';
 import { Send, Smile } from 'lucide-react';
 
 const MOOD_TYPES = [
-    { type: 'motivated', label: 'やる気🔥', emoji: '🔥' },
-    { type: 'excited', label: 'ワクワク🤩', emoji: '🤩' },
-    { type: 'happy', label: 'ハッピー😊', emoji: '😊' },
-    { type: 'calm', label: '落ち着き😌', emoji: '😌' },
-    { type: 'neutral', label: '普通😐', emoji: '😐' },
-    { type: 'anxious', label: '不安😟', emoji: '😟' },
-    { type: 'tired', label: '疲労困憊😥', emoji: '😥' },
-    { type: 'sad', label: '悲しい😭', emoji: '😭' },
-    { type: 'angry', label: 'イライラ😠', emoji: '😠' },
-    { type: 'grateful', label: '感謝🙏', emoji: '🙏' },
+    { type: 'motivated', label: 'メラメラ🔥', emoji: '🔥' },
+    { type: 'excited',   label: 'ワクワク🤩', emoji: '🤩' },
+    { type: 'happy',     label: 'ルンルン😊', emoji: '😊' },
+    { type: 'calm',      label: 'ホッコリ😌', emoji: '😌' },
+    { type: 'neutral',   label: 'ボチボチ😐', emoji: '😐' },
+    { type: 'anxious',   label: 'モヤモヤ😟', emoji: '😟' },
+    { type: 'tired',     label: 'ヘトヘト😥', emoji: '😥' },
+    { type: 'sad',       label: 'ショボーン😭', emoji: '😭' },
+    { type: 'angry',     label: 'プンプン😠', emoji: '😠' },
+    { type: 'grateful',  label: 'ホロリ🙏',   emoji: '🙏' },
 ];
 
 interface MoodInputProps {
@@ -54,7 +54,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
     return (
         <div className="p-6 bg-blue-50 rounded-xl border border-blue-200 shadow-md">
             <h3 className="text-xl font-bold text-blue-800 flex items-center mb-4">
-                <Smile className="w-6 h-6 mr-2 text-blue-500" /> 今日の気分を投稿
+                <Smile className="w-6 h-6 mr-2 text-blue-500" /> TODAY's FEELING
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-4">

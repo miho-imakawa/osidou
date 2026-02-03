@@ -24,12 +24,16 @@ class UserProfileUpdate(BaseModel):
     email: Optional[EmailStr] = None
     nickname: Optional[str] = None
     password: Optional[str] = Field(None, min_length=8) # パスワード変更（ハッシュ化はルーターで処理）
-    
+
     # 住所情報
     prefecture: Optional[str] = None
     city: Optional[str] = None
     town: Optional[str] = None
-    
+
+    #Birth, Gender
+    birth_year_month: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}$", description="YYYY-MM形式")
+    gender: Optional[str] = Field(None, description="male, female, other, prefer_not_to_say")
+
     # プロフィール情報
     bio: Optional[str] = None 
     oshi_page_url: Optional[str] = None
@@ -110,11 +114,14 @@ class UserMe(UserPublic):
     username: str
     is_active: bool
 
+    # 💡 追加：自分のプロフィール確認・編集画面で表示するために必要
+    birth_year_month: Optional[str] = None
+    gender: Optional[str] = None
+
     # 住所情報（本人にのみ返す）
     prefecture: Optional[str] = None
     city: Optional[str] = None
     town: Optional[str] = None
-
 
 # ==========================================
 # 💡 4. 通知スキーマ

@@ -2,6 +2,7 @@ import os
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
 
 # 💡 修正: moods を追加
@@ -11,7 +12,7 @@ from .routers import (
     invoices,
     hobbies, posts, notifications,
     moods, 
-    friend_requests, # 👈 これを追加！
+    friend_requests, community # 👈 これを追加！
 )
 
 Base.metadata.create_all(bind=engine)
@@ -56,6 +57,7 @@ app.include_router(users.router, prefix="/users")
 
 # SNS・コミュニティ系
 app.include_router(hobbies.router) 
+app.include_router(community.router, prefix="/hobby-categories")
 app.include_router(posts.router) 
 app.include_router(notifications.router)
 app.include_router(moods.router, prefix="/users")
