@@ -231,6 +231,7 @@ export interface Post {
     meetup_capacity?: number;  // 追加
     author_id?: number;          // 投稿者のID（CommunityChatの非表示機能で必要）
     ad_end_date?: string;
+    parent_id?: number | null; // 💡 これを追加
     response_count?: number;   // 追加
     participation_count?: number; // 追加
     region_tag_pref?: string;  // 追加
@@ -240,6 +241,7 @@ export interface Post {
 export interface PostCreate {
     content: string;
     hobby_category_id: number;
+    parent_id?: number | null;
     is_meetup?: boolean;
     is_ad?: boolean;      // 💡 追加
     meetup_date?: string;

@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { 
   User, Globe, Twitter, Facebook, Instagram, BookOpen,
-  Edit, MessageSquare, Heart, Download, Save, X, Eye, EyeOff, AtSign, MapPin, Clock
+  Edit, MessageSquare, Heart, Download, Save, X, Eye, EyeOff, AtSign, MapPin, Clock, Flame //
 } from 'lucide-react';
 
 import { 
   authApi, 
-  fetchMyCategories, 
+  fetchMyCommunities, // ← fetchMyCategories から変更
   HobbyCategory, 
   fetchMyMoodHistory, 
   MoodLog 
-} from '../api'; 
+} from '../api';
 
 interface UserProfileProps {
   profile: any; 
@@ -66,21 +66,24 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
     }
   }, [userId, myProfile]);
 
+// 🔥 修正箇所: loadData 内のロジック
   useEffect(() => {
     if (!displayProfile?.id) return;
-    const loadData = async () => {
-      try {
-        const categories = await fetchMyCategories();
-        const uniqueMap = new Map();
-        categories.forEach(cat => {
-          const key = cat.master_id || cat.id;
-          if (!uniqueMap.has(key)) { uniqueMap.set(key, cat); }
-        });
-        setMyCategories(Array.from(uniqueMap.values()));
-        const logs = await fetchMyMoodHistory();
-        setMoodLogs(logs);
-      } catch (err) { console.error(err); }
-    };
+
+  const loadData = async () => {
+    try {
+      const categories = await fetchMyCommunities();
+      
+      // 💡 バックエンドがトップレベルを本尊だけにしてくれているので、
+      // 複雑な Map 処理は消して、そのままセットして大丈夫です！
+      setMyCategories(categories); 
+
+      const logs = await fetchMyMoodHistory();
+      setMoodLogs(logs);
+    } catch (err) {
+      console.error("データ取得失敗:", err);
+    }
+  };
     loadData();
   }, [displayProfile?.id, isMe, location.pathname]);
 
@@ -233,14 +236,34 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
           </div>
 
           <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
-            <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]"><MessageSquare className="text-pink-600" size={14}/> Communities</h2>
+            <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
+              <MessageSquare className="text-pink-600" size={14}/> Communities
+            </h2>
             <div className="flex flex-wrap gap-2">
-              {myCategories.length > 0 ? myCategories.map(cat => (
-                <Link key={cat.id} to={`/community/${cat.id}`} className={`px-4 py-1.5 rounded-full text-xs border flex items-center gap-3 font-bold shadow-sm transition-all hover:scale-105 ${getRankClasses(cat.member_count || 0)}`}>
-                  <span>{cat.name}</span>
-                  <div className="flex items-center gap-1 opacity-60 text-[10px] tabular-nums"><User size={10} strokeWidth={3} /><span>{(cat.member_count || 0).toLocaleString()}</span></div>
+            {myCategories.length > 0 ? myCategories.map(cat => {
+              const totalCount = cat.member_count || 0; 
+
+              // 💡 ここを追加！「岡田斗司夫 (Toshio Okada)」から「岡田斗司夫」だけを抜き出す
+              // ( の前にある文字列だけを取得し、前後の空白を消す
+              const displayName = cat.name.split('(')[0].trim();
+
+              return (
+                <Link 
+                  key={cat.id} 
+                  to={`/community/${cat.id}`} 
+                  className={`px-4 py-1.5 rounded-full text-xs border flex items-center gap-3 font-black shadow-sm transition-all hover:scale-105 ${getRankClasses(totalCount)}`}
+                >
+                  {/* 💡 cat.name を displayName に変更 */}
+                  <span>{cat.name.split(' (')[0]}</span> 
+                  
+                  <div className="flex items-center gap-1 opacity-60 text-[10px] tabular-nums">
+                    <User size={10} strokeWidth={3} />
+                    <span>{totalCount.toLocaleString()}</span>
+                    {totalCount >= 500 && <Flame size={10} className="text-orange-500" />}
+                  </div>
                 </Link>
-              )) : <p className="text-gray-400 text-xs italic">未参加</p>}
+              );
+            }) : <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Activity</p>}
             </div>
           </div>
 
