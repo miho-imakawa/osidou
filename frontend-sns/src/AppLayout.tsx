@@ -88,7 +88,7 @@ const AppLayout: React.FC = () => {
         const initializeApp = async () => {
             // 💡 開発用の強制トークンセット
             // 先ほど取得した access_token をここに貼り付けます
-            const devToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiZXhwIjoxNzcwMjk1NDA0fQ.Udes-R2jZ--jZ2PaamD62VWDAbbwAnDKqI51AhGEO40";
+            const devToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiZXhwIjoxNzcwNjIxNjIxfQ.lBtJMm_Pn768ygbki8dlROysTkRD3E-vIKsk3VMKgp8";
 
             if (devToken) {
                 // api.ts が見に行く 'access_token' というキー名で保存

@@ -246,6 +246,9 @@ export interface PostCreate {
     is_ad?: boolean;      // 💡 追加
     meetup_date?: string;
     ad_end_date?: string; // 💡 追加
+    meetup_location?: string; // 💡 これが必要
+    meetup_fee_info?: string; // 💡 これが必要
+    meetup_capacity?: number; // 💡 これが必要
     is_system: boolean;
 }
 
