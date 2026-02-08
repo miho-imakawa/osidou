@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import List
-
+from sqlalchemy import func, or_
 from .. import models, schemas
 from ..database import get_db
 from .auth import get_current_user
@@ -119,12 +119,37 @@ def leave_community(category_id: int, db: Session = Depends(get_db), current_use
     
     return {"message": "退会しました"}
 
+# community.py の修正イメージ
 @router.get("/my-communities", response_model=List[schemas.HobbyCategoryResponse])
 def get_my_communities(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    """自分が参加しているコミュニティ一覧を取得"""
-    return db.query(models.HobbyCategory).join(models.UserHobbyLink).filter(
-        models.UserHobbyLink.user_id == current_user.id
-    ).all()
+    # 1. 自分が参加しているリンクをすべて取得
+    links = db.query(models.UserHobbyLink).filter(models.UserHobbyLink.user_id == current_user.id).all()
+    
+    unique_masters = {}
+    for link in links:
+        cat = link.hobby_category
+        # 本尊（master_id）があればそれを、なければ自身のIDを基準にする
+        master_id = cat.master_id if cat.master_id else cat.id
+        
+        if master_id in unique_masters:
+            continue
+            
+        master_cat = db.query(models.HobbyCategory).filter(models.HobbyCategory.id == master_id).first()
+        if master_cat:
+            # 本尊＋全支部の合算人数を計算
+            total = db.query(models.UserHobbyLink.user_id).distinct().join(models.HobbyCategory).filter(
+                or_(
+                    models.HobbyCategory.id == master_id,
+                    models.HobbyCategory.master_id == master_id
+                )
+            ).count() # 🔥 .distinct() を入れることで、一人が複数箇所にいても「1」と数える
+            
+            res_obj = schemas.HobbyCategoryResponse.from_orm(master_cat)
+            res_obj.member_count = total
+            res_obj.children = []  # 🔥 マイページでは整理箱（フラット）に見せる
+            unique_masters[master_id] = res_obj
+
+    return list(unique_masters.values())
 
 @router.get("/check-join/{category_id}")
 def check_join_status(category_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):

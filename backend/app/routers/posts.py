@@ -35,7 +35,7 @@ class MessageResponse(BaseModel):
 
 @router.post("/posts", response_model=HobbyPostResponse)
 def create_hobby_post(
-    post: HobbyPostCreate,
+    post: HobbyPostCreate, # ← ここ(schemas)にも parent_id が必要です
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(get_current_user)
@@ -63,6 +63,7 @@ def create_hobby_post(
         content=post.content,
         hobby_category_id=post.hobby_category_id,
         user_id=current_user.id,
+        parent_id=post.parent_id,  # 💡 これを追加！
         region_tag_pref=current_user.prefecture,
         region_tag_city=current_user.city,
         is_meetup=is_meetup_val,
@@ -289,25 +290,25 @@ def get_posts_by_category(
         models.HobbyPost.created_at.desc()
     ).all()
     
-    print(f"📊 Debug: 取得した投稿数={len(posts)}")
+    print(f"📊 Debug: 取得した件数={len(posts)}")
     
     for post in posts:
         user = db.query(models.User).filter(
             models.User.id == post.user_id
         ).first()
-        
+
         print(f"📝 Debug: post_id={post.id}, user_id={post.user_id}, is_restricted={user.is_restricted if user else 'N/A'}")
-        
+
         post.author_nickname = user.nickname if user else "Unknown"
         post.public_code = user.public_code if user else "-------"
-        
+
         # 返信数・参加数
         post.response_count = db.query(
             func.count(models.PostResponse.id)
         ).filter(
             models.PostResponse.post_id == post.id
         ).scalar() or 0
-        
+
         post.participation_count = db.query(
             func.count(models.PostResponse.id)
         ).filter(

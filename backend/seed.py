@@ -96,7 +96,7 @@ def build_hierarchy():
         japan_children.append({"name": pref["name"], "prefix": "R", "children": cities})
 
     return [
-        # --- 1. MUSIC (グローバル・ブランド戦略) ---
+        # --- 1. MUSIC ---
         {
             "name": "MUSIC (音楽)", "prefix": "M",
             "children": [
@@ -115,9 +115,7 @@ def build_hierarchy():
                 ]}
             ]
         },
-# seed.py の build_hierarchy 内、VIDEO & ENT セクション
-
-        # --- 2. VIDEO & ENTERTAINMENT (映像・コンテンツ) ---
+        # --- 2. VIDEO & ENT ---
         {
             "name": "VIDEO & ENT (映像・発信)", "prefix": "V",
             "children": [
@@ -125,55 +123,96 @@ def build_hierarchy():
                     {"name": "Acting (演技・舞台)"}, {"name": "Video Making (制作・配信)"}
                 ]},
                 {"name": "FANs (推し)", "role_type": models.HobbyRoleType.FANS, "children": [
-                    # 💡 戦略ポイント：先に「人(本尊)」を定義する
-                    {"name": "Performers (出演・発信者)", "children": [
-                        {"name": "岡田斗司夫 (Toshio Okada)"}, # 👈 ここが自動的に ID:1 (本尊) になる
+                    {"name": "Performers (出演者)", "children": [
+                        {"name": "岡田斗司夫 (Toshio Okada)"},
                         {"name": "Robert De Niro"}, 
                         {"name": "Tatsuya Fujiwara (藤原竜也)"},
                         {"name": "佐藤健 (Takeru Sato)"}
                     ]},
-                    
-                    # その後に「番組(分身)」を定義する
-                    {"name": "Programs (作品・番組)", "children": [
+                    {"name": "Programs (作品)", "children": [
                         {"name": "Movies (映画)"}, 
                         {"name": "TV / Drama", "children": [
-                            {"name": "るろうに剣心", "children": [{"name": "佐藤健 (Takeru Sato)"}]} # 👈 自動で本尊へリンク
+                            {"name": "るろうに剣心", "children": [{"name": "佐藤健 (Takeru Sato)"}]}
                         ]}, 
-                        {
-                            "name": "YouTube / Online", 
-                            "children": [
-                                {
-                                    "name": "OTAKING", 
-                                    "children": [{"name": "岡田斗司夫 (Toshio Okada)"}] # 👈 自動で本尊へリンク
-                                }
-                            ]
-                        }
+                        {"name": "YouTube / Online", "children": [
+                            {"name": "OTAKING", "children": [{"name": "岡田斗司夫 (Toshio Okada)"}]}
+                        ]}
                     ]}
                 ]}
             ]
         },
-        # --- 3. ANIME & MANGA (ジブリの独立) ---
+        # --- 3. ANIME & MANGA ---
         {
             "name": "ANIME & MANGA", "prefix": "A",
             "children": [
-                {"name": "Studio Ghibli (ジブリ)", "children": [{"name": "宮崎 駿 作品"}, {"name": "高畑 勲 作品"}]},
-                {"name": "Popular Works", "children": [{"name": "One Piece"}, {"name": "NARUTO"}, {"name": "Demon Slayer"}]}
+                {"name": "DOer (制作・漫画家)", "role_type": models.HobbyRoleType.DOERS, "children": [
+                    {"name": "Illustration (イラスト)"}, {"name": "Manga Writing"}, {"name": "Cosplay"}
+                ]},
+                {"name": "FANs (作品軸)", "role_type": models.HobbyRoleType.FANS, "children": [
+                    {"name": "Studio Ghibli", "children": [{"name": "宮崎 駿"}, {"name": "高畑 勲"}]},
+                    {"name": "WORKS", "children": [
+                        {"name": "One Piece", "children": [{"name": "MANGA"}, {"name": "ANIME"}, {"name": "CAST (CV)"}]},
+                        {"name": "Pokemon", "children": [{"name": "ANIME"}, {"name": "GAME"}, {"name": "CAST (CV)"}]},
+                        {"name": "Demon Slayer (鬼滅の刃)", "children": [{"name": "MANGA"}, {"name": "ANIME"}, {"name": "CAST (CV)"}]},
+                        {"name": "NARUTO", "children": [{"name": "MANGA"}, {"name": "ANIME"}]}
+                    ]}
+                ]}
             ]
         },
-        # --- 4. LIFESTYLE (ファッション・グルメ) ---
+        # --- 4. LIFE (LIFESTYLE) ---
         {
-            "name": "LIFESTYLE", "prefix": "L",
+            "name": "LIFE", "prefix": "L",
             "children": [
-                {"name": "Fashion", "children": [{"name": "Luxury Brands (CHANEL/DIOR)"}, {"name": "Handmade (ハンドメイド)"}]},
-                {"name": "Gourmet (グルメ)"}, {"name": "Travel (旅行)"}
+                {"name": "DOer (こだわり・実践)", "role_type": models.HobbyRoleType.DOERS, "children": [
+                    {"name": "Fashion Design"}, {"name": "Cooking / Recipe"}, {"name": "Interior / DIY"}
+                ]},
+                {"name": "FANs (探求・愛好)", "role_type": models.HobbyRoleType.FANS, "children": [
+                    {"name": "Luxury Brands"}, {"name": "Gourmet"}, {"name": "Travel"}
+                ]}
             ]
         },
-        # --- 5~8. 他 (GAMES, SPORT, REGIONS, FESTIVALS) ---
-        # ※既存の構成を維持、FESTIVALSを独立させるのが今後の戦略です
-        { "name": "GAMES", "prefix": "G", "children": [{"name": "eSports"}, {"name": "Pokemon"}] },
-        { "name": "SPORT", "prefix": "S", "children": [{"name": "Baseball (Shohei Ohtani)"}, {"name": "Soccer"}] },
+        # --- 5. GAMES ---
+        {
+            "name": "GAMES", "prefix": "G",
+            "children": [
+                {"name": "DOer (開発・制作)", "role_type": models.HobbyRoleType.DOERS, "children": [
+                    {"name": "Game Dev"}, {"name": "3D Modeling"}, {"name": "Indie Game"}
+                ]},
+                {"name": "FANs (プレイヤー)", "role_type": models.HobbyRoleType.FANS, "children": [
+                    {"name": "eSports"}, {"name": "RPG"}, {"name": "FPS"}
+                ]}
+            ]
+        },
+        # --- 6-8. SPORT / REGIONS / FESTIVALS ---
+        # --- 6. SPORT (スポーツ) ---
+        {
+            "name": "SPORT", "prefix": "S",
+            "children": [
+                {
+                    "name": "DOer (プレイヤー)", 
+                    "role_type": models.HobbyRoleType.DOERS,
+                    "children": [
+                        {"name": "Baseball (野球)"}, 
+                        {"name": "Soccer (サッカー)"}, 
+                        {"name": "Tennis (テニス)"},
+                        {"name": "Running / Gym"}
+                    ]
+                },
+                {
+                    "name": "FANs (観戦・推し)", 
+                    "role_type": models.HobbyRoleType.FANS,
+                    "children": [
+                        {"name": "MLB"}, 
+                        {"name": "Professional Baseball (NPB)"},
+                        {"name": "European Soccer"},
+                        {"name": "Sumo / Martial Arts"}
+                    ]
+                }
+            ]
+        },
+        # --- 7. REGIONS / 8. FESTIVALS ---
         { "name": "REGIONS (地域)", "prefix": "R", "children": japan_children },
-        { "name": "FESTIVALS (お祭り)", "prefix": "F", "children": [{"name": "Traditional (伝統祭り)"}, {"name": "Events (イベント)"}] }
+        { "name": "FESTIVALS (お祭り)", "prefix": "F", "children": [{"name": "Traditional (伝統祭り)"}, {"name": "Events (イベント)"}] }        
     ]
 
 # --- [4. リンク対応・再帰挿入関数] ---

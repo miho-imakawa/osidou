@@ -209,7 +209,8 @@ class HobbyPost(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     hobby_category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"))
     is_system = Column(Boolean, default=False)
-    
+    parent_id = Column(Integer, ForeignKey("hobby_posts.id"), nullable=True) # 🔥 追加
+
     # 地域タグ
     region_tag_pref = Column(String(50), index=True, nullable=True)
     region_tag_city = Column(String(100), index=True, nullable=True)
@@ -238,10 +239,22 @@ class HobbyPost(Base):
     user = relationship("User", back_populates="hobby_posts")
     hobby_category = relationship("HobbyCategory", back_populates="posts")
     responses = relationship("PostResponse", back_populates="post", cascade="all, delete-orphan")
-    
-    # リポスト元の投稿を取得するためのリレーション
-    original_post = relationship("HobbyPost", remote_side=[id], backref="reposts")
+    # 🔥 リレーションシップを明示的に指定
+# 🔥 1. 返信用（スレッド用）
+    parent = relationship(
+        "HobbyPost", 
+        remote_side=[id], 
+        foreign_keys=[parent_id], 
+        backref="children_posts"  # 名前を replies から children_posts に変更
+    )
 
+    # 🔥 2. リポスト用（引用用）
+    original_post = relationship(
+        "HobbyPost", 
+        remote_side=[id],
+        foreign_keys=[original_post_id], # カラム名を parent_id から original_post_id に修正
+        backref="reposts"                # 名前を replies から reposts に変更
+    )
 
 # 投稿への返信（PostResponse）
 class PostResponse(Base):

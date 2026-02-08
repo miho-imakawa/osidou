@@ -15,6 +15,8 @@ class HobbyPostBase(BaseModel):
     # --- 💡 新規追加: MeetUpの運用詳細 ---
     meetup_fee_info: Optional[str] = Field(None, description="費用詳細")
     meetup_status: Optional[str] = Field("open", description="募集状況 (open/closed)")
+    parent_id: Optional[int] = Field(None, description="親投稿のID（返信の場合）")
+    is_meetup: bool = Field(False, description="Meet up告知")
 
     # --- 広告とリポスト用 ---
     is_ad: bool = Field(False, description="有料広告投稿であるか")
