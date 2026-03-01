@@ -2,19 +2,20 @@ import os
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
 
-# 💡 修正: moods を追加
+# ルーターのインポート
 from .routers import (
     auth, users, access_logs,
     branches, events, reservations,
     invoices,
     hobbies, posts, notifications,
     moods, 
-    friend_requests, community # 👈 これを追加！
+    friend_requests, community,
+    meetup_chat  # 💡 1. チャット用ルーターをインポート
 )
 
+# データベーステーブルの作成
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -23,31 +24,19 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# ✨ CORS設定を追加・修正
+# ✨ CORS設定（二重になっていたものを整理しました）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # Viteのデフォルトポート
+        "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
-    allow_credentials=True,
-    allow_methods=["*"],  # すべてのHTTPメソッドを許可
-    allow_headers=["*"],  # すべてのヘッダーを許可
-)
-
-origins = [
-    "http://localhost",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- ルーターの登録 ---
 
 # 認証系
 app.include_router(auth.router, prefix="/auth")
@@ -61,7 +50,11 @@ app.include_router(community.router, prefix="/hobby-categories")
 app.include_router(posts.router) 
 app.include_router(notifications.router)
 app.include_router(moods.router, prefix="/users")
-app.include_router(friend_requests.router, prefix="/friends") # 👈 /friends プレフィックスを追加！
+app.include_router(friend_requests.router, prefix="/friends")
+
+# 💡 2. MEETUPチャット系ルーターを登録
+app.include_router(meetup_chat.router) 
+
 # 店舗・イベント・予約・決済系
 app.include_router(branches.router)
 app.include_router(events.router) 

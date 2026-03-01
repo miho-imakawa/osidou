@@ -6,6 +6,8 @@ import FriendManager from './components/FriendManager';
 import CommunityList from './components/CommunityList';
 import CommunityDetail from './components/CommunityDetail';
 import { authApi, UserProfile as UserProfileType } from './api';
+import CategoryDetailPage from './components/CategoryDetailPage';
+import AdQuoteCalculator from './components/AdQuoteCalculator';
 
 // 💡 TypeScriptのエラー を防ぐための完全な初期値
 const initialProfile: UserProfileType = {
@@ -88,7 +90,7 @@ const AppLayout: React.FC = () => {
         const initializeApp = async () => {
             // 💡 開発用の強制トークンセット
             // 先ほど取得した access_token をここに貼り付けます
-            const devToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiZXhwIjoxNzcwNjIxNjIxfQ.lBtJMm_Pn768ygbki8dlROysTkRD3E-vIKsk3VMKgp8";
+            const devToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJraW5raV9mYW5AZXhhbXBsZS5jb20iLCJleHAiOjE3NzIzODczNzR9.cvhDLAIiP2tJjz1lEJGL89BT9JjEdHhuIUDv6bgnNLI"
 
             if (devToken) {
                 // api.ts が見に行く 'access_token' というキー名で保存
@@ -116,11 +118,12 @@ const AppLayout: React.FC = () => {
                 <Route path="/community" element={<CommunityList />} />
                 <Route path="/community/:categoryId" element={<CommunityDetail />} />
                 <Route path="*" element={<HomeFeed profile={profile} />} />
+                <Route path="/community/:categoryId/detail" element={<CategoryDetailPage />} />
             </Routes>
         );
     };
 
-    return (
+return (
         <div className="min-h-screen bg-gray-100 font-sans pt-20">
             <Header /> 
             <main className="container mx-auto px-4">

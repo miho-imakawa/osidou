@@ -1,44 +1,71 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createPost, fetchPostsByCategory, Post, authApi } from '../api';
+import { createPost, fetchPostsByCategory, Post, authApi, toggleAttendance, adInteraction, fetchMyAdInteractions } from '../api';
 import { 
-  Send, MessageSquare, Calendar, Megaphone, ShieldAlert, 
-  EyeOff, ChevronDown, ChevronUp, Reply, MapPin, Users, Coins
+  Send, MessageSquare, MapPin, Users, CheckSquare, Square, Clock, Coins, Pin, Calendar
 } from 'lucide-react';
-import { MeetupAccordion } from './MeetupAccordion';
+import MeetupChatModal from './MeetupChatModal';
+import AdPostModal from './AdPostModal';
 
 interface CommunityChatProps {
     categoryId: string;
     masterId?: number | null;
+    currentUserId: number;
+    currentCategoryName?: string;
 }
 
-const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryId, masterId }) => {
+const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryId, masterId, currentUserId, currentCategoryName }) => {
     const chatTargetId = masterId ? String(masterId) : propCategoryId;
 
     const [posts, setPosts] = useState<Post[]>([]);
-    const [newPost, setNewPost] = useState('');
+    const [newPost, setNewPost] = useState<string>(''); 
     const [loading, setLoading] = useState(true);
-    const [specialPosts, setSpecialPosts] = useState<Post[]>([]);
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [replyingTo, setReplyingTo] = useState<Post | null>(null);
-    const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set()); // 💡 展開状態を管理
-    const [postType, setPostType] = useState<'normal' | 'meetup' | 'ad'>('normal');
-    const [meetupDetails, setMeetupDetails] = useState({
-        date: '',
-        location: '',
-        pref: '',      // 追加
-        city_town: '', // 追加
-        capacity: 5,
-        fee: '500'
+    const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set());
+    const [postType, setPostType] = useState<'normal' | 'meetup'>('normal');
+    const [activeChat, setActiveChat] = useState<{id: number, title: string} | null>(null);
+    const [showAdModal, setShowAdModal] = useState(false);
+    const [adInteractions, setAdInteractions] = useState<Record<number, {
+        is_liked: boolean, 
+        is_pinned: boolean, 
+        is_closed: boolean,
+        is_attended?: boolean // 👈 ここを追加（? を付けると「無い場合もある」という意味になります）
+    }>>({});
+    const [closedAds, setClosedAds] = useState<Set<number>>(() => {
+        const saved = localStorage.getItem('closedAds');
+        return saved ? new Set(JSON.parse(saved)) : new Set();
     });
+    const [meetupDetails, setMeetupDetails] = useState({
+        title: '', date: '', pref: '', city_town: '', capacity: 5, fee: ''
+    });
+    const [pinnedAds, setPinnedAds] = useState<any[]>([]);
+    
+    const MEETUP_TEMPLATE = `📍 集合場所：
+
+📍 開催場所：
+
+🗺️ 開催場所URLまたはMapURL：
+
+💰【支払い方法】： 当日現金 / Stripe決済 / お茶代のみ各自
+※カフェ開催のためお茶代が必要です。
+
+❌【キャンセルポリシー】： 当日0時以降のキャンセル50%、NoShow100%`;
+
+    const toggleAdCollapse = (postId: number) => {
+        setClosedAds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(postId)) newSet.delete(postId);
+            else newSet.add(postId);
+            localStorage.setItem('closedAds', JSON.stringify([...newSet]));
+            return newSet;
+        });
+    };
+
     const fetchPosts = useCallback(async () => {
         if (!chatTargetId) return;
         try {
             const data = await fetchPostsByCategory(parseInt(chatTargetId));
-            setPosts(data);
-            const specials = data.filter(p => (p.is_meetup || p.is_ad));
-            setSpecialPosts(specials);
-        } catch (err: any) {
-            console.error('❌ 投稿取得エラー:', err);
+            setPosts(data || []);
+        } catch (err) {
+            console.error('Fetch Error:', err);
         } finally {
             setLoading(false);
         }
@@ -50,179 +77,392 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryI
         return () => clearInterval(interval);
     }, [fetchPosts]);
 
-    // 💡 スレッドの展開/折りたたみ
-    const toggleThread = (postId: number) => {
-        setExpandedThreads(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(postId)) {
-                newSet.delete(postId);
-            } else {
-                newSet.add(postId);
+    useEffect(() => {
+        const loadInteractions = async () => {
+            try {
+                const data = await fetchMyAdInteractions();
+                setAdInteractions(data);
+            } catch {}
+        };
+        loadInteractions();
+    }, []);
+
+    // 🔄 リロード時やデータ更新時に、PIN済みのものをリストに復元する
+    useEffect(() => {
+        if (posts.length > 0) {
+            // 全投稿の中から、interactionデータで is_pinned が true のものを抽出
+            const pinned = posts.filter(post => adInteractions[post.id]?.is_pinned);
+            setPinnedAds(pinned);
+        }
+    }, [posts, adInteractions]); // posts か adInteractions が変わるたびに実行
+
+    const handleAdAction = async (postId: number, action: 'like' | 'pin' | 'close') => {
+        try {
+            const result = await adInteraction(postId, action);
+            
+            // 1. まず全体のインタラクション状態を更新（ボタンの色が変わる）
+            setAdInteractions(prev => ({ ...prev, [postId]: result }));
+
+            // 2. PINアクションの場合、ヘッダーに表示するリスト(pinnedAds)を更新
+            if (action === 'pin') {
+                if (result.is_pinned) {
+                    // PINされた場合：リストに追加
+                    const targetedPost = posts.find(p => p.id === postId);
+                    if (targetedPost) {
+                        setPinnedAds(prev => {
+                            // 重複を防ぎつつ追加
+                            if (prev.find(p => p.id === postId)) return prev;
+                            return [...prev, targetedPost];
+                        });
+                    }
+                } else {
+                    // PIN解除された場合：リストから削除
+                    setPinnedAds(prev => prev.filter(p => p.id !== postId));
+                }
             }
-            return newSet;
-        });
+        } catch (err) {
+            console.error('Action Error:', err);
+        }
     };
 
-    // 💡 返信アンカーをセットする関数
-    const handleReply = (post: Post) => {
-        setReplyingTo(post);
-        const nickname = post.author_nickname;
-        setNewPost(prev => prev.includes(`>>${nickname}`) ? prev : `>>${nickname} ${prev}`);
+    const switchPostType = (type: 'normal' | 'meetup') => {
+        setPostType(type);
+        if (type === 'meetup') {
+            setNewPost(prev => (!prev || prev.trim() === '') ? MEETUP_TEMPLATE : prev);
+        } else {
+            setNewPost('');
+        }
     };
 
     const handleSend = async (e: React.FormEvent) => {
-            e.preventDefault();
-            // 本文が空、またはターゲットIDがない場合は何もしない
-            if (!newPost.trim() || !chatTargetId) return;
-            
-            try {
-                await createPost({
-                    content: newPost,                // テキストエリアの本文（Cafeの詳細など）
-                    hobby_category_id: parseInt(chatTargetId),
-                    parent_id: replyingTo?.id || null,
-                    // 💡 ボタンで選択したタイプに基づいてフラグを立てる
-                    is_meetup: postType === 'meetup',
-                    is_ad: postType === 'ad',
-                    // 💡 MeetUp専用フォームの値をセットする
-                    meetup_date: postType === 'meetup' ? meetupDetails.date : undefined,
-                    meetup_location: postType === 'meetup' ? `${meetupDetails.pref} ${meetupDetails.city_town}` : undefined,
-                    meetup_capacity: postType === 'meetup' ? meetupDetails.capacity : undefined,
-                    meetup_fee_info: postType === 'meetup' ? meetupDetails.fee : undefined,
-                    is_system: false
-                });
-
-                // 送信が成功したら入力をリセット
-                setNewPost('');
-                setPostType('normal'); // 投稿後は通常モードに戻す
-                setReplyingTo(null);
-                fetchPosts();          // 投稿一覧を再取得
-            } catch (err: any) {
-                console.error('❌ 送信エラー:', err);
-                alert(`送信失敗: ${err.response?.data?.detail || "Unknown error"}`);
-            }
-        };
-    if (loading) return <div className="p-8 text-center text-gray-400 italic">Exploring logs...</div>;
-
-// 💡 広告費用の計算ロジック
-    // ※現在は仮の人数として posts.length * 10 を使っています。
-    // 将来的には Chatグループの実際の参加人数（memberCountなど）をここに当てはめます。
-    const memberCount = posts.length * 5; // 仮の人数設定
-    
-    const getAdPrice = (count: number) => {
-        if (count < 200) return 100; // 199人までは一律100円
-        return Math.floor(count / 100) * 100; // 200人以上は下2桁切り捨て（例：1765人 → 1700円）
+        e.preventDefault();
+        const isMeetup = postType === 'meetup';
+        if (isMeetup ? !meetupDetails.title?.trim() : !newPost?.trim()) return;
+        if (!chatTargetId) return;
+        try {
+            await createPost({
+                content: isMeetup ? `${meetupDetails.title}\n${newPost}` : newPost,
+                hobby_category_id: parseInt(chatTargetId),
+                is_meetup: isMeetup,
+                is_ad: false,
+                is_system: false,
+                // 🔥 追加部分
+                meetup_date: meetupDetails.date || undefined,
+                meetup_location: `${meetupDetails.pref || ''} ${meetupDetails.city_town || ''}`.trim(),
+                meetup_capacity: meetupDetails.capacity || 0,
+                meetup_fee_info: meetupDetails.fee || undefined,
+            });
+            setNewPost('');
+            setMeetupDetails({ title: '', date: '', pref: '', city_town: '', capacity: 5, fee: '' });
+            setPostType('normal');
+            fetchPosts();
+        } catch (err) {
+            console.error('送信エラー:', err);
+            alert("送信に失敗しました");
+        }
     };
 
-    const adPrice = getAdPrice(memberCount);
+    if (loading) {
+        return (
+            <div className="h-[650px] bg-white rounded-3xl flex items-center justify-center">
+                <p className="text-gray-400">Loading...</p>
+            </div>
+        );
+    }
 
-    // 💡 親投稿のみフィルタ
-const parentPosts = posts.filter(p => !p.parent_id);
+    const parentPosts = posts.filter(p => !p.parent_id);
 
     return (
-        /* 全体の外枠：高さを固定し、はみ出しを防ぐ */
-        <div className="flex flex-col h-[600px] bg-white overflow-hidden border rounded-3xl shadow-xl relative">
-            
-            {/* 1. ヘッダー（固定） */}
-            <div className="px-6 py-3 border-b border-gray-50 flex justify-between items-center flex-shrink-0 bg-white z-10">
-                <div className="flex items-center gap-2">
-                    <MessageSquare size={16} className="text-gray-400" />
-                    <span className="text-sm font-black text-gray-700 tracking-tighter uppercase">Board</span>
-                </div>
+        <div className="flex flex-col h-[650px] bg-white border rounded-3xl shadow-xl overflow-hidden text-left font-sans relative">
+            {/* 1. Header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center bg-white shrink-0 z-20">
+                <MessageSquare size={18} className="text-pink-500 mr-2" />
+                <span className="text-sm font-black text-gray-800 uppercase tracking-tighter">Community Board</span>
             </div>
 
-            {/* 2. メッセージリスト（掲示板エリア：ここがスクロールします） */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/30 text-left">
+        {/* 📌 新設：PIN済み広告 ＆ 参加予定ミートアップのお知らせバー */}
+        {(pinnedAds.length > 0 || posts.some(p => p.is_meetup && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended))) && (
+            <div className="bg-orange-50/50 border-b border-orange-100 px-4 py-2 flex flex-col gap-2 shrink-0">
+                {/* ミートアップ表示エリア */}
+                <div className="flex flex-wrap gap-2">
+                    {posts.filter(p => p.is_meetup && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended)).map(meetup => (
+                        <button
+                            key={`meet-link-${meetup.id}`}
+                            onClick={() => document.getElementById(`post-${meetup.id}`)?.scrollIntoView({ behavior: 'smooth' })}
+                            className="flex items-center gap-1.5 bg-white border border-brown-200 px-3 py-1 rounded-full text-[11px] font-bold text-orange-800 shadow-sm hover:bg-orange-100 transition-colors"
+                        >
+                            <Calendar size={10} className="text-orange-500" />
+                            <span>{meetup.user_id === currentUserId ? '主催：' : '参加：'}{meetup.content.split('\n')[0]}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {/* 既存のPIN済み広告エリア */}
+                {pinnedAds.length > 0 && (
+                    <div className="flex flex-wrap gap-2 border-t border-orange-100 pt-1">
+                        {pinnedAds.map(post => (
+                            <button
+                                key={`pin-link-${post.id}`}
+                                onClick={() => document.getElementById(`post-${post.id}`)?.scrollIntoView({ behavior: 'smooth' })}
+                                className="flex items-center gap-1.5 bg-white border border-gray-200 px-3 py-1 rounded-full text-[11px] font-bold text-yellow-800 shadow-sm hover:bg-yellow-100"
+                            >
+                                <Pin size={10} className="fill-yellow-500 text-yellow-500" />
+                                <span className="truncate max-w-[150px]">{post.content.split('\n')[0]}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
+
+            {/* 2. Chat Timeline */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
                 {parentPosts.map((post) => {
-                    const replies = posts.filter(p => p.parent_id === post.id);
-                    const isThreadExpanded = expandedThreads.has(post.id);
-                    const isMyTown = post.meetup_location?.includes("豊島区千川");
+                    const rawResponses = post.responses || [];
+                    const organizer = {
+                        id: -1, user_id: post.user_id,
+                        author_nickname: post.author_nickname || "HOST",
+                        is_participation: true, is_attended: false
+                    };
+                    const uniqueParticipantsMap = new Map();
+                    rawResponses.forEach(res => {
+                        if (res.is_participation && res.user_id !== post.user_id) {
+                            uniqueParticipantsMap.set(res.user_id, {
+                                ...res,
+                                author_nickname: res.author_nickname || `User-${res.user_id}`
+                            });
+                        }
+                    });
+                    const dbParticipants = Array.from(uniqueParticipantsMap.values());
+                    const allParticipants = [organizer, ...dbParticipants];
+                    const isExpanded = expandedThreads.has(post.id);
+                    const isOwner = currentUserId === post.user_id;
+                    const isJoined = allParticipants.some(p => p.user_id === currentUserId);
+                    const interaction = adInteractions[post.id];
+                    const isClosed = closedAds.has(post.id);
+
+                    const adBg = post.ad_color === 'red' ? 'bg-red-50' : post.ad_color === 'blue' ? 'bg-blue-50' : post.ad_color === 'purple' ? 'bg-purple-50' : post.ad_color === 'white' ? 'bg-slate-50' : 'bg-green-50';
+                    const adBorder = post.ad_color === 'red' ? 'border-red-200 text-red-900' : post.ad_color === 'blue' ? 'border-blue-200 text-blue-900' : post.ad_color === 'purple' ? 'border-purple-200 text-purple-900' : post.ad_color === 'white' ? 'border-slate-200 text-slate-900' : 'border-green-200 text-green-900';
+                    const adBorderL = post.ad_color === 'red' ? 'border-red-400' : post.ad_color === 'blue' ? 'border-blue-400' : post.ad_color === 'purple' ? 'border-purple-400' : post.ad_color === 'white' ? 'border-slate-300' : 'border-green-400';
 
                     return (
-                        <div key={post.id} className="mb-6">
-                            {post.is_meetup ? (
-                                /* 🟠 MEETUP看板（ご要望の2行レイアウト） */
-                                <div className="flex flex-col gap-1">
-                                    <div className={`p-3 rounded-[24px] border-2 shadow-sm transition-all ${isMyTown ? 'bg-orange-100 border-orange-400 shadow-md' : 'bg-orange-50 border-orange-200'} max-w-[95%]`}>
-                                        
-                                        {/* 💡 1行目：開催名 & 日時 */}
-                                        <div className="flex justify-between items-center mb-1.5 px-1">
-                                        <h3 className="text-[13px] font-black text-orange-800 truncate flex-1 leading-tight">
-                                            {post.content.split('\n')[0]}
-                                        </h3>
-
-                                        {/* 右側：開催日（大）＋ POSTED（小） */}
-                                        <div className="flex flex-col items-end ml-4 shrink-0 leading-tight">
-                                            {/* 開催日 */}
-                                            <div className="flex flex-col items-end ml-4 shrink-0 leading-tight">
-                                            {/* 開催日（主） */}
-                                            <div className="flex items-center gap-1 text-orange-700 font-black text-[12px]">
-                                                <Calendar size={12} className="text-orange-500" />
-                                                <span>
-                                                開催日 / Date：
-                                                {post.meetup_date
-                                                    ? ` ${post.meetup_date.slice(5, 10)} ${post.meetup_date.slice(11, 16)}`
-                                                    : ' 未定'}
-                                                </span>
-                                            </div>
-
-                                            {/* 投稿日（従） */}
-                                            <div className="text-[8px] text-gray-400 font-bold">
-                                                POSTED：{post.created_at ? post.created_at.slice(5, 10) : '--/--'}
-                                            </div>
-                                            </div>
-
-                                        </div>
-                                        </div>
-
-
-                                        {/* 💡 2行目：場所 & 人数 & 費用 & 詳細ボタン */}
-                                        <div className="flex items-center justify-between px-1">
-                                            <div className="flex items-center gap-3">
-                                                {/* 場所情報 */}
-                                                <div className="flex items-center gap-1 text-[10px] text-gray-600 font-bold">
-                                                    <MapPin size={11} className="text-orange-500" />
-                                                    <span className="truncate max-w-[120px]">{post.meetup_location}</span>
-                                                </div>
-                                                {/* 人数 & 費用をセットで表示 */}
-                                                <div className="flex items-center gap-2 border-l pl-2 border-orange-200/50 text-[10px] text-gray-600 font-bold">
-                                                    <Users size={11} className="text-orange-400" />
-                                                    <span>{post.meetup_capacity}人</span>
-                                                    <Coins size={11} className="text-orange-400 ml-1" />
-                                                    <span className="text-orange-600 font-black">
-                                                        {post.meetup_fee_info && Number(post.meetup_fee_info) > 0 ? `￥${post.meetup_fee_info}` : 'お茶代'}
+                       <div key={post.id} id={`post-${post.id}`} className="animate-in fade-in slide-in-from-bottom-2">
+                        {post.is_ad ? (
+                            <div className="mb-4">
+                                {isClosed ?(
+                                        /* コンパクト表示 */
+                                        <div className={`p-3 border-l-4 rounded-r-2xl ${adBg} ${adBorderL}`}>
+                                        {/* --- ここから差し替え --- */}
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                <span className="text-[8px] font-black bg-gray-800 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
+                                                
+                                                {/* タイトルと日付を縦に並べるための div */}
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="text-[14px] font-bold text-gray-700 truncate">
+                                                        {post.content.split('\n')[0]}
                                                     </span>
+                                                    {/* ★ 掲載終了日をコンパクトに表示 */}
+                                                    {post.ad_start_date && post.ad_end_date && (
+                                                        <span className="text-[9px] font-bold opacity-80 leading-none mt-1">
+                                                            掲載期間: {post.ad_start_date.slice(0, 10).replace(/-/g, '/')} 〜 {post.ad_end_date.slice(0, 10).replace(/-/g, '/')}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
-
-                                            {/* 💡 詳細ボタン：これを押すまで詳細は表示されません */}
-                                            <button 
-                                                onClick={() => toggleThread(post.id)} 
-                                                className="py-1 px-3 bg-orange-600 text-white rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm hover:bg-orange-700 transition-all"
+                                            <button
+                                                onClick={() => toggleAdCollapse(post.id)}
+                                                className="px-3 py-1 bg-white border border-gray-200 rounded-full text-[10px] font-black text-gray-600 shrink-0 ml-2 shadow-sm active:scale-95 transition-transform"
                                             >
-                                                {isThreadExpanded ? "CLOSE" : "DETAILS"}
-                                                <ChevronDown size={10} className={isThreadExpanded ? "rotate-180" : ""} />
+                                                RE-OPEN
                                             </button>
                                         </div>
-                                    </div>
-
-                                    {/* 💡 詳細展開エリア：ボタンを押したときだけ中身が出ます */}
-                                    {isThreadExpanded && (
-                                        <div className="ml-6 mt-1 space-y-2 border-l-2 border-orange-100 pl-4 animate-in fade-in slide-in-from-top-1">
-                                            <div className="bg-white/80 p-3 rounded-2xl border border-orange-50 text-[11px] whitespace-pre-wrap leading-relaxed text-gray-700 relative text-left">
-                                                {post.content}
-                                                <div className="mt-3 border-t pt-2 flex justify-end">
-                                                    <button onClick={() => handleReply(post)} className="px-3 py-1 bg-orange-600 text-white rounded-full text-[9px] font-black shadow-sm">JOIN REQUEST / 参加希望</button>
+                                        {/* --- ここまで --- */}
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <button
+                                                    onClick={() => handleAdAction(post.id, 'like')}
+                                                    className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-400 border border-gray-200'}`}
+                                                >
+                                                    👍 {interaction?.is_liked ? 'イイネ済' : 'イイネ'}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAdAction(post.id, 'pin')}
+                                                    className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-400 border border-gray-200'}`}
+                                                >
+                                                    📌 {interaction?.is_pinned ? 'PIN済' : 'PIN'}
+                                                </button>
+                                                {post.ad_end_date && (
+                                                    <span className="text-[9px] text-gray-400 ml-auto">〜{post.ad_end_date.slice(0, 10)}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        /* フル表示 */
+                                        <div className={`p-4 rounded-[28px] border-2 shadow-sm ${adBg} ${adBorder}`}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[9px] font-black bg-gray-900 text-white px-2 py-0.5 rounded-full uppercase">Sponsored AD</span>
+                                                    <h3 className="font-black text-sm leading-tight">
+                                                        {post.content.split('\n')[0]}
+                                                    </h3>
+                                                </div>
+                                            </div>
+                                            <p className="text-[12px] opacity-90 whitespace-pre-wrap leading-relaxed mt-2 mb-3">
+                                                {post.content.split('\n').slice(1).join('\n')}
+                                            </p>
+                                            <div className="flex justify-between items-center pt-3 border-t border-black/5">
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleAdAction(post.id, 'like')}
+                                                        className={`px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}
+                                                    >
+                                                        👍 {interaction?.is_liked ? 'イイネ済' : 'イイネ'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleAdAction(post.id, 'pin')}
+                                                        className={`px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}
+                                                    >
+                                                        📌 {interaction?.is_pinned ? 'PIN済' : 'PIN'}
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {post.ad_end_date && (
+                                                        <span className="text-[9px] font-bold opacity-60">{post.ad_end_date.slice(0, 10)} 終了</span>
+                                                    )}
+                                                    <button
+                                                        onClick={() => toggleAdCollapse(post.id)}
+                                                        className="px-3 py-1.5 bg-white/70 border border-gray-200 rounded-full text-[10px] font-black text-gray-500"
+                                                    >
+                                                        ✕ 閉じる
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                            ) : (
-                                /* 通常投稿 */
-                                <div className="flex gap-2">
-                                    <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 max-w-[90%]">
-                                        <button onClick={() => handleReply(post)} className="font-black text-[11px] text-pink-600 hover:underline block mb-1">{post.author_nickname}</button>
-                                        <p className="text-gray-700 whitespace-pre-wrap text-[13px] leading-relaxed">{post.content}</p>
+                            ) : post.is_meetup ? (
+                                /* 🟠 MEETUP カード 完全復活版 */
+                                <div className="space-y-2 mb-4">
+                                    <div className={`p-3 rounded-[24px] border-2 shadow-sm bg-orange-50 border-orange-200 max-w-[95%] text-left`}>
+                                        
+                                        {/* 💡 1行目：開催名 & 日時 */}
+                                        <div className="flex justify-between items-center mb-1.5 px-1">
+                                            <h3 className="text-[13px] font-black text-orange-800 truncate flex-1 leading-tight">
+                                                {post.content.split('\n')[0]}
+                                            </h3>
+                                            <div className="flex items-center gap-1 text-orange-700 font-black text-[11px] shrink-0 ml-4 leading-none">
+                                                <Clock size={12} className="text-orange-500" />
+                                                <span>
+                                                    {post.meetup_date 
+                                                        ? `${post.meetup_date.slice(5, 10).replace('-', '/')} ${post.meetup_date.slice(11, 16)}` 
+                                                        : '日時未定'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* 💡 2行目：場所 & 人数 & 費用 & ボタン */}
+                                        <div className="flex items-center justify-between px-1">
+                                            <div className="flex items-center gap-3">
+                                                {/* 場所 */}
+                                                <div className="flex items-center gap-1 text-[10px] text-gray-600 font-bold">
+                                                    <MapPin size={11} className="text-orange-500" />
+                                                    <span className="truncate max-w-[100px]">{post.meetup_location || '場所未定'}</span>
+                                                </div>
+                                                {/* 人数 & 費用 */}
+                                                <div className="flex items-center gap-2 border-l pl-2 border-orange-200/50 text-[10px] text-gray-600 font-bold">
+                                                    <Users size={11} className="text-orange-400" />
+                                                    <span>{dbParticipants.length}/{post.meetup_capacity}人</span>
+                                                    
+                                                    <Coins size={11} className="text-orange-400 ml-1" />
+                                                    <span className="text-orange-600 font-black">
+                                                        {post.meetup_fee_info && !isNaN(Number(post.meetup_fee_info)) && Number(post.meetup_fee_info) > 0 ? (
+                                                            <span className="flex items-center gap-1">
+                                                                ¥{post.meetup_fee_info}
+                                                                <span className="bg-blue-500 text-white px-1 rounded-[3px] text-[7px] italic font-black">STRIPE</span>
+                                                            </span>
+                                                        ) : (
+                                                            post.meetup_fee_info || 'お茶代'
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* ボタン類 */}
+                                            <div className="flex gap-1.5">
+                                                {(isJoined || isOwner) && (
+                                                    <button 
+                                                        onClick={() => setActiveChat({ id: post.id, title: post.content.split('\n')[0] })}
+                                                        className="px-3 py-1 bg-blue-600 text-white rounded-full text-[9px] font-black shadow-sm flex items-center gap-1 hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        <MessageSquare size={10} /> CHAT
+                                                    </button>
+                                                )}
+                                                <button 
+                                                    onClick={() => setExpandedThreads(p => { const n = new Set(p); n.has(post.id) ? n.delete(post.id) : n.add(post.id); return n; })} 
+                                                    className="px-3 py-1 bg-orange-600 text-white rounded-full text-[9px] font-black shadow-sm hover:bg-orange-700 transition-colors"
+                                                >
+                                                    {isExpanded ? "CLOSE" : "DETAILS"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 📖 詳細展開エリア（参加ボタン・参加者リストを含む） */}
+                                    {isExpanded && (
+                                        <div className="ml-4 p-4 bg-white rounded-3xl border border-orange-100 shadow-inner animate-in fade-in slide-in-from-top-1 text-left">
+                                            <p className="text-[12px] text-gray-700 whitespace-pre-wrap mb-4 leading-relaxed">
+                                                {post.content}
+                                            </p>
+                                            
+                                            <div className="border-t border-orange-50 pt-3">
+                                                <p className="text-[9px] font-black text-orange-400 mb-2 uppercase tracking-widest">Participants</p>
+                                                <div className="flex flex-wrap gap-2 mb-4">
+                                                    {allParticipants.map(p => (
+                                                        <div key={p.id} className="flex items-center gap-1.5 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
+                                                            {isOwner && p.id !== -1 && (
+                                                                <button onClick={() => toggleAttendance(p.id).then(fetchPosts)} className="text-orange-500 hover:scale-110 transition-transform">
+                                                                    {p.is_attended ? <CheckSquare size={14} /> : <Square size={14} />}
+                                                                </button>
+                                                            )}
+                                                            <span className={`text-[11px] font-bold ${p.is_attended ? 'text-gray-400 line-through' : 'text-orange-900'}`}>
+                                                                {p.author_nickname}
+                                                                {p.id === -1 && <span className="ml-1 text-[8px] bg-orange-200 px-1 rounded text-orange-700">HOST</span>}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* 参加・キャンセル待ちボタン */}
+                            {/* ✅ 参加者リストのすぐ下に続くロジック */}
+                                                {!isJoined && !isOwner && (
+                                                    dbParticipants.length < (post.meetup_capacity || 0) ? (
+                                                        <button onClick={() => authApi.post(`/posts/${post.id}/responses`, { content: "Join!", is_participation: true }).then(fetchPosts)} 
+                                                            className="w-full py-2.5 bg-orange-600 text-white rounded-xl text-[11px] font-black hover:bg-orange-700 shadow-md">
+                                                            JOIN THIS MEETUP / 参加を希望する
+                                                        </button>
+                                                    ) : (
+                                                        <button onClick={() => authApi.post(`/posts/${post.id}/responses`, { content: "Waitlist", is_participation: true }).then(fetchPosts)} 
+                                                            className="w-full py-2.5 bg-gray-800 text-white rounded-xl text-[11px] font-black hover:bg-gray-900 shadow-md">
+                                                            JOIN WAITLIST / キャンセル待ち
+                                                        </button>
+                                                    )
+                                                )}
+                                                
+                                                {(isJoined || isOwner) && (
+                                                    <div className="w-full py-2 bg-orange-100 text-orange-600 rounded-xl text-[11px] font-black text-center">
+                                                        {isOwner ? "YOU ARE HOSTING THIS EVENT" : 
+                                                        allParticipants.find(p => p.user_id === currentUserId)?.content === "Waitlist" ? "ON WAITLIST (キャンセル待ち中)" : "YOU ARE JOINED!"}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (                                /* 通常チャット */
+                                <div className="flex items-start gap-2 max-w-[85%] mb-4">
+                                    <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+                                        <span className="font-black text-[10px] text-pink-500 uppercase mb-1 block">{post.author_nickname}</span>
+                                        <p className="text-gray-700 text-[13px] leading-relaxed">{post.content}</p>
                                     </div>
                                 </div>
                             )}
@@ -231,188 +471,57 @@ const parentPosts = posts.filter(p => !p.parent_id);
                 })}
             </div>
 
-{/* 3. フォームエリア（下部に固定。入力項目が増えてもスクロールして送信ボタンが見えます） */}
-<div className="bg-white border-t border-gray-100 p-3 flex-shrink-0 max-h-[55%] overflow-y-auto shadow-inner z-20">
-    <div className="flex gap-2 mb-3">
-        <button type="button" onClick={() => {
-            const newType = postType === 'meetup' ? 'normal' : 'meetup';
-            setPostType(newType);
-            if (newType === 'meetup' && !newPost.trim()) {
-                setNewPost("\n📍 集合場所：\n\n📍 開催場所：\n\n🗺️ 開催場所URLまたはMapURL：\n\n💰【支払い方法】： 当日現金 / Stripe決済 / お茶代のみ各自（※不要なものを消してください）\n※カフェ開催のためお茶代が必要です。\n\n❌【キャンセルポリシー】： 当日0時以降のキャンセル50%、NoShow100%\n※キャンセル待ちの方は当日参加が確定（繰り上げ）する場合があります。");
-            }
-        }} className={`px-4 py-1.5 rounded-full text-[10px] font-black border transition-all ${postType === 'meetup' ? 'bg-orange-600 text-white border-orange-600 shadow-sm' : 'bg-gray-50 text-gray-400'}`}>
-            <Calendar size={12} className="inline mr-1" /> MEETUP / 募集
-        </button>
-        <button type="button" onClick={() => setPostType(postType === 'ad' ? 'normal' : 'ad')} className={`px-4 py-1.5 rounded-full text-[10px] font-black border transition-all ${postType === 'ad' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-400'}`}>
-            <Megaphone size={12} className="inline mr-1" /> AD / 広告
-        </button>
-    </div>
-
-    <form onSubmit={handleSend} className="space-y-3">
-        {postType === 'meetup' ? (
-            <div className="bg-orange-50 border-2 border-orange-200 rounded-[28px] p-3 space-y-2 text-left">
-                
-                {/* 1段目：開催名 ＋ 日時 */}
-                <div className="grid grid-cols-[1fr,auto] gap-2 pb-2 border-b border-orange-200/30">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] font-bold text-orange-800 flex items-center gap-1">
-                            <MessageSquare size={10} />
-                            EVENT TITLE / 開催名
-                        </label>
-                        <input 
-                            type="text" 
-                            placeholder="例：ミステリについて熱く語る会" 
-                            className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] focus:border-orange-400 transition-all" 
-                            value={newPost.split('\n')[0] || ''} 
-                            onChange={(e) => {
-                                const lines = newPost.split('\n'); 
-                                lines[0] = e.target.value; 
-                                setNewPost(lines.join('\n'));
-                            }} 
-                        />
-                    </div>
-
-                    <div className="flex flex-col gap-1" style={{minWidth: '160px'}}>
-                        <label className="text-[9px] font-bold text-orange-800 flex items-center gap-1">
-                            <Calendar size={10} />
-                            DATE / 日時
-                        </label>
-                        <input 
-                            type="datetime-local" 
-                            className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] focus:border-orange-400 transition-all" 
-                            value={meetupDetails.date} 
-                            onChange={(e) => setMeetupDetails({...meetupDetails, date: e.target.value})} 
-                        />
-                    </div>
-                </div>
-
-                {/* 2段目：都道府県 ＋ 市区町村・町名 */}
-                <div className="grid grid-cols-[120px,1fr] gap-2 pb-2 border-b border-orange-200/30">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] font-bold text-orange-800 flex items-center gap-1">
-                            <MapPin size={10} />
-                            都道府県
-                        </label>
-                        <input 
-                            type="text" 
-                            placeholder="例：東京都" 
-                            className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] focus:border-orange-400 transition-all" 
-                            value={meetupDetails.pref} 
-                            onChange={(e) => setMeetupDetails({...meetupDetails, pref: e.target.value})} 
-                        />
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] font-bold text-orange-800">
-                            市区町村・町名
-                        </label>
-                        <input 
-                            type="text" 
-                            placeholder="例：豊島区千川" 
-                            className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] focus:border-orange-400 transition-all" 
-                            value={meetupDetails.city_town} 
-                            onChange={(e) => setMeetupDetails({...meetupDetails, city_town: e.target.value})} 
-                        />
-                    </div>
-                </div>
-
-                {/* 3段目：MAX定員 ＋ 費用 */}
-                <div className="grid grid-cols-2 gap-2 pb-2 border-b border-orange-200/30">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] font-bold text-orange-800 flex items-center gap-1">
-                            <Users size={10} />
-                            MAX / 定員
-                        </label>
-                        <input 
-                            type="number" 
-                            placeholder="5" 
-                            min="1" 
-                            max="10" 
-                            className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] focus:border-orange-400 transition-all" 
-                            value={meetupDetails.capacity} 
-                            onChange={(e) => setMeetupDetails({...meetupDetails, capacity: parseInt(e.target.value) || 5})} 
-                        />
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] font-bold text-orange-800 flex items-center gap-1">
-                            <Coins size={10} className="text-orange-500" />
-                            FEE / 費用
-                        </label>
-                        <div className="relative">
-                            <input 
-                                type="text" 
-                                placeholder="金額 or お茶代" 
-                                className="w-full px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] focus:border-orange-400 transition-all font-bold text-orange-600" 
-                                value={meetupDetails.fee} 
-                                onChange={(e) => setMeetupDetails({...meetupDetails, fee: e.target.value})} 
-                            />
-                            {meetupDetails.fee && !isNaN(Number(meetupDetails.fee)) && Number(meetupDetails.fee) > 0 && (
-                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[7px] bg-blue-500 text-white px-1 py-0.5 rounded font-black">
-                                    STRIPE
-                                </span>
-                            )}
+            {/* 3. Footer */}
+            <div className="flex-shrink-0 max-h-[55%] overflow-y-auto bg-white border-t border-gray-100 z-20 shadow-2xl p-3">
+                <form onSubmit={handleSend}>
+                    {postType === 'meetup' && (
+                        <div className="bg-orange-50 border-2 border-orange-200 rounded-[28px] p-3 space-y-2 mb-3">
+                            <div className="grid grid-cols-[1fr,auto] gap-2 pb-2 border-b border-orange-200/30">
+                                <div className="flex flex-col"><label className="text-[9px] font-bold text-orange-800">開催名</label><input value={meetupDetails.title} onChange={e => setMeetupDetails({...meetupDetails, title: e.target.value})} className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" /></div>
+                                <div className="flex flex-col" style={{minWidth: '160px'}}><label className="text-[9px] font-bold text-orange-800">日時</label><input type="datetime-local" value={meetupDetails.date} onChange={e => setMeetupDetails({...meetupDetails, date: e.target.value})} className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" /></div>
+                            </div>
+                            <div className="grid grid-cols-[120px,1fr] gap-2 pb-2 border-b border-orange-200/30">
+                                <div className="flex flex-col"><label className="text-[9px] font-bold text-orange-800">都道府県</label><input value={meetupDetails.pref} onChange={e => setMeetupDetails({...meetupDetails, pref: e.target.value})} className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" /></div>
+                                <div className="flex flex-col"><label className="text-[9px] font-bold text-orange-800">市区町村</label><input value={meetupDetails.city_town} onChange={e => setMeetupDetails({...meetupDetails, city_town: e.target.value})} className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 pb-2 border-b border-orange-200/30">
+                                <div className="flex flex-col"><label className="text-[9px] font-bold text-orange-800">MAX定員</label><input type="number" value={meetupDetails.capacity} onChange={e => setMeetupDetails({...meetupDetails, capacity: parseInt(e.target.value) || 0})} className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" /></div>
+                                <div className="flex flex-col"><label className="text-[9px] font-bold text-orange-800 flex items-center gap-1">費用{meetupDetails.fee && <span className="bg-blue-500 text-white px-1 rounded-[4px] text-[7px] italic font-black">STRIPE</span>}</label><input value={meetupDetails.fee} onChange={e => setMeetupDetails({...meetupDetails, fee: e.target.value})} className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" /></div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[9px] font-bold text-orange-800">詳細</label>
+                                <textarea value={newPost} onChange={e => setNewPost(e.target.value)} className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[12px] h-[100px] resize-none outline-none leading-relaxed" />
+                            </div>
                         </div>
+                    )}
+                    <div className="flex gap-2 items-end mb-3">
+                        {postType === 'normal' && (
+                            <textarea value={newPost} onChange={e => setNewPost(e.target.value)} placeholder="メッセージを入力..." className="flex-1 p-3 rounded-2xl bg-gray-50 border-2 border-transparent outline-none text-[13px] h-[90px] resize-none" />
+                        )}
+                        {postType === 'meetup' && <div className="flex-1" />}
+                        <button type="submit" disabled={postType === 'meetup' ? !meetupDetails.title.trim() : !newPost.trim()} className="p-4 bg-gray-900 text-white rounded-2xl shrink-0 shadow-xl mb-1 disabled:opacity-40">
+                            <Send size={20} />
+                        </button>
                     </div>
-                </div>
-
-                {/* 詳細情報 - 高さ固定 */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-[9px] font-bold text-orange-800">
-                        DETAILS / 詳細
-                    </label>
-                    <textarea 
-                        placeholder="テンプレートを編集してください" 
-                        className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[12px] h-[90px] focus:border-orange-400 transition-all resize-none leading-relaxed" 
-                        value={newPost.split('\n').slice(1).join('\n')} 
-                        onChange={(e) => {
-                            const firstLine = newPost.split('\n')[0] || ''; 
-                            setNewPost(firstLine + '\n' + e.target.value);
-                        }} 
-                    />
-                </div>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => switchPostType('normal')} className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${postType === 'normal' ? 'bg-gray-800 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>CHAT</button>
+                        <button type="button" onClick={() => switchPostType('meetup')} className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${postType === 'meetup' ? 'bg-orange-500 text-white shadow-md' : 'bg-orange-50 text-orange-300'}`}>MEETUP</button>
+                        <button type="button" onClick={() => setShowAdModal(true)} className="flex-1 py-2 rounded-xl text-[10px] font-black transition-all bg-green-50 text-green-400 hover:bg-green-500 hover:text-white">AD</button>
+                    </div>
+                </form>
             </div>
-        ) : null}
 
-        {/* 送信ボタン：どのモードでも常に最後に表示 */}
-<div className="flex gap-2 sticky bottom-0 bg-white pt-1">
-    {replyingTo && (
-        <div className="absolute -top-8 left-0 right-0 bg-pink-50 p-1 text-[9px] text-pink-700 font-bold flex justify-between rounded-t-lg border border-pink-100">
-            <span>💬 {replyingTo.author_nickname} への返信</span>
-            <button type="button" onClick={() => {
-                setReplyingTo(null);
-                setNewPost('');
-            }}>✕</button>
-        </div>
-    )}
-
-    {/* ⛔ meetup時は表示しない */}
-    {postType !== 'meetup' && (
-        <textarea 
-            value={newPost} 
-            onChange={(e) => setNewPost(e.target.value)} 
-            placeholder="Type a message..." 
-            className="flex-1 px-4 py-2 bg-gray-50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all resize-none text-sm" 
-            rows={1} 
-        />
-    )}
-
-    <button 
-        type="submit" 
-        disabled={!newPost.trim()} 
-        className={`bg-gray-900 text-white rounded-2xl hover:bg-orange-600 disabled:opacity-20 transition-all shadow-lg flex items-center justify-center font-black tracking-tighter ${
-            postType === 'normal' ? 'p-3 shrink-0' : 'flex-1 py-4 text-[14px]'
-        }`}
-    >
-        <Send size={18} className={postType === 'normal' ? '' : 'mr-3'} /> 
-        {postType === 'meetup' && "¥500：MEET UP POST"}
-        {/* 💡 ここを adPrice に連動させます */}
-        {postType === 'ad' && `¥${adPrice}：ADVERTIZEMENT POST`}
-    </button>
-</div>
-
-    </form>
-</div>
+            {activeChat && (
+                <MeetupChatModal postId={activeChat.id} meetupTitle={activeChat.title} onClose={() => setActiveChat(null)} />
+            )}
+            {showAdModal && (
+                <AdPostModal
+                    currentCategoryId={parseInt(chatTargetId)}
+                    currentCategoryName={currentCategoryName || ''}
+                    onClose={() => setShowAdModal(false)}
+                    onPosted={fetchPosts}
+                />
+            )}
         </div>
     );
 };

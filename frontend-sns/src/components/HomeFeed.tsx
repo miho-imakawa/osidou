@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, UserMoodResponse, fetchFollowingMoods } from '../api.ts';
-import { MessageSquare, Clock } from 'lucide-react'; // UserCircleは使わないので削除
+import { MessageSquare, Clock } from 'lucide-react';
 import MoodInput from './MoodInput.tsx';
 
 const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
@@ -23,18 +23,18 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     useEffect(() => {
         loadMoods();
     }, []);
-    
+
     const MOOD_TYPES: Record<string, { label: string; emoji: string }> = {
-        'motivated': { label: 'メラメラ', emoji: '🔥' },
-        'excited':   { label: 'ワクワク', emoji: '🤩' },
-        'happy':     { label: 'ルンルン', emoji: '😊' },
-        'calm':      { label: 'ホッコリ', emoji: '😌' },
-        'neutral':   { label: 'ボチボチ', emoji: '😐' },
-        'anxious':   { label: 'モヤモヤ', emoji: '😟' },
-        'tired':     { label: 'ヘトヘト', emoji: '😥' },
-        'sad':       { label: 'ショボーン', emoji: '😭' },
-        'angry':     { label: 'プンプン', emoji: '😠' },
-        'grateful':  { label: 'ホロリ', emoji: '🙏' },
+        'motivated': { label: 'On Fire!/活',   emoji: '🔥' },
+        'excited':   { label: 'Yay/上々!',      emoji: '🤩' },
+        'happy':     { label: 'Happy/幸',       emoji: '😊' },
+        'calm':      { label: 'Relax/温',       emoji: '😌' },
+        'neutral':   { label: '±Meh/中',         emoji: '😐' },
+        'anxious':   { label: 'Hmm/焦',          emoji: '😟' },
+        'tired':     { label: 'No Power/疲',     emoji: '😥' },
+        'sad':       { label: 'SAD/悲',          emoji: '😭' }, 
+        'angry':     { label: 'Grrr!/怒',        emoji: '😠' },
+        'grateful':  { label: 'Aww/感謝',        emoji: '🙏' }, 
     };
 
     return (
@@ -61,9 +61,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
 
                 <div className="space-y-2">
                     {friendMoods.map((friendMood) => {
-                        // 気分データの詳細を取得
-                        const moodDetail = MOOD_TYPES[friendMood.current_mood] || 
-                            { label: '不明', emoji: '🤔' };
+                        const moodDetail = MOOD_TYPES[friendMood.current_mood] || { label: '不明', emoji: '🤔' };
                         
                         return (
                             <div 
@@ -71,19 +69,15 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                                 className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-150"
                             >
                                 <div className="flex items-center overflow-hidden flex-1">
-                                    {/* 1. 日付（マイページに合わせて一番左へ） */}
+                                    {/* 1. 日付 */}
                                     <span className="text-xs text-gray-500 mr-4 shrink-0">
                                         {friendMood.mood_updated_at && new Date(friendMood.mood_updated_at).toLocaleString('ja-JP', {
-                                            month: 'numeric',
-                                            day: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
+                                            month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
                                         })}
                                     </span>
 
-                                    {/* 2. ユーザー名・気分・コメントを1列に */}
+                                    {/* 2. ユーザー名・気分・コメント */}
                                     <p className="text-sm font-medium text-gray-800 flex items-center min-w-0 truncate">
-                                        {/* 名前（メモ） */}
                                         <span className="shrink-0 font-bold mr-2">
                                             {(() => {
                                                 const name = friendMood.nickname || (friendMood.email ? friendMood.email.split('@')[0] : 'ユーザー');
@@ -92,13 +86,12 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                                             })()}
                                         </span>
 
-                                        {/* 気分絵文字とラベル */}
                                         <span className="text-lg mr-2 shrink-0">{moodDetail.emoji}</span>
                                         <span className="shrink-0">{moodDetail.label}</span>
 
-                                        {/* コメント */}
-                                        {friendMood.current_mood_comment && (
-                                            <span className="text-sm text-gray-600 ml-2 truncate">
+                                        {/* 💡 フラグが True の時だけコメントを表示する */}
+                                        {friendMood.is_mood_comment_visible && friendMood.current_mood_comment && (
+                                            <span className="text-sm text-gray-600 ml-2 truncate italic">
                                                 : {friendMood.current_mood_comment}
                                             </span>
                                         )}
@@ -110,7 +103,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                 </div>
             </div>
         </div>
-    ); // ここで return を閉じる
-}; // ここで HomeFeed 関数を閉じる
+    );
+};
 
 export default HomeFeed;

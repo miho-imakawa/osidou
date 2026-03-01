@@ -1,9 +1,8 @@
 import enum
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, ForeignKey, Float, Date, Text, 
-    Enum as SQLEnum, PrimaryKeyConstraint, Boolean, 
-    UniqueConstraint 
+    Enum as SQLEnum, PrimaryKeyConstraint, UniqueConstraint 
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -14,191 +13,163 @@ from datetime import datetime
 # 💡 1. Enum定義 (定数)
 # ==========================================
 
-# サブスクリプションプラン
 class SubscriptionPlan(str, enum.Enum):
-    BASE_MEMBERSHIP = "base_membership"  # 月額200円
-    MONTHLY_TABLE = "monthly_table"      # 月極25,000円
-    TEN_DAY_TABLE = "ten_day_table"      # 10日席10,000円
+    BASE_MEMBERSHIP = "base_membership"
+    MONTHLY_TABLE = "monthly_table"
+    TEN_DAY_TABLE = "ten_day_table"
 
-# 趣味の役割タイプ (Doers vs Fans)
 class HobbyRoleType(str, enum.Enum):
-    DOERS = "doers"  # する人（演奏する人、描く人、競技する人、料理する人、旅行する人など）
-    FANS = "fans"    # 見る人、聞く人、応援する人
+    DOERS = "doers"
+    FANS = "fans"
 
-# 感情タイプ (Mood Types) - プリセット10種類
 class MoodType(str, enum.Enum):
-    HAPPY = "happy"          # 😊 幸せ
-    EXCITED = "excited"      # 🤩 ワクワク
-    CALM = "calm"            # 😌 穏やか
-    TIRED = "tired"          # 😴 疲れた
-    SAD = "sad"              # 😢 悲しい
-    ANXIOUS = "anxious"      # 😰 不安
-    ANGRY = "angry"          # 😠 怒り
-    NEUTRAL = "neutral"      # 😐 普通
-    GRATEFUL = "grateful"    # 🙏 感謝
-    MOTIVATED = "motivated"  # 💪 やる気
+    HAPPY = "happy"
+    EXCITED = "excited"
+    CALM = "calm"
+    TIRED = "tired"
+    SAD = "sad"
+    ANXIOUS = "anxious"
+    ANGRY = "angry"
+    NEUTRAL = "neutral"
+    GRATEFUL = "grateful"
+    MOTIVATED = "motivated"
 
-# フレンド申請の状態
 class FriendRequestStatus(str, enum.Enum):
-    PENDING = "pending"       # 申請中
-    ACCEPTED = "accepted"     # 承認済み
-    REJECTED = "rejected"     # 拒否済み
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
 
 # ==========================================
-# 💡 2. SNS・コミュニティ機能モデル（多層ツリー構造）
+# 💡 2. SNS・コミュニティ機能モデル
 # ==========================================
-
-# 【多層ツリー構造】Category, Role, Genre, HobbyGroup を統合
-# backend/app/models.py
 
 class HobbyCategory(Base):
     __tablename__ = "hobby_categories"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(200), index=True) 
+    name = Column(String(200), index=True, nullable=False)  # 💡 nullable=False追加
+    alias_name = Column(String, nullable=True)
     parent_id = Column(Integer, ForeignKey('hobby_categories.id'), nullable=True)
-    depth = Column(Integer, nullable=False)
-    
-    # 💡 1. マスター（本尊）へのリンクを追加
-    # これにより「ブランチ（出張所）」が「マスター（本尊）」を指せるようになります
+    depth = Column(Integer, nullable=False, default=0)  # 💡 default追加
     master_id = Column(Integer, ForeignKey('hobby_categories.id'), nullable=True)
-    
-    unique_code = Column(String(7), unique=True, index=True)
+    unique_code = Column(String(7), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
     role_type = Column(SQLEnum(HobbyRoleType), nullable=True)
-    
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
-    # リレーション
     parent = relationship(
         "HobbyCategory", 
         remote_side=[id], 
         backref="children", 
         uselist=False,
-        foreign_keys=[parent_id]  # 👈 親子関係にはこれを使うと明示
+        foreign_keys=[parent_id]
     )
     
-    # 💡 2. マスター情報を取得するためのリレーションを追加
-    # remote_side=[id] を使うことで、自分自身のテーブル内で親子やマスターを表現できます
     master = relationship(
         "HobbyCategory", 
         remote_side=[id], 
-        foreign_keys=[master_id], # 👈 マスターリンクにはこれを使うと明示
+        foreign_keys=[master_id],
         backref="aliases"
     )
     
-    # 以前の HobbyGroup に相当するリレーション
-    members = relationship("UserHobbyLink", back_populates="hobby_category", cascade="all, delete-orphan")
+    members = relationship(
+        "UserHobbyLink", 
+        back_populates="hobby_category", 
+        cascade="all, delete-orphan",
+        foreign_keys="[UserHobbyLink.hobby_category_id]" # ⬅️ これを追加！
+    )
     posts = relationship("HobbyPost", back_populates="hobby_category")
-    
-    # 【通知モデルとのリレーション】
-    # backref="notifications_sent_to" は User モデル側で定義済みのため不要
 
-# 【中間テーブル】ユーザー ⇔ 趣味カテゴリ（旧 UserHobbyLink）
+# app/models.py 最終版（今夜の作業用）
+
 class UserHobbyLink(Base):
     __tablename__ = "user_hobby_links"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     
-    # 【修正】hobby_group_id を hobby_category_id に変更
-    hobby_category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"))
+    # 💡 1. ここがカラムの定義です。名前が hobby_category_id であることを確認してください。
+    hobby_category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"), nullable=False)
+    
+    # 💡 2. 本尊（マスター）IDのカラム定義です。
+    master_id = Column(Integer, ForeignKey("hobby_categories.id"), nullable=False, index=True) # 💡 nullable=Falseに強制
+    
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
     
-    # Userとのリレーション: Userモデル側で 'hobby_categories' を期待
     user = relationship("User", back_populates="hobby_categories")
-    hobby_category = relationship("HobbyCategory", back_populates="members")
 
-# C:\osidou\backend\app\models.py の Follow クラス部分
+    # 💡 3. リレーションシップの定義。
+    # さっきの「ナミナミ」対策として、クラス名.カラム名 で指定します。
+    hobby_category = relationship(
+        "HobbyCategory", 
+        back_populates="members",
+        foreign_keys=[hobby_category_id]
+    )
+    
+    # 💡 4. ユニーク制約。
+    # 1.で定義したカラム名と完全に一致させる必要があります。
+    __table_args__ = (
+        # 💡 ここを master_id に変更！
+        UniqueConstraint('user_id', 'master_id', name='unique_user_master_entry'),
+    )
 
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+class CategoryDetail(Base):
+    __tablename__ = "category_details"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"), unique=True)
+    description = Column(Text, nullable=True)
+    cast_json = Column(Text, nullable=True)      # JSON文字列で保存
+    sections_json = Column(Text, nullable=True)  # JSON文字列で保存
+    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    category = relationship("HobbyCategory")
+    editor = relationship("User", foreign_keys=[updated_by])
 
-# models.py の正しい構造
-
-# ✅ Follow クラス (Chat/場所用)
-# 人と人の関係ではなく、人とコミュニティ/場所の関係
 class Follow(Base):
     __tablename__ = "follows"
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 ondelete追加
     target_id = Column(Integer, nullable=False)
-    target_type = Column(String, nullable=False)  # "chat", "place", "community"
-
+    target_type = Column(String(50), nullable=False)  # 💡 長さ指定追加
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
     user = relationship("User")
-
+    
+    # 💡 同じユーザーが同じ対象を重複フォローしないように
+    __table_args__ = (UniqueConstraint('user_id', 'target_id', 'target_type', name='unique_follow'),)
 
 class Friendship(Base):
     __tablename__ = "friendships"
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    friend_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-
-# 💡 これを追加：自分だけが見える相手のメモ（「父」など）
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 ondelete追加
+    friend_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 ondelete追加
     friend_note = Column(String(100), nullable=True)
-
-    is_muted = Column(Boolean, default=False)
-    is_hidden = Column(Boolean, default=False)
+    is_muted = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
+    is_hidden = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
+    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
 
     user = relationship("User", foreign_keys=[user_id])
     friend = relationship("User", foreign_keys=[friend_id])
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "friend_id", name="unique_friendship"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "friend_id", name="unique_friendship"),)
 
-
-
-# ✅ FriendRequest クラス (人と人の関係)
 class FriendRequest(Base):
     __tablename__ = "friend_requests"
-
     id = Column(Integer, primary_key=True, index=True)
     requester_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     receiver_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-
-    status = Column(
-        SQLEnum(FriendRequestStatus),
-        default=FriendRequestStatus.PENDING,
-        nullable=False
-    )
-    
-    # # 友達管理フラグ（status='accepted'の場合に使用）
-    # is_muted = Column(Boolean, default=False)   # 更新停止
-    # is_hidden = Column(Boolean, default=False)  # 非表示
-
+    status = Column(SQLEnum(FriendRequestStatus), default=FriendRequestStatus.PENDING, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    __table_args__ = (
-        UniqueConstraint('requester_id', 'receiver_id', name='_requester_receiver_uc'),
-    )
+    requester = relationship("User", foreign_keys=[requester_id], back_populates="requests_sent")
+    receiver = relationship("User", foreign_keys=[receiver_id], back_populates="requests_received")
 
-    requester = relationship(
-        "User",
-        foreign_keys=[requester_id],
-        back_populates="requests_sent"
-    )
+    __table_args__ = (UniqueConstraint('requester_id', 'receiver_id', name='_requester_receiver_uc'),)
 
-    receiver = relationship(
-        "User",
-        foreign_keys=[receiver_id],
-        back_populates="requests_received"
-    )
-    
 # ==========================================
-# 💡 3. 投稿機能
-# ==========================================
-
-# 趣味グループへの投稿
-# ==========================================
-# 💡 3. 投稿機能 (修正版)
+# 💡 3. 投稿機能 (HobbyPost)
 # ==========================================
 
 class HobbyPost(Base):
@@ -206,336 +177,308 @@ class HobbyPost(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     content = Column(Text, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    hobby_category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"))
-    is_system = Column(Boolean, default=False)
-    parent_id = Column(Integer, ForeignKey("hobby_posts.id"), nullable=True) # 🔥 追加
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    hobby_category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"), nullable=False)
+    is_system = Column(Boolean, default=False, nullable=False)
+    parent_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=True)
 
-    # 地域タグ
     region_tag_pref = Column(String(50), index=True, nullable=True)
     region_tag_city = Column(String(100), index=True, nullable=True)
     
-    # --- 既存の Meet up用 ---
-    is_meetup = Column(Boolean, default=False)
+    # --- MeetUp関連 ---
+    is_meetup = Column(Boolean, default=False, nullable=False)
     meetup_date = Column(DateTime, nullable=True)
     meetup_location = Column(String(200), nullable=True)
     meetup_capacity = Column(Integer, nullable=True)
+    meetup_fee_info = Column(Text, nullable=True)
+    meetup_status = Column(String(20), default="open", nullable=False)
     
-    # MeetUpの詳細情報を格納するカラムを追加
-    meetup_fee_info = Column(Text, nullable=True)   # "施設代: 500円/人数" などのテキスト
-    meetup_status = Column(String(20), default="open") # 募集状況 (open/closed)
-    
-    # --- 💡 新規追加: 広告用 ---
-    is_ad = Column(Boolean, default=False)          # 有料広告フラグ
-    ad_end_date = Column(DateTime, nullable=True)   # 広告の掲載終了期限
-    
-    # --- 💡 新規追加: リポスト用 ---
-    # 自分自身のテーブル(hobby_posts)のIDを指す自己参照
-    original_post_id = Column(Integer, ForeignKey("hobby_posts.id"), nullable=True)
+    # --- 広告・リポスト関連 (ここをスッキリ整理しました) ---
+    is_ad = Column(Boolean, default=False, nullable=False)
+    ad_color = Column(String(20), nullable=True, default="green")  # ★メンカラ用
+    ad_start_date = Column(DateTime, nullable=True)
+    ad_end_date = Column(DateTime, nullable=True)
+    original_post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="SET NULL"), nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
-    # リレーション
+    # --- リレーションシップ ---
     user = relationship("User", back_populates="hobby_posts")
     hobby_category = relationship("HobbyCategory", back_populates="posts")
     responses = relationship("PostResponse", back_populates="post", cascade="all, delete-orphan")
-    # 🔥 リレーションシップを明示的に指定
-# 🔥 1. 返信用（スレッド用）
-    parent = relationship(
-        "HobbyPost", 
-        remote_side=[id], 
-        foreign_keys=[parent_id], 
-        backref="children_posts"  # 名前を replies から children_posts に変更
-    )
+    meetup_messages = relationship("MeetupMessage", back_populates="post", cascade="all, delete-orphan")
 
-    # 🔥 2. リポスト用（引用用）
-    original_post = relationship(
-        "HobbyPost", 
-        remote_side=[id],
-        foreign_keys=[original_post_id], # カラム名を parent_id から original_post_id に修正
-        backref="reposts"                # 名前を replies から reposts に変更
-    )
+    parent = relationship("HobbyPost", remote_side=[id], foreign_keys=[parent_id], backref="children_posts")
+    original_post = relationship("HobbyPost", remote_side=[id], foreign_keys=[original_post_id], backref="reposts")
 
-# 投稿への返信（PostResponse）
+class UserAdInteraction(Base):
+    __tablename__ = "user_ad_interactions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=False)
+    is_liked = Column(Boolean, default=False)
+    is_pinned = Column(Boolean, default=False)
+    is_closed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+    
+    __table_args__ = (UniqueConstraint('user_id', 'post_id', name='uq_user_ad'),)
+
 class PostResponse(Base):
     __tablename__ = "post_responses"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
     
     content = Column(Text, nullable=True)
-    is_participation = Column(Boolean, default=False) # Meet up参加表明
+    is_participation = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
+    is_attended = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="post_responses")
     post = relationship("HobbyPost", back_populates="responses")
+    
+    # 💡 同じユーザーが同じ投稿に重複参加しないように
+    __table_args__ = (UniqueConstraint('user_id', 'post_id', name='unique_user_post_response'),)
+
+class MeetupMessage(Base):
+    __tablename__ = "meetup_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    author_nickname = Column(String(100), nullable=False)  # 💡 nullable=False追加
+    content = Column(Text, nullable=False)  # 💡 nullable=False追加
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    post = relationship("HobbyPost", back_populates="meetup_messages")
+    user = relationship("User")
 
 # ==========================================
-# 💡 4. 通知モデル (HobbyCategoryへの告知機能に対応)
+# 💡 4. 通知・感情・その他
 # ==========================================
 
 class Notification(Base):
     __tablename__ = "notifications"
     
     id = Column(Integer, primary_key=True, index=True)
-    
-    # 💡 修正: 通知対象のユーザーID（宛先）を追加
     recipient_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False) 
-    
-    # 通知の送信元（投稿者やシステム）
-    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    
-    # この通知がどのカテゴリ階層への告知かを示す (Meetupの地域フィルタリングなど用)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 ondelete追加
     hobby_category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"), nullable=False)
-    
     message = Column(Text, nullable=False)
-    
-    # 関連する MeetUp イベントの ID 
-    event_post_id = Column(Integer, ForeignKey("hobby_posts.id"), nullable=True)
-    
+    event_post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="SET NULL"), nullable=True)  # 💡 ondelete追加
+    is_read = Column(Boolean, default=False, nullable=False)  # 💡 既読フラグ追加
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
-    # リレーション
-    # 🚨 修正点: 'foreign_keys' を指定し、recipient_id のみが User モデルを参照することを明確化
     recipient = relationship("User", foreign_keys=[recipient_id], back_populates="notifications_received") 
     sender = relationship("User", foreign_keys=[sender_id])
-    hobby_category = relationship("HobbyCategory", backref="notifications_sent_to") 
+    hobby_category = relationship("HobbyCategory") 
     event_post = relationship("HobbyPost")
-
-# ==========================================
-# 💡 6. 感情ログ (Mood Log) - 軽量化設計
-# ==========================================
 
 class MoodLog(Base):
     __tablename__ = "mood_logs"
-
+    
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    
-    # 感情タイプ（プリセットから選択）
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
     mood_type = Column(SQLEnum(MoodType), nullable=False)
-    
-    # ひとことコメント（任意）
     comment = Column(String(200), nullable=True)
-    
-    # 公開設定
-    is_visible = Column(Boolean, default=True)
-    
+    is_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
+    
     user = relationship("User", back_populates="mood_logs")
 
 # ==========================================
-# 💡 7. 既存の管理機能モデル (店舗・予約・決済)
+# 💡 5. 管理機能モデル (店舗・予約・決済)
 # ==========================================
 
 class UserSubscription(Base):
     __tablename__ = "user_subscriptions"
+    
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE")) 
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
     plan_type = Column(SQLEnum(SubscriptionPlan), nullable=False)
-    stripe_subscription_id = Column(String, unique=True, nullable=True) 
-    status = Column(String(50), default="active") 
+    stripe_subscription_id = Column(String(255), unique=True, nullable=True)  # 💡 長さ指定追加
+    status = Column(String(50), default="active", nullable=False)  # 💡 nullable=False追加
     next_billing_date = Column(Date, nullable=True) 
+    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
+    
     user = relationship("User", back_populates="subscriptions")
 
 class Branch(Base):
     __tablename__ = "branches"
+    
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, nullable=False)
-    address = Column(String, nullable=True)
+    name = Column(String(100), unique=True, nullable=False)  # 💡 長さ指定追加
+    address = Column(String(200), nullable=True)  # 💡 長さ指定追加
     max_capacity = Column(Integer, nullable=False, default=50) 
     hourly_base_fee = Column(Float, nullable=False, default=300.0)
+    
     events = relationship("Event", back_populates="branch")
 
 class EventRegistration(Base):
     __tablename__ = "event_registrations"
+    
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True) 
     event_id = Column(Integer, ForeignKey("events.id", ondelete="CASCADE"), primary_key=True)
-    registered_at = Column(DateTime, default=datetime.now) 
+    registered_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 server_default使用
+    
     user = relationship("User", back_populates="event_registrations")
     event = relationship("Event", back_populates="registrations")
 
 class Event(Base):
     __tablename__ = "events"
+    
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True, nullable=False)
-    description = Column(String, nullable=True)
+    title = Column(String(200), index=True, nullable=False)  # 💡 長さ指定追加
+    description = Column(Text, nullable=True)
     branch_id = Column(Integer, ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
     capacity = Column(Integer, nullable=False, default=12) 
     creator_price = Column(Integer, nullable=False, default=0)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
-    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
+    
     owner = relationship("User", back_populates="owned_events")
     branch = relationship("Branch", back_populates="events") 
     registrations = relationship("EventRegistration", back_populates="event", cascade="all, delete-orphan") 
 
 class Seat(Base):
     __tablename__ = "seats"
+    
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), unique=True, index=True)
-    location = Column(String(100)) 
-    seat_type = Column(String(50), default="flexible") 
-    price_per_hour = Column(Float, default=500.0) 
+    name = Column(String(50), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
+    location = Column(String(100), nullable=True) 
+    seat_type = Column(String(50), default="flexible", nullable=False)  # 💡 nullable=False追加
+    price_per_hour = Column(Float, default=500.0, nullable=False)  # 💡 nullable=False追加
+    
     reservations = relationship("Reservation", back_populates="seat")
 
 class AccessLog(Base):
     __tablename__ = "access_logs"
+    
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
     entry_time = Column(DateTime, nullable=False)
     exit_time = Column(DateTime, nullable=True)
+    
     user = relationship("User", back_populates="access_logs")
 
 class Reservation(Base):
     __tablename__ = "reservations"
+    
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE")) 
-    seat_id = Column(Integer, ForeignKey("seats.id", ondelete="CASCADE")) 
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    seat_id = Column(Integer, ForeignKey("seats.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
-    status = Column(String(20), default="active") 
+    status = Column(String(20), default="active", nullable=False)  # 💡 nullable=False追加
+    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
+    
     user = relationship("User", back_populates="reservations")
     seat = relationship("Seat", back_populates="reservations")
 
 class Invoice(Base):
     __tablename__ = "invoices"
+    
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE")) 
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
     billing_start_date = Column(Date, nullable=False)
     billing_end_date = Column(Date, nullable=False)
-    total_amount = Column(Float, default=0.0)
-    status = Column(String(50), default="pending") 
+    total_amount = Column(Float, default=0.0, nullable=False)  # 💡 nullable=False追加
+    status = Column(String(50), default="pending", nullable=False)  # 💡 nullable=False追加
     payment_date = Column(DateTime, nullable=True) 
+    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
+    
     user = relationship("User", back_populates="invoices")
 
 # ==========================================
-# 💡 8. ユーザーモデル (User) - 全統合版
+# 💡 6. ユーザーモデル (User)
 # ==========================================
 
 class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    
-    # 基本情報
-    public_code = Column(String(7), unique=True, index=True)
-    username = Column(String(50), unique=True, index=True)
-    email = Column(String(120), unique=True, index=True)
-    hashed_password = Column(String(255))
-    is_company = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True)
-    
-    # 生まれ年月 (統計用: 差別防止のため「日」は持たない)
-    birth_year_month = Column(String(7), nullable=True)  # 例: "1990-01"
-
-    # 性別 (統計用: 多様性に配慮)
-    # ここにEnumを定義するか、Stringで持つ
-    gender = Column(String(20), nullable=True)  # "male", "female", "other", "no_answer"
-    
-    # 統計グラフ公開への同意フラグ（任意）
-    is_stats_visible = Column(Boolean, default=True)
-    
-    # SNS用プロフィール
+    public_code = Column(String(7), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
+    username = Column(String(50), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
+    email = Column(String(120), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
+    hashed_password = Column(String(255), nullable=False)  # 💡 nullable=False追加
+    is_company = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
+    is_active = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    birth_year_month = Column(String(7), nullable=True)
+    gender = Column(String(20), nullable=True)
+    is_stats_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
     nickname = Column(String(100), unique=True, index=True, nullable=True) 
     prefecture = Column(String(50), index=True, nullable=True)
     city = Column(String(100), index=True, nullable=True)
     town = Column(String(100), index=True, nullable=True)
 
-    hobby_categories = relationship("UserHobbyLink", back_populates="user")
-    hobby_posts = relationship("HobbyPost", back_populates="user")
-    post_responses = relationship("PostResponse", back_populates="user")
-
-    requests_sent = relationship(
-        "FriendRequest",
-        foreign_keys="FriendRequest.requester_id",
-        back_populates="requester",
-        cascade="all, delete-orphan"
-    )
-
-    requests_received = relationship(
-        "FriendRequest",
-        foreign_keys="FriendRequest.receiver_id",
-        back_populates="receiver",
-        cascade="all, delete-orphan"
-    )
-    
-    friendships = relationship("Friendship", foreign_keys="Friendship.user_id")
-    follows = relationship("Follow")    
-    # --- 1. 入推しとSNSリンク ---
-
-    # 💡 新規追加: 入推しとSNSリンク (出力用)
-    oshi_page_url = Column(String(255), nullable=True) # 💡 Columnを使用し、型をStringに
+    bio = Column(Text, nullable=True)
+    oshi_page_url = Column(String(255), nullable=True)
     facebook_url = Column(String(255), nullable=True)
     x_url = Column(String(255), nullable=True)
     instagram_url = Column(String(255), nullable=True)
-    note_url = Column(String(255), nullable=True)    
-    # 💡 新規追加: 自己紹介とプライバシー設定フラグ
-    bio = Column(Text, nullable=True)
-    is_member_count_visible = Column(Boolean, default=True) # 人数情報の公開
-    is_pref_visible = Column(Boolean, default=True)         # 都道府県の公開
-    is_city_visible = Column(Boolean, default=True)          # 区市の公開
-    is_town_visible = Column(Boolean, default=True)          # Townの公開
-    is_notification_visible = Column(Boolean, default=True)  # 通知情報の公開 (関わっている通知)
-    
-    # 💡 安全機能用のカラム
-    is_restricted = Column(Boolean, default=False) # 通報累計などで自動的にTrueにする用
-    report_count = Column(Integer, default=0)      # 被通報合計数
+    note_url = Column(String(255), nullable=True)
 
-    # 現在の感情状態（最新のMood Logから自動更新）
-    current_mood = Column(SQLEnum(MoodType), default=MoodType.NEUTRAL) 
+    is_member_count_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    is_pref_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    is_city_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    is_town_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    is_notification_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    
+    is_restricted = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
+    report_count = Column(Integer, default=0, nullable=False)  # 💡 nullable=False追加
+
+    current_mood = Column(SQLEnum(MoodType), default=MoodType.NEUTRAL, nullable=False)  # 💡 nullable=False追加
     current_mood_comment = Column(String(200), nullable=True)
     mood_updated_at = Column(DateTime, nullable=True)
-    is_mood_visible = Column(Boolean, default=True)
+    is_mood_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
     
-    # リレーションシップ
-    # 管理機能系
+    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())  # 💡 更新日時追加
+    
     subscriptions = relationship("UserSubscription", back_populates="user")
     access_logs = relationship("AccessLog", back_populates="user")
     reservations = relationship("Reservation", back_populates="user")
     invoices = relationship("Invoice", back_populates="user")
     owned_events = relationship("Event", back_populates="owner")
     event_registrations = relationship("EventRegistration", back_populates="user", cascade="all, delete-orphan")
+    mood_logs = relationship("MoodLog", back_populates="user", order_by="desc(MoodLog.created_at)")
     
-    # SNS系
     hobby_categories = relationship("UserHobbyLink", back_populates="user")
     hobby_posts = relationship("HobbyPost", back_populates="user")
     post_responses = relationship("PostResponse", back_populates="user")
     
-    # 🚨 修正点: Notification リレーションの外部キーを明確に指定
+    requests_sent = relationship("FriendRequest", foreign_keys="FriendRequest.requester_id", back_populates="requester", cascade="all, delete-orphan")
+    requests_received = relationship("FriendRequest", foreign_keys="FriendRequest.receiver_id", back_populates="receiver", cascade="all, delete-orphan")
+    friendships = relationship("Friendship", foreign_keys="Friendship.user_id")
+    follows = relationship("Follow", overlaps="user") #
+
     notifications_received = relationship(
         "Notification", 
         back_populates="recipient", 
         foreign_keys="[Notification.recipient_id]", 
         cascade="all, delete-orphan"
     )
-    
-    # 感情ログ（最新3ヶ月/1000件まで保持）
-    mood_logs = relationship("MoodLog", back_populates="user", order_by="desc(MoodLog.created_at)")
 
 # ==========================================
-# 💡 9. 安全機能 (Report / Block)
+# 💡 7. 安全機能 (Report / Block)
 # ==========================================
 
 class PostReport(Base):
     __tablename__ = "post_reports"
-
+    
     id = Column(Integer, primary_key=True, index=True)
     reporter_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=False)
-    
-    # 通報理由（任意）
     reason = Column(String(200), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # リレーション
+    
     reporter = relationship("User", foreign_keys=[reporter_id])
     post = relationship("HobbyPost")
-
-    # 同じ人が同じ投稿を何度も通報できないようにする
-    __table_args__ = (
-        UniqueConstraint('reporter_id', 'post_id', name='unique_report_per_user'),
-    )
+    
+    __table_args__ = (UniqueConstraint('reporter_id', 'post_id', name='unique_report_per_user'),)

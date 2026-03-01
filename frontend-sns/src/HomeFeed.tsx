@@ -26,16 +26,16 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     
     // 💡 あなたが決めた最強のマッピング
     const MOOD_TYPES: Record<string, { label: string; emoji: string }> = {
-        'motivated': { label: 'メラメラ', emoji: '🔥' },
-        'excited':   { label: 'ワクワク', emoji: '🤩' },
-        'happy':     { label: 'ルンルン', emoji: '😊' },
-        'calm':      { label: 'ホッコリ', emoji: '😌' },
-        'neutral':   { label: 'ボチボチ', emoji: '😐' },
-        'anxious':   { label: 'モヤモヤ', emoji: '😟' },
-        'tired':     { label: 'ヘトヘト', emoji: '😥' },
-        'sad':       { label: 'ショボーン', emoji: '😭' },
-        'angry':     { label: 'プンプン', emoji: '😠' },
-        'grateful':  { label: 'ホロリ', emoji: '🙏' },
+        'motivated': { label: 'On Fire!',     emoji: '🔥' },
+        'excited':   { label: 'Yay!',         emoji: '🤩' },
+        'happy':     { label: 'Happy',        emoji: '😊' },
+        'calm':      { label: 'Ahh...',       emoji: '😌' },
+        'neutral':   { label: 'Meh',          emoji: '😐' },
+        'anxious':   { label: 'Hmm...',       emoji: '😟' },
+        'tired':     { label: 'Ugh...',       emoji: '😥' },
+        'sad':       { label: 'Sigh/ザーッ',   emoji: '😭' }, 
+        'angry':     { label: 'Grrr!',        emoji: '😠' },
+        'grateful':  { label: 'Aww/感謝',      emoji: '🙏' }, 
     };
 
     return (

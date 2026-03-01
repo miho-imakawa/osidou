@@ -5,17 +5,77 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, distinct, func
 from typing import List, Dict, Set
 import collections
-
+import json
 from ..database import get_db
-from .. import models 
-from ..schemas.hobbies import HobbyCategoryResponse, HobbySearchParams
+from .. import models, schemas 
+from ..schemas.hobbies import HobbyCategoryResponse, HobbySearchParams, CategoryDetailBase
 from .auth import get_current_user
+from pydantic import BaseModel
 
 router = APIRouter(
     prefix="/hobby-categories",
     tags=["hobbies"],
     responses={404: {"description": "Not found"}},
 )
+
+# 💡 実料金計算ロジック
+def calculate_ad_fee(unique_users: int) -> int:
+    """
+    599人まで500円。
+    600人以上は1人1円、かつ下2桁切り捨て。
+    """
+    if unique_users <= 599:
+        return 500
+    # 100単位で切り捨て (例: 1289 -> 1200)
+    return (unique_users // 100) * 100
+
+class AdQuoteRequest(BaseModel):
+    category_ids: list[int]
+
+@router.post("/ad-quote")
+async def get_ad_quote(request: AdQuoteRequest, db: Session = Depends(get_db)):
+    category_ids = request.category_ids
+    
+    unique_user_count = db.query(func.count(distinct(models.UserHobbyLink.user_id)))\
+        .filter(models.UserHobbyLink.master_id.in_(category_ids))\
+        .scalar() or 0
+    
+    total_user_count = db.query(func.count(models.UserHobbyLink.user_id))\
+        .filter(models.UserHobbyLink.master_id.in_(category_ids))\
+        .scalar() or 0
+    
+    fee = calculate_ad_fee(unique_user_count)
+    
+    return {
+        "unique_user_count": unique_user_count,
+        "total_user_count": total_user_count,
+        "estimated_fee": fee,
+        "currency": "JPY"
+    }
+
+@router.get("/categories/{category_id}/related")
+def get_related_categories(category_id: int, db: Session = Depends(get_db)):
+    """cast_jsonにこのcategory_idが含まれている作品を返す"""
+    all_details = db.query(models.CategoryDetail).filter(
+        models.CategoryDetail.cast_json.like(f'%"master_id": {category_id}%')
+    ).all()
+    
+    result = []
+    # 現在のChatも含める
+    current = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.id == category_id
+    ).first()
+    if current:
+        result.append({"id": current.id, "name": current.name, "member_count": 0})
+    
+    for detail in all_details:
+        cat = db.query(models.HobbyCategory).filter(
+            models.HobbyCategory.id == detail.category_id
+        ).first()
+        if cat and cat.id != category_id:
+            result.append({"id": cat.id, "name": cat.name, "member_count": 0})
+    
+    return result
 
 # --------------------------------------------------
 # 💡 カテゴリツリーの構築ヘルパー関数
@@ -76,44 +136,21 @@ def get_all_descendant_ids(
     cache[category_id] = descendants
     return descendants
 
-def get_total_member_count(
-    db: Session, 
-    category: models.HobbyCategory,
-    all_categories: List[models.HobbyCategory] = None
-) -> int:
-    """
-    本尊・分身・そして『子孫カテゴリ』の人数をすべて合算して返す
+# --- [ 💡 修正：集計ロジックのアップグレード ] ---
+
+def get_total_member_count(db, category, all_categories=None) -> int:
+    # PEOPLEトップカテゴリは人数表示しない
+    if category.name == "PEOPLE (人物)":
+        return "-"
     
-    Args:
-        db: データベースセッション
-        category: 対象カテゴリ
-        all_categories: 全カテゴリのリスト（パフォーマンス最適化用）
-    """
-    # 1. 全カテゴリを取得（外部から渡されていない場合のみ）
-    if all_categories is None:
-        all_categories = db.query(models.HobbyCategory).all()
+    # 子孫IDも含めてカウント（波及させる）
+    target_ids = get_all_descendant_ids(category.id, all_categories) if all_categories else [category.id]
     
-    # 2. 本尊IDを特定
-    master_id = category.master_id if category.master_id else category.id
-    
-    # 3. 子孫IDをすべて取得（再帰的）
-    descendant_ids = get_all_descendant_ids(category.id, all_categories)
-    
-    # 4. 本尊・分身のIDを取得
-    linked_ids = [
-        c.id for c in all_categories 
-        if (c.master_id == master_id or c.id == master_id)
-    ]
-    
-    # 5. すべてのターゲットIDを統合（重複排除）
-    target_ids = list(set(descendant_ids + linked_ids))
-    
-    # 6. ユニークなユーザー数をカウント
     count = db.query(func.count(distinct(models.UserHobbyLink.user_id))).filter(
         models.UserHobbyLink.hobby_category_id.in_(target_ids)
     ).scalar() or 0
     
-    return count
+    return count if count > 0 else "-"
 
 # --------------------------------------------------
 # 💡 全カテゴリ取得エンドポイント
@@ -149,43 +186,56 @@ def get_all_categories(db: Session = Depends(get_db)):
 # 💡 カテゴリ検索
 # --------------------------------------------------
 
-@router.get(
-    "/search",
-    response_model=List[HobbyCategoryResponse],
-    summary="趣味カテゴリーを全階層から検索"
-)
+@router.get("/search", response_model=List[HobbyCategoryResponse])
 def search_hobby_categories(
     db: Session = Depends(get_db),
     params: HobbySearchParams = Depends(),
 ):
-    """キーワードやジャンルIDでカテゴリを検索"""
     query = db.query(models.HobbyCategory)
 
-    # キーワード検索
     if params.keyword:
-        query = query.filter(models.HobbyCategory.name.ilike(f"%{params.keyword}%"))
+        query = query.filter(
+            or_(
+                models.HobbyCategory.name.ilike(f"%{params.keyword}%"),
+                models.HobbyCategory.alias_name.ilike(f"%{params.keyword}%")
+            )
+        ).filter(
+            models.HobbyCategory.master_id == None  # 本尊のみ
+        )
 
-    # ジャンルIDフィルタ
     if params.genre_id is not None:
         query = query.filter(models.HobbyCategory.parent_id == params.genre_id)
-    
+
     searched_categories = query.order_by(models.HobbyCategory.name).all()
-    
+
     if not searched_categories:
         return []
-    
-    # 全カテゴリを取得（メンバー数計算用）
+
     all_categories = db.query(models.HobbyCategory).all()
-    
-    # メンバー数を計算
+
     response_categories = []
     for cat in searched_categories:
         cat_schema = HobbyCategoryResponse.model_validate(cat)
         cat_schema.member_count = get_total_member_count(db, cat, all_categories)
         cat_schema.children = []
         response_categories.append(cat_schema)
-        
+
+    # PEOPLE配下を上位に表示
+    response_categories.sort(key=lambda x: 0 if _is_under_people(x, all_categories) else 1)
+
     return response_categories
+
+def _is_under_people(cat, all_categories, people_id=196):
+    """カテゴリがPEOPLE（id=196）配下かどうか判定"""
+    current_id = cat.parent_id
+    visited = set()
+    while current_id and current_id not in visited:
+        if current_id == people_id:
+            return True
+        visited.add(current_id)
+        parent = next((c for c in all_categories if c.id == current_id), None)
+        current_id = parent.parent_id if parent else None
+    return False
 
 # --------------------------------------------------
 # 💡 カテゴリ詳細取得
@@ -231,37 +281,31 @@ def get_category_detail(category_id: int, db: Session = Depends(get_db)):
 # 💡 コミュニティ参加/脱退
 # --------------------------------------------------
 
-@router.post("/categories/{category_id}/join", tags=["groups"])
-def join_hobby_category(
-    category_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    """カテゴリに参加する"""
-    category = db.query(models.HobbyCategory).filter(
-        models.HobbyCategory.id == category_id
-    ).first()
+# backend/app/routers/hobbies.py (join_hobby_category 修正案)
+
+# ✅ 正しいコード
+@router.post("/categories/{category_id}/join")
+def join_hobby_category(category_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    category = db.query(models.HobbyCategory).get(category_id)
+    
     if not category:
         raise HTTPException(status_code=404, detail="カテゴリが見つかりません")
     
-    # 本尊IDを取得
-    target_id = category.master_id if category.master_id else category.id
+    master_id = category.master_id if category.master_id else category.id
+
+    try:
+        link = models.UserHobbyLink(
+            user_id=current_user.id,
+            hobby_category_id=category_id,  # 入口を記録
+            master_id=master_id             # 本尊を記録
+        )
+        db.add(link)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return {"message": "このChatにはすでに参加済みです", "master_id": master_id}
     
-    # 既に参加済みかチェック
-    existing = db.query(models.UserHobbyLink).filter(
-        models.UserHobbyLink.user_id == current_user.id,
-        models.UserHobbyLink.hobby_category_id == target_id
-    ).first()
-    
-    if existing:
-        return {"message": "既に参加済みです", "category_id": target_id}
-    
-    # 参加登録
-    link = models.UserHobbyLink(user_id=current_user.id, hobby_category_id=target_id)
-    db.add(link)
-    db.commit()
-    
-    return {"message": "コミュニティに参加しました", "category_id": target_id}
+    return {"message": "コミュニティに参加しました", "category_id": master_id}
 
 @router.delete("/categories/{category_id}/leave", tags=["groups"])
 def leave_hobby_category(
@@ -269,10 +313,16 @@ def leave_hobby_category(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """カテゴリから脱退する"""
+    category = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.id == category_id
+    ).first()
+    
+    # master_idで検索して削除
+    master_id = category.master_id if category and category.master_id else category_id
+    
     link = db.query(models.UserHobbyLink).filter(
         models.UserHobbyLink.user_id == current_user.id,
-        models.UserHobbyLink.hobby_category_id == category_id
+        models.UserHobbyLink.hobby_category_id == master_id
     ).first()
     
     if not link:
@@ -281,9 +331,9 @@ def leave_hobby_category(
     db.delete(link)
     db.commit()
     
-    return {"message": "カテゴリから脱退しました", "category_id": category_id}
+    return {"message": "カテゴリから脱退しました", "category_id": master_id}
 
-@router.get("/my-categories", response_model=List[HobbyCategoryResponse], tags=["groups"])
+@router.get("/my-communities", response_model=List[HobbyCategoryResponse], tags=["groups"])
 def get_my_categories(
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(get_current_user)
@@ -292,30 +342,27 @@ def get_my_categories(
     links = db.query(models.UserHobbyLink).filter(
         models.UserHobbyLink.user_id == current_user.id
     ).all()
-    
+
     if not links:
         return []
-    
-    categories = db.query(models.HobbyCategory).filter(
-        models.HobbyCategory.id.in_([l.hobby_category_id for l in links])
-    ).all()
-    
-    # 重複排除：本尊が同じなら1つにまとめる
-    unique_map = {}
-    for cat in categories:
-        mid = cat.master_id if cat.master_id else cat.id
-        if mid not in unique_map:
-            unique_map[mid] = cat
 
-    # 全カテゴリを取得（メンバー数計算用）
-    all_categories = db.query(models.HobbyCategory).all()
-    
+    # master_idで重複排除してからカテゴリ取得
+    unique_master_ids = list({l.master_id for l in links})
+
+    categories = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.id.in_(unique_master_ids)
+    ).all()
+
+    # デバッグ用
+    for cat in categories:
+        print(f"id={cat.id}, name={cat.name}, master_id={cat.master_id}")
+
     res = []
-    for cat in unique_map.values():
+    for cat in categories:
         schema = HobbyCategoryResponse.model_validate(cat)
-        schema.member_count = get_total_member_count(db, cat, all_categories)
+        schema.member_count = get_total_member_count(db, cat, categories)
         res.append(schema)
-    
+
     return res
 
 # --------------------------------------------------
@@ -355,3 +402,81 @@ def check_duplicate_category(
         }
     
     return {"is_duplicate": False}
+
+@router.get("/categories/{category_id}/detail")
+def get_category_detail_info(category_id: int, db: Session = Depends(get_db)):
+    # 1. カテゴリ自体の情報を取得
+    category = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.id == category_id
+    ).first()
+    
+    # 2. カテゴリのDETAIL情報を取得
+    detail = db.query(models.CategoryDetail).filter(
+        models.CategoryDetail.category_id == category_id
+    ).first()
+    
+    # --- 💡 出演作品の逆引きロジック ---
+    # 自分のID（または master_id）が cast_json に含まれている作品を探す
+    target_id = category.master_id if category and category.master_id else category_id
+    appearances = []
+    
+    # 全ての作品のDetailをチェック（地道にスキャン）
+    # ※ 将来的にはSQLのJSON関数で高速化可能ですが、まずはこのロジックで確実に動かします
+    all_details = db.query(models.CategoryDetail).all()
+    for d in all_details:
+        if d.category_id == category_id:
+            continue  # 自分自身のDETAILはスキップ
+            
+        try:
+            cast_list = json.loads(d.cast_json or "[]")
+            # キャストの中に自分のIDを master_id として持っている人がいるか
+            if any(str(c.get('master_id')) == str(target_id) for c in cast_list):
+                work_cat = db.query(models.HobbyCategory).filter(models.HobbyCategory.id == d.category_id).first()
+                if work_cat:
+                    appearances.append({
+                        "id": work_cat.id,
+                        "name": work_cat.name
+                    })
+        except:
+            continue
+    # --- 逆引きここまで ---
+
+    # 基本データの構築
+    response_data = {
+        "description": detail.description if detail else "",
+        "alias": category.alias_name or "" if category else "",
+        "cast": json.loads(detail.cast_json or "[]") if detail else [],
+        "sections": json.loads(detail.sections_json or "[]") if detail else [],
+        "appearances": appearances  # 💡 これをフロントに渡す
+    }
+    
+    return response_data
+
+@router.put("/categories/{category_id}/detail")
+def update_category_detail_info(
+    category_id: int,
+    data: CategoryDetailBase,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    category = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.id == category_id
+    ).first()
+    if category:
+        category.alias_name = data.alias
+
+    detail = db.query(models.CategoryDetail).filter(
+        models.CategoryDetail.category_id == category_id
+    ).first()
+    if not detail:
+        detail = models.CategoryDetail(category_id=category_id)
+        db.add(detail)
+    
+    detail.description = data.description
+    detail.cast_json = json.dumps([c.dict() for c in data.cast], ensure_ascii=False)
+    detail.sections_json = json.dumps([s.dict() for s in data.sections], ensure_ascii=False)
+    detail.updated_by = current_user.id
+    
+    db.commit()
+    return {"message": "保存しました"}
+

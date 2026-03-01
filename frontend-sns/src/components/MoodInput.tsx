@@ -3,16 +3,16 @@ import { postMoodLog, MoodPostPayload } from '../api.ts';
 import { Send, Smile } from 'lucide-react';
 
 const MOOD_TYPES = [
-    { type: 'motivated', label: 'メラメラ🔥', emoji: '🔥' },
-    { type: 'excited',   label: 'ワクワク🤩', emoji: '🤩' },
-    { type: 'happy',     label: 'ルンルン😊', emoji: '😊' },
-    { type: 'calm',      label: 'ホッコリ😌', emoji: '😌' },
-    { type: 'neutral',   label: 'ボチボチ😐', emoji: '😐' },
-    { type: 'anxious',   label: 'モヤモヤ😟', emoji: '😟' },
-    { type: 'tired',     label: 'ヘトヘト😥', emoji: '😥' },
-    { type: 'sad',       label: 'ショボーン😭', emoji: '😭' },
-    { type: 'angry',     label: 'プンプン😠', emoji: '😠' },
-    { type: 'grateful',  label: 'ホロリ🙏',   emoji: '🙏' },
+    { type: 'motivated', label: 'On Fire!/活',     emoji: '🔥' },
+    { type: 'excited',   label: 'Yay/上々!',         emoji: '🤩' },
+    { type: 'happy',     label: 'Happy/幸',        emoji: '😊' },
+    { type: 'calm',      label: 'Relax/温',       emoji: '😌' },
+    { type: 'neutral',   label: '±Meh/中',          emoji: '😐' },
+    { type: 'anxious',   label: 'Hmm/焦',       emoji: '😟' },
+    { type: 'tired',     label: 'No Power/疲',       emoji: '😥' },
+    { type: 'sad',       label: 'SAD/悲',   emoji: '😭' }, 
+    { type: 'angry',     label: 'Grrr!/怒',        emoji: '😠' },
+    { type: 'grateful',  label: 'Aww/感謝',      emoji: '🙏' }, 
 ];
 
 interface MoodInputProps {

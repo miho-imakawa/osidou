@@ -50,3 +50,23 @@ class HobbySearchParams(BaseModel):
     role_type: Optional[str] = None  # "doers" or "fans"
     genre_id: Optional[int] = None
     keyword: Optional[str] = None  # グループ名で検索
+
+class CastMember(BaseModel):
+    name: str
+    role: Optional[str] = None
+    master_id: Optional[int] = None
+
+# 自由セクションの定義
+class DetailSection(BaseModel):
+    label: str
+    content: str
+
+# 今回エラーになっているメインのクラス
+class CategoryDetailBase(BaseModel):
+    description: Optional[str] = ""
+    alias: Optional[str] = "" 
+    cast: List[CastMember] = []
+    sections: List[DetailSection] = []
+
+    # Pydantic V2 用の設定
+    model_config = {"from_attributes": True}

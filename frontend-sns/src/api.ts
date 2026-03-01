@@ -4,29 +4,21 @@ const API_BASE_URL = 'http://localhost:8000';
 
 export const authApi = axios.create({
     baseURL: API_BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
 });
 
 authApi.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('access_token'); 
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
+        if (token) config.headers.Authorization = `Bearer ${token}`;
         return config;
     },
-    (error) => {
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
 export const publicApi = axios.create({
     baseURL: API_BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
 });
 
 // ----------------------------------------------------
@@ -52,6 +44,7 @@ export interface UserProfileType {
     is_mood_visible: boolean;
     current_mood: string | null; 
     current_mood_comment: string | null;
+    is_mood_comment_visible?: boolean;
 }
 
 export interface HobbyCategory {
@@ -69,8 +62,6 @@ export interface HobbyCategory {
 export interface MoodLog {
     id: number;
     user_id: number;
-    user_nickname?: string;
-    user_avatar_url?: string | null;
     mood_type: string;
     comment: string | null;
     is_visible: boolean;
@@ -83,34 +74,15 @@ export interface MoodPostPayload {
     is_visible: boolean;
 }
 
-export interface UserProfile {
-    id: number;
-    username: string;
-    nickname: string | null;
-    bio: string | null;
-    current_mood: string | null;
-    current_mood_comment: string | null;
+export interface UserProfile extends UserProfileType {
     mood_updated_at: string | null;
-    is_mood_visible: boolean;
-    is_member_count_visible: boolean;
     is_pref_visible?: boolean;
     is_city_visible?: boolean;
     is_town_visible?: boolean;
-    oshi_page_url: string | null;
-    facebook_url: string | null;
-    x_url: string | null;
-    instagram_url: string | null;
-    note_url: string | null;
-    threads_url: string | null;
-    email: string;
-    prefecture: string | null;
-    city: string | null;
-    town: string | null;
     birth_year_month: string | null; 
-    gender: string | null;           
+    gender: string | null;               
 }
 
-// ✅ FriendRequest 型を追加
 export interface FriendRequest {
     id: number;
     requester_id: number;
@@ -145,76 +117,26 @@ export interface UserMoodResponse {
     current_mood_comment: string | null;
     mood_updated_at: string | null;
     friend_note: string | null;
+    is_mood_comment_visible?: boolean;
 }
 
-// ----------------------------------------------------
-// 📌 API関数
-// ----------------------------------------------------
+/** 💡 参加表明・レスポンスの詳細型 */
+export interface PostResponse {
+    id: number;
+    content: string;
+    is_participation: boolean;
+    is_attended: boolean;
+    user_id: number;
+    post_id: number;
+    author_nickname: string; // バックエンドから返される名前
+    created_at: string;
+    ad_start_date?: string; // ★追加
+    like_count?: number;    // ★追加
+    pin_count?: number;     // ★追加
+}
 
-export const fetchMyCategories = async (): Promise<HobbyCategory[]> => {
-    // 💡 エンドポイントを /hobby-categories/my-communities に合わせる
-    const response = await authApi.get<HobbyCategory[]>('/hobby-categories/my-communities');
-    return response.data;
-};
-
-export const fetchFollowingMoods = async (): Promise<UserMoodResponse[]> => {
-    const response = await authApi.get<UserMoodResponse[]>('/users/following/moods');
-    return response.data;
-};
-
-export const fetchMyMoodHistory = async (): Promise<MoodLog[]> => {
-    const response = await authApi.get<MoodLog[]>('/users/me/mood-history');
-    return response.data;
-};
-
-export const postMoodLog = async (data: MoodPostPayload): Promise<void> => {
-    await authApi.post('/users/moods', data); 
-};
-
-export const searchUsers = async (query: string): Promise<UserProfileType[]> => {
-    const response = await authApi.get<UserProfileType[]>('/users/search', {
-        params: { query }
-    });
-    return response.data;
-};
-
-export const followOrUnfollowUser = async (userId: number): Promise<{ message: string, status: 'followed' | 'unfollowed' }> => {
-    const response = await authApi.post(`/users/${userId}/follow`);
-    return response.data;
-};
-
-export const sendFriendRequest = async (userId: number): Promise<void> => {
-    await authApi.post(`/friends/${userId}/friend_request`); 
-};
-
-export const fetchFriendRequests = async (): Promise<FriendRequest[]> => {
-    const response = await authApi.get<FriendRequest[]>('/friends/me/friend-requests');
-    return response.data;
-};
-
-export const acceptFriendRequest = async (requestId: number): Promise<void> => {
-    await authApi.put(`/friends/friend_requests/${requestId}/status`, { 
-        status: 'accepted' 
-    });
-};
-
-export const rejectFriendRequest = async (requestId: number): Promise<void> => {
-    await authApi.put(`/friends/friend_requests/${requestId}/status`, { 
-        status: 'rejected' 
-    });
-};
-
-export const fetchMyFriends = async (): Promise<Friendship[]> => {
-    const response = await authApi.get<Friendship[]>('/friends/me/friends');
-    return response.data;
-};
-
-// api.ts に追加
-
-// frontend-sns/src/api.ts
-
+/** 💡 投稿（Post）型：バックエンドの修正に合わせて responses を追加 */
 export interface Post {
-    is_system: any;
     id: number;
     content: string;
     user_id: number;
@@ -224,18 +146,29 @@ export interface Post {
     created_at: string;
     is_meetup: boolean;
     is_ad: boolean;
+    ad_color?: string;
     meetup_date?: string;
-    meetup_location?: string;  // 追加
-    meetup_fee_info?: string;     // 💡 これを追記！
-    meetup_status?: string;       // 💡 ついでにステータスも追記しておくと安心です
-    meetup_capacity?: number;  // 追加
-    author_id?: number;          // 投稿者のID（CommunityChatの非表示機能で必要）
+    meetup_location?: string;
+    meetup_fee_info?: string;
+    meetup_status?: string;
+    meetup_capacity?: number;
     ad_end_date?: string;
-    parent_id?: number | null; // 💡 これを追加
-    response_count?: number;   // 追加
-    participation_count?: number; // 追加
-    region_tag_pref?: string;  // 追加
-    region_tag_city?: string;  // 追加
+    ad_start_date?: string; // ★追加：掲載開始日
+    like_count?: number;    // ★追加：いいね数
+    pin_count?: number;     // ★追加：PIN数
+    parent_id?: number | null;
+    response_count?: number; 
+    participation_count?: number;
+    is_joined: boolean;
+    region_tag_pref?: string; // 都道府県タグ
+    region_tag_city?: string; // 市区町村タグ（これが足りない！）    
+    responses: PostResponse[];
+}
+
+/** 💡 参加表明の作成用 */
+export interface PostResponseCreate {
+    content?: string;
+    is_participation: boolean;
 }
 
 export interface PostCreate {
@@ -243,94 +176,93 @@ export interface PostCreate {
     hobby_category_id: number;
     parent_id?: number | null;
     is_meetup?: boolean;
-    is_ad?: boolean;      // 💡 追加
+    is_ad?: boolean;
+    ad_color?: string;
     meetup_date?: string;
-    ad_end_date?: string; // 💡 追加
-    meetup_location?: string; // 💡 これが必要
-    meetup_fee_info?: string; // 💡 これが必要
-    meetup_capacity?: number; // 💡 これが必要
+    ad_end_date?: string;
+    meetup_location?: string;
+    meetup_fee_info?: string;
+    meetup_capacity?: number;
     is_system: boolean;
+    ad_start_date?: string;
 }
 
-// --- 💡 参加状態用の型を新規追加 ---
 export interface JoinStatus {
     is_joined: boolean;
 }
-// 投稿を作成する関数
-export const createPost = async (data: PostCreate): Promise<Post> => {
-    const response = await authApi.post<Post>('/posts', data);
-    return response.data;
-};
 
-// カテゴリの投稿一覧を取得する関数
-export const fetchPostsByCategory = async (categoryId: number): Promise<Post[]> => {
-    const response = await authApi.get<Post[]>(`/posts/category/${categoryId}`);
-    return response.data;
-};
+// ----------------------------------------------------
+// 📌 API関数
+// ----------------------------------------------------
 
-// コミュニティに参加する
-export const joinCommunity = async (categoryId: number): Promise<void> => {
-    await authApi.post(`/hobby-categories/join/${categoryId}`);
-};
-
-// 参加状態を確認する
-export const fetchJoinStatus = async (categoryId: number): Promise<JoinStatus> => {
-    const response = await authApi.get<JoinStatus>(`/hobby-categories/check-join/${categoryId}`);
-    return response.data;
-};
-
-// 自分が参加しているコミュニティ一覧を取得する
 export const fetchMyCommunities = async (): Promise<HobbyCategory[]> => {
     const response = await authApi.get<HobbyCategory[]>('/hobby-categories/my-communities');
     return response.data;
 };
 
-// 投稿を通報する
-export const reportPost = async (postId: number): Promise<{ message: string }> => {
-    const response = await authApi.post(`/posts/${postId}/report`);
-    return response.data;
+export const fetchFollowingMoods = async (): Promise<UserMoodResponse[]> => (await authApi.get('/users/following/moods')).data;
+export const fetchMyMoodHistory = async (): Promise<MoodLog[]> => (await authApi.get('/users/me/mood-history')).data;
+export const postMoodLog = async (data: MoodPostPayload): Promise<void> => await authApi.post('/users/moods', data);
+export const searchUsers = async (query: string): Promise<UserProfileType[]> => (await authApi.get('/users/search', { params: { query } })).data;
+export const sendFriendRequest = async (userId: number): Promise<void> => await authApi.post(`/friends/${userId}/friend_request`);
+export const fetchFriendRequests = async (): Promise<FriendRequest[]> => (await authApi.get('/friends/me/friend-requests')).data;
+
+export const acceptFriendRequest = async (requestId: number): Promise<void> => {
+    await authApi.put(`/friends/friend_requests/${requestId}/status`, { status: 'accepted' });
 };
 
-// コミュニティを退会する
-export const leaveCommunity = async (categoryId: number): Promise<void> => {
-    await authApi.delete(`/hobby-categories/leave/${categoryId}`);
+export const rejectFriendRequest = async (requestId: number): Promise<void> => {
+    await authApi.put(`/friends/friend_requests/${requestId}/status`, { status: 'rejected' });
+};
+
+export const fetchMyFriends = async (): Promise<Friendship[]> => (await authApi.get('/friends/me/friends')).data;
+
+export const createPost = async (data: PostCreate): Promise<Post> => (await authApi.post('/posts', data)).data;
+export const fetchPostsByCategory = async (categoryId: number): Promise<Post[]> => (await authApi.get(`/posts/category/${categoryId}`)).data;
+
+/** 💡 参加表明（JOIN REQUEST）の作成 */
+export const createPostResponse = async (postId: number, data: PostResponseCreate): Promise<PostResponse> => {
+    return (await authApi.post(`/posts/${postId}/responses`, data)).data;
+};
+
+export const joinCommunity = async (categoryId: number): Promise<void> => await authApi.post(`/hobby-categories/join/${categoryId}`);
+export const fetchJoinStatus = async (categoryId: number): Promise<JoinStatus> => (await authApi.get(`/hobby-categories/check-join/${categoryId}`)).data;
+export const leaveCommunity = async (categoryId: number): Promise<void> => await authApi.delete(`/hobby-categories/leave/${categoryId}`);
+export const reportPost = async (postId: number): Promise<{ message: string }> => (await authApi.post(`/posts/${postId}/report`)).data;
+
+/** 💡 出席管理の切り替え（バックエンドのパスに合わせて修正） */
+export const toggleAttendance = async (responseId: number) => {
+    return (await authApi.put(`/responses/${responseId}/attendance`)).data;
 };
 
 // ----------------------------------------------------
-// 📌 住所・地域統計関連
+// 📌 住所・地域
 // ----------------------------------------------------
 
-export interface Prefecture {
-    id: number;
-    name: string;
-}
+export interface Prefecture { id: number; name: string; }
+export interface City { id: number; name: string; }
 
-export interface City {
-    id: number;
-    name: string;
-}
+export const fetchPrefectures = async (): Promise<Prefecture[]> => (await authApi.get('/admin/address/prefectures')).data;
+export const fetchCities = async (prefectureId: number): Promise<City[]> => (await authApi.get(`/admin/address/cities/${prefectureId}`)).data;
 
-export interface MemberCountResponse {
-    count: number;
-}
-
-// 都道府県一覧を取得
-export const fetchPrefectures = async (): Promise<Prefecture[]> => {
-    // 認証不要な場合は publicApi、必要な場合は authApi を使用
-    const response = await authApi.get<Prefecture[]>('/admin/address/prefectures');
+// 💡 広告の見積もりを取得するAPI
+export const fetchAdQuote = async (categoryIds: number[]) => {
+    // ✅ 正しい書き方
+    const response = await authApi.post('/hobby-categories/ad-quote', { category_ids: categoryIds });
     return response.data;
 };
 
-// 市区町村一覧を取得
-export const fetchCities = async (prefectureId: number): Promise<City[]> => {
-    const response = await authApi.get<City[]>(`/admin/address/cities/${prefectureId}`);
+// 広告をマイリスト（保存）に追加
+export const pinAd = (postId: number) => authApi.post(`/posts/${postId}/pin`);
+// 広告の「いいね」
+export const likePost = (postId: number) => authApi.post(`/posts/${postId}/like`);
+
+export const adInteraction = async (postId: number, action: 'like' | 'pin' | 'close') => {
+    const response = await authApi.post(`/posts/${postId}/ad-interaction`, { action });
     return response.data;
 };
 
-// 地域メンバー数を取得
-export const fetchMemberCount = async (prefecture: string, city: string): Promise<MemberCountResponse> => {
-    const response = await authApi.get<MemberCountResponse>('/admin/address/member-count', {
-        params: { prefecture, city }
-    });
+export const fetchMyAdInteractions = async () => {
+    const response = await authApi.get('/posts/my-ad-interactions');
     return response.data;
 };

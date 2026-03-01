@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { 
   User, Globe, Twitter, Facebook, Instagram, BookOpen,
-  Edit, MessageSquare, Heart, Download, Save, X, Eye, EyeOff, AtSign, MapPin, Clock, Flame //
+  Edit, MessageSquare, Heart, Download, Save, X, Eye, EyeOff, AtSign, MapPin, Clock, Flame, Calendar
 } from 'lucide-react';
 
 import { 
   authApi, 
-  fetchMyCommunities, // ← fetchMyCategories から変更
+  fetchMyCommunities,
   HobbyCategory, 
   fetchMyMoodHistory, 
   MoodLog 
@@ -29,6 +29,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   const [tempProfile, setTempProfile] = useState<any>(null);
   const [myCategories, setMyCategories] = useState<HobbyCategory[]>([]);
   const [moodLogs, setMoodLogs] = useState<MoodLog[]>([]);
+  const [myMeetups, setMyMeetups] = useState<any[]>([]); 
 
   const getRankClasses = (count: number) => {
     if (count >= 10000) return "bg-yellow-50 text-yellow-700 border-yellow-300 shadow-sm";
@@ -66,24 +67,39 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
     }
   }, [userId, myProfile]);
 
-// 🔥 修正箇所: loadData 内のロジック
   useEffect(() => {
     if (!displayProfile?.id) return;
 
-  const loadData = async () => {
-    try {
-      const categories = await fetchMyCommunities();
-      
-      // 💡 バックエンドがトップレベルを本尊だけにしてくれているので、
-      // 複雑な Map 処理は消して、そのままセットして大丈夫です！
-      setMyCategories(categories); 
+    const loadData = async () => {
+      try {
+        const categories = await fetchMyCommunities();
+        setMyCategories(categories); 
 
-      const logs = await fetchMyMoodHistory();
-      setMoodLogs(logs);
-    } catch (err) {
-      console.error("データ取得失敗:", err);
-    }
-  };
+        const [joinedRes, hostedRes] = await Promise.all([
+          authApi.get('/posts/my-meetups'),
+          authApi.get('/posts/my-hosted-meetups')
+        ]);
+
+        const joined = joinedRes.data || [];
+        const hosted = hostedRes.data || [];
+        
+        const allMeetups = [...hosted];
+        joined.forEach((m: any) => {
+          if (!allMeetups.find((existing: any) => existing.id === m.id)) {
+            allMeetups.push(m);
+          }
+        });
+
+        console.log("主催:", hosted.length, "参加:", joined.length, "合計:", allMeetups.length);
+        setMyMeetups(allMeetups);
+
+        const logs = await fetchMyMoodHistory();
+        setMoodLogs(logs);
+      } catch (err) {
+        console.error("データ取得失敗:", err);
+      }
+    };
+
     loadData();
   }, [displayProfile?.id, isMe, location.pathname]);
 
@@ -110,12 +126,23 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
     } catch (err) { alert("更新に失敗しました。"); }
   };
 
+  const handleCancel = async (postId: number) => {
+    if (!window.confirm("このミートアップの参加をキャンセルしますか？\n※当日0時以降はキャンセル料が発生する場合があります。")) return;
+    try {
+      await authApi.delete(`/responses/cancel/${postId}`);
+      setMyMeetups(prev => prev.filter(m => m.id !== postId));
+      alert("キャンセルを完了しました。");
+    } catch (err) {
+      alert("キャンセルの実行に失敗しました。");
+    }
+  };
+
   if (loading) return <div className="text-center py-10">読み込み中...</div>;
   if (!displayProfile) return <div className="text-center py-10 text-gray-400">ユーザーが見つかりません。</div>;
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
-      {/* 🏰 Header */}
+      {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
           <User className="text-pink-600" size={32} />
@@ -129,7 +156,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
       </div>
 
       {isEditing && tempProfile ? (
-        /* 🛠️ EDIT MODE */
+        /* EDIT MODE */
         <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 space-y-8 animate-in fade-in">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
@@ -205,13 +232,29 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                   <span className="text-xs font-bold text-gray-500">Activity Logs を表示する</span>
                 </label>
               </div>
+
+              <div className="pt-4 border-t border-gray-50">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" className="hidden" checked={tempProfile.is_mood_comment_visible} onChange={e => setTempProfile({...tempProfile, is_mood_comment_visible: e.target.checked})} />
+                  <div className={`p-2 rounded-xl transition-all ${tempProfile.is_mood_comment_visible ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-400'}`}>
+                    {tempProfile.is_mood_comment_visible ? <MessageSquare size={18}/> : <EyeOff size={18}/>}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-gray-500">気分のコメントを表示する</span>
+                    <span className="text-[10px] text-gray-400">災害時など、言葉を伝えたい時にONにしてください</span>
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
-          <button onClick={handleSave} className="w-full py-5 bg-gray-900 text-white rounded-[24px] font-bold flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-[0.98]"><Save size={20} /> プロフィールを保存</button>
+          <button onClick={handleSave} className="w-full py-5 bg-gray-900 text-white rounded-[24px] font-bold flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-[0.98]">
+            <Save size={20} /> プロフィールを保存
+          </button>
         </div>
       ) : (
-        /* 🏰 VIEW MODE */
+        /* VIEW MODE */
         <div className="space-y-6">
+          {/* SNS Links & Bio */}
           <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
             <div className="flex flex-wrap gap-4 mb-6">
               {displayProfile.x_url && displayProfile.is_x_visible !== false && (
@@ -230,62 +273,91 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
             <div className="space-y-4">
               <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-base">{displayProfile.bio || '自己紹介はまだありません。'}</p>
               {(displayProfile.prefecture || displayProfile.city) && (
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-300 uppercase tracking-widest border-t border-gray-50 pt-4"><MapPin size={12} /> {displayProfile.prefecture} {displayProfile.city} {displayProfile.town}</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-300 uppercase tracking-widest border-t border-gray-50 pt-4">
+                  <MapPin size={12} /> {displayProfile.prefecture} {displayProfile.city} {displayProfile.town}
+                </div>
               )}
             </div>
           </div>
 
+          {/* Communities */}
           <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
             <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
               <MessageSquare className="text-pink-600" size={14}/> Communities
             </h2>
             <div className="flex flex-wrap gap-2">
-            {myCategories.length > 0 ? myCategories.map(cat => {
-              const totalCount = cat.member_count || 0; 
-
-              // 💡 ここを追加！「岡田斗司夫 (Toshio Okada)」から「岡田斗司夫」だけを抜き出す
-              // ( の前にある文字列だけを取得し、前後の空白を消す
-              const displayName = cat.name.split('(')[0].trim();
-
-              return (
-                <Link 
-                  key={cat.id} 
-                  to={`/community/${cat.id}`} 
-                  className={`px-4 py-1.5 rounded-full text-xs border flex items-center gap-3 font-black shadow-sm transition-all hover:scale-105 ${getRankClasses(totalCount)}`}
-                >
-                  {/* 💡 cat.name を displayName に変更 */}
-                  <span>{cat.name.split(' (')[0]}</span> 
-                  
-                  <div className="flex items-center gap-1 opacity-60 text-[10px] tabular-nums">
-                    <User size={10} strokeWidth={3} />
-                    <span>{totalCount.toLocaleString()}</span>
-                    {totalCount >= 500 && <Flame size={10} className="text-orange-500" />}
-                  </div>
-                </Link>
-              );
-            }) : <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Activity</p>}
+              {myCategories.length > 0 ? myCategories.map(cat => {
+                const totalCount = cat.member_count || 0; 
+                return (
+                  <Link 
+                    key={cat.id} 
+                    to={`/community/${cat.id}`} 
+                    className={`px-4 py-1.5 rounded-full text-xs border flex items-center gap-3 font-black shadow-sm transition-all hover:scale-105 ${getRankClasses(totalCount)}`}
+                  >
+                    <span>{cat.name.split(' (')[0]}</span> 
+                    <div className="flex items-center gap-1 opacity-60 text-[10px] tabular-nums">
+                      <User size={10} strokeWidth={3} />
+                      <span>{totalCount.toLocaleString()}</span>
+                      {totalCount >= 500 && <Flame size={10} className="text-orange-500" />}
+                    </div>
+                  </Link>
+                );
+              }) : <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Activity</p>}
             </div>
           </div>
 
-          {/* 💓 Activity Logs (顔の色を出し、月表示を大きく) */}
+          {/* JOINING & MY MEETUPS */}
+          {isMe && (
+            <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
+              <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
+                <Calendar className="text-orange-500" size={12}/> Joining & My Meetups
+              </h2>
+              {myMeetups.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {myMeetups.map(meetup => (
+                    <Link
+                      key={meetup.id}
+                      to={`/community/${meetup.hobby_category_id}`}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 transition-all"
+                    >
+                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${meetup.user_id === displayProfile.id ? 'bg-orange-500 text-white' : 'bg-orange-200 text-orange-700'}`}>
+                        {meetup.user_id === displayProfile.id ? "主催" : "参加"}
+                      </span>
+                      <span className="font-bold text-gray-700 text-[11px] max-w-[120px] truncate">
+                        {meetup.content.split('\n')[0]}
+                      </span>
+                      {meetup.meetup_date && (
+                        <span className="text-[9px] text-gray-400 shrink-0">
+                          {meetup.meetup_date.slice(5, 10).replace('-', '/')}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[10px] font-bold text-gray-300 uppercase text-center py-2">予定はありません</p>
+              )}
+            </div>
+          )}
+
+          {/* Activity Logs */}
           {displayProfile.is_mood_visible && (
-            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-2"> {/* space-y-6 から 2 に変更 */}
-                <div className="flex justify-between items-center border-b border-gray-50 pb-2 mb-2"> {/* pb-4 mb-6 から変更 */}
-                  <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
-                    <Heart className="text-pink-600" size={14}/> Activity Logs
-                  </h2>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm" onClick={() => alert("DL準備中")}>
-                          <Download size={14} /> <span>DL-200JPY</span>
-                        </button>
-                      </div>
-              
-            <div className="space-y-10"> {/* ここは月の間の余白なのでそのままか、お好みで調整 */}
-                  {Object.keys(groupedLogs).sort().reverse().map(month => (
-                    <div key={month} className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="px-4 py-1.5 bg-gray-900 text-white text-[12px] font-black rounded-xl border border-gray-900 tracking-tight shadow-sm">{month}</div>
-                        <div className="flex-1 h-px bg-gray-100"></div>
-                      </div>
+            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-2">
+              <div className="flex justify-between items-center border-b border-gray-50 pb-2 mb-2">
+                <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
+                  <Heart className="text-pink-600" size={14}/> Activity Logs
+                </h2>
+                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm" onClick={() => alert("DL準備中")}>
+                  <Download size={14} /> <span>DL-200JPY</span>
+                </button>
+              </div>
+              <div className="space-y-10">
+                {Object.keys(groupedLogs).sort().reverse().map(month => (
+                  <div key={month} className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="px-4 py-1.5 bg-gray-900 text-white text-[12px] font-black rounded-xl border border-gray-900 tracking-tight shadow-sm">{month}</div>
+                      <div className="flex-1 h-px bg-gray-100"></div>
+                    </div>
                     <div className="space-y-4 pl-1">
                       {groupedLogs[month].map((log: any) => {
                         const date = new Date(log.created_at);
@@ -296,7 +368,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                               <span className="text-[12px] font-black text-gray-800 tabular-nums">{String(date.getDate()).padStart(2, '0')}</span>
                               <span className="text-[10px] font-bold text-gray-400 tabular-nums flex items-center gap-1 opacity-80"><Clock size={10} strokeWidth={3} />{date.getHours()}:{String(date.getMinutes()).padStart(2, '0')}</span>
                             </div>
-                            {/* 💡 顔の色をグレースケール解除して可愛く */}
                             <span className="text-xl transform hover:scale-125 transition-transform cursor-default">
                               {moodMap[log.mood_type] || '✨'}
                             </span>
