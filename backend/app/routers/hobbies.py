@@ -1,9 +1,11 @@
 # backend/app/routers/hobbies.py (改善版)
 
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, distinct, func
-from typing import List, Dict, Set
+from sqlalchemy.exc import IntegrityError
+from typing import List, Dict, Set, Optional
 import collections
 import json
 from ..database import get_db
@@ -480,3 +482,47 @@ def update_category_detail_info(
     db.commit()
     return {"message": "保存しました"}
 
+# Sub Chat作成用スキーマ
+class SubCategoryCreate(BaseModel):
+    name: str
+    parent_id: int
+    master_id: Optional[int] = None
+    role_type: Optional[str] = None  # "doer" / "fan" / None
+
+@router.post("/create-sub", tags=["hobbies"])
+def create_sub_category(
+    data: SubCategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    parent = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.id == data.parent_id
+    ).first()
+    if not parent:
+        raise HTTPException(status_code=404, detail="親カテゴリが見つかりません")
+    
+    existing = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.name == data.name,
+        models.HobbyCategory.parent_id == data.parent_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"「{data.name}」はすでに存在します")
+    
+    new_cat = models.HobbyCategory(
+        name=data.name,
+        parent_id=data.parent_id,
+        master_id=data.master_id,
+        depth=(parent.depth or 0) + 1,
+        unique_code=str(uuid.uuid4())[:8],  # ★ 追加
+        role_type=data.role_type,  # ★追加
+    )
+    db.add(new_cat)
+    db.commit()
+    db.refresh(new_cat)
+    
+    return {
+        "id": new_cat.id,
+        "name": new_cat.name,
+        "parent_id": new_cat.parent_id,
+        "message": f"「{new_cat.name}」を作成しました！"
+    }

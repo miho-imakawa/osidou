@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createPost, fetchPostsByCategory, Post, authApi, toggleAttendance, adInteraction, fetchMyAdInteractions } from '../api';
+import { createPost, fetchPostsByCategory, Post, authApi, toggleAttendance, adInteraction, fetchMyAdInteractions, createSubCategory  } from '../api';
 import { 
   Send, MessageSquare, MapPin, Users, CheckSquare, Square, Clock, Coins, Pin, Calendar
 } from 'lucide-react';
@@ -37,7 +37,15 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryI
         title: '', date: '', pref: '', city_town: '', capacity: 5, fee: ''
     });
     const [pinnedAds, setPinnedAds] = useState<any[]>([]);
-    
+    const [showSubChatModal, setShowSubChatModal] = useState(false);
+    const [subChatName, setSubChatName] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [selectedMasterId, setSelectedMasterId] = useState<number | null>(null);
+    const [selectedMasterName, setSelectedMasterName] = useState<string>('');
+    const [selectedRoleType, setSelectedRoleType] = useState<string | null>(null);
+    const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
+
     const MEETUP_TEMPLATE = `📍 集合場所：
 
 📍 開催場所：
@@ -95,7 +103,7 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryI
             setPinnedAds(pinned);
         }
     }, [posts, adInteractions]); // posts か adInteractions が変わるたびに実行
-
+   
     const handleAdAction = async (postId: number, action: 'like' | 'pin' | 'close') => {
         try {
             const result = await adInteraction(postId, action);
@@ -134,33 +142,90 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryI
         }
     };
 
-    const handleSend = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const isMeetup = postType === 'meetup';
-        if (isMeetup ? !meetupDetails.title?.trim() : !newPost?.trim()) return;
-        if (!chatTargetId) return;
-        try {
-            await createPost({
-                content: isMeetup ? `${meetupDetails.title}\n${newPost}` : newPost,
-                hobby_category_id: parseInt(chatTargetId),
-                is_meetup: isMeetup,
-                is_ad: false,
-                is_system: false,
-                // 🔥 追加部分
-                meetup_date: meetupDetails.date || undefined,
-                meetup_location: `${meetupDetails.pref || ''} ${meetupDetails.city_town || ''}`.trim(),
-                meetup_capacity: meetupDetails.capacity || 0,
-                meetup_fee_info: meetupDetails.fee || undefined,
-            });
-            setNewPost('');
-            setMeetupDetails({ title: '', date: '', pref: '', city_town: '', capacity: 5, fee: '' });
-            setPostType('normal');
-            fetchPosts();
-        } catch (err) {
-            console.error('送信エラー:', err);
-            alert("送信に失敗しました");
+    const handleSubChatNameChange = async (val: string) => {
+        setSubChatName(val);
+        setSelectedMasterId(null);
+        setSelectedMasterName('');
+        if (val.length >= 2) {
+            try {
+                const res = await authApi.get(`/hobby-categories/search?keyword=${encodeURIComponent(val)}`);
+                setSearchResults(res.data.slice(0, 5));
+            } catch {
+                setSearchResults([]);
+            }
+        } else {
+            setSearchResults([]);
         }
     };
+
+    const handleSelectMaster = (id: number, name: string) => {
+        setSelectedMasterId(id);
+        setSelectedMasterName(name);
+        setSearchResults([]);
+    };
+
+    const handleCreateSubChat = async () => {
+        if (!subChatName.trim()) return;
+        setIsCreating(true);
+        try {
+            const result = await createSubCategory({
+                name: subChatName,
+                parent_id: parseInt(chatTargetId),
+                master_id: selectedMasterId || undefined,
+                role_type: selectedRoleType || undefined,  
+            });
+            alert(`✅ 「${result.name}」を作成しました！`);
+            setShowSubChatModal(false);
+            setSubChatName('');
+            setSelectedMasterId(null);
+            setSelectedMasterName('');
+            window.location.href = `/community/${result.id}`;
+        } catch (err: any) {
+            alert(err.response?.data?.detail || 'Sub Chatの作成に失敗しました');
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const isMeetup = postType === 'meetup';
+    if (isMeetup ? !meetupDetails.title?.trim() : !newPost?.trim()) return;
+    if (!chatTargetId) return;
+
+    // ★ MEETUPの場合は確認画面を出す
+    if (isMeetup) {
+        setShowPaymentConfirm(true);
+        return;
+    }
+
+    await submitPost();
+};
+
+const submitPost = async () => {
+    const isMeetup = postType === 'meetup';
+    try {
+        await createPost({
+            content: isMeetup ? `${meetupDetails.title}\n${newPost}` : newPost,
+            hobby_category_id: parseInt(chatTargetId),
+            is_meetup: isMeetup,
+            is_ad: false,
+            is_system: false,
+            meetup_date: meetupDetails.date || undefined,
+            meetup_location: `${meetupDetails.pref || ''} ${meetupDetails.city_town || ''}`.trim(),
+            meetup_capacity: meetupDetails.capacity || 0,
+            meetup_fee_info: meetupDetails.fee || undefined,
+        });
+        setNewPost('');
+        setMeetupDetails({ title: '', date: '', pref: '', city_town: '', capacity: 5, fee: '' });
+        setPostType('normal');
+        setShowPaymentConfirm(false);
+        fetchPosts();
+    } catch (err) {
+        console.error('送信エラー:', err);
+        alert("送信に失敗しました");
+    }
+};
 
     if (loading) {
         return (
@@ -175,23 +240,31 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryI
     return (
         <div className="flex flex-col h-[650px] bg-white border rounded-3xl shadow-xl overflow-hidden text-left font-sans relative">
             {/* 1. Header */}
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center bg-white shrink-0 z-20">
-                <MessageSquare size={18} className="text-pink-500 mr-2" />
-                <span className="text-sm font-black text-gray-800 uppercase tracking-tighter">Community Board</span>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0 z-20">
+                <div className="flex items-center">
+                    <MessageSquare size={18} className="text-pink-500 mr-2" />
+                    <span className="text-sm font-black text-gray-800 uppercase tracking-tighter">Community Board</span>
+                </div>
+                <button
+                    onClick={() => setShowSubChatModal(true)}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-pink-50 text-pink-600 rounded-full text-[11px] font-black hover:bg-pink-100 transition-colors"
+                >
+                    <span>＋</span> Sub Chat
+                </button>
             </div>
 
         {/* 📌 新設：PIN済み広告 ＆ 参加予定ミートアップのお知らせバー */}
         {(pinnedAds.length > 0 || posts.some(p => p.is_meetup && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended))) && (
-            <div className="bg-orange-50/50 border-b border-orange-100 px-4 py-2 flex flex-col gap-2 shrink-0">
+            <div className="bg-rose-50/50 border-b border-rose-100 px-4 py-2 flex flex-col gap-2 shrink-0">
                 {/* ミートアップ表示エリア */}
                 <div className="flex flex-wrap gap-2">
                     {posts.filter(p => p.is_meetup && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended)).map(meetup => (
                         <button
                             key={`meet-link-${meetup.id}`}
                             onClick={() => document.getElementById(`post-${meetup.id}`)?.scrollIntoView({ behavior: 'smooth' })}
-                            className="flex items-center gap-1.5 bg-white border border-brown-200 px-3 py-1 rounded-full text-[11px] font-bold text-orange-800 shadow-sm hover:bg-orange-100 transition-colors"
+                            className="flex items-center gap-1.5 bg-white border border-rose-200 px-3 py-1 rounded-full text-[11px] font-bold text-rose-800 shadow-sm hover:bg-rose-100 transition-colors"
                         >
-                            <Calendar size={10} className="text-orange-500" />
+                            <Calendar size={10} className="text-rose-500" />
                             <span>{meetup.user_id === currentUserId ? '主催：' : '参加：'}{meetup.content.split('\n')[0]}</span>
                         </button>
                     ))}
@@ -199,14 +272,14 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryI
 
                 {/* 既存のPIN済み広告エリア */}
                 {pinnedAds.length > 0 && (
-                    <div className="flex flex-wrap gap-2 border-t border-orange-100 pt-1">
+                    <div className="flex flex-wrap gap-2 border-t border-amber-100 pt-1">
                         {pinnedAds.map(post => (
                             <button
                                 key={`pin-link-${post.id}`}
                                 onClick={() => document.getElementById(`post-${post.id}`)?.scrollIntoView({ behavior: 'smooth' })}
-                                className="flex items-center gap-1.5 bg-white border border-gray-200 px-3 py-1 rounded-full text-[11px] font-bold text-yellow-800 shadow-sm hover:bg-yellow-100"
+                                className="flex items-center gap-1.5 bg-white border border-gray-200 px-3 py-1 rounded-full text-[11px] font-bold text-amber-800 shadow-sm hover:bg-amber-100"
                             >
-                                <Pin size={10} className="fill-yellow-500 text-yellow-500" />
+                                <Pin size={10} className="fill-amber-500 text-amber-500" />
                                 <span className="truncate max-w-[150px]">{post.content.split('\n')[0]}</span>
                             </button>
                         ))}
@@ -499,7 +572,7 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryI
                             <textarea value={newPost} onChange={e => setNewPost(e.target.value)} placeholder="メッセージを入力..." className="flex-1 p-3 rounded-2xl bg-gray-50 border-2 border-transparent outline-none text-[13px] h-[90px] resize-none" />
                         )}
                         {postType === 'meetup' && <div className="flex-1" />}
-                        <button type="submit" disabled={postType === 'meetup' ? !meetupDetails.title.trim() : !newPost.trim()} className="p-4 bg-gray-900 text-white rounded-2xl shrink-0 shadow-xl mb-1 disabled:opacity-40">
+                        <button type="submit" disabled={postType === 'normal' && !newPost.trim()} className="p-4 bg-gray-900 text-white rounded-2xl shrink-0 shadow-xl mb-1 disabled:opacity-40">
                             <Send size={20} />
                         </button>
                     </div>
@@ -522,6 +595,174 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryI
                     onPosted={fetchPosts}
                 />
             )}
+{showSubChatModal && (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-[32px] shadow-2xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-sm font-black text-gray-800 flex items-center gap-2">
+                <MessageSquare size={16} className="text-pink-500" />
+                Sub Chat を作成
+            </h3>
+
+            {/* 名前入力 */}
+            <input
+                type="text"
+                value={subChatName}
+                onChange={(e) => handleSubChatNameChange(e.target.value)}
+                placeholder="例：佐藤健、関東エリア、初心者歓迎..."
+                className="w-full p-4 bg-gray-50 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-pink-300"
+                autoFocus
+            />
+
+            {/* 本尊の候補リスト */}
+            {searchResults.length > 0 && (
+                <div className="space-y-2">
+                    <p className="text-[10px] font-black text-gray-400 uppercase">
+                        既存の本尊が見つかりました
+                    </p>
+                    {searchResults.map((s) => (
+                        <div key={s.id} className="flex justify-between items-center p-3 bg-pink-50 rounded-2xl">
+                            <span className="text-xs font-bold text-gray-700">{s.name}</span>
+                            <button
+                                onClick={() => handleSelectMaster(s.id, s.name)}
+                                className="text-[10px] bg-pink-500 text-white px-3 py-1 rounded-full font-black"
+                            >
+                                紐づける
+                            </button>
+                        </div>
+                    ))}
+                    <p className="text-[10px] text-gray-400 text-center pt-1">
+                        該当しない場合はそのまま「作成する」を押してください
+                    </p>
+                </div>
+            )}
+
+                {/* 本尊が選択された場合の表示 */}
+                    {selectedMasterId && (
+                        <div className="flex items-center gap-2 p-3 bg-green-50 rounded-2xl border border-green-200">
+                            <span className="text-[10px] font-black text-green-600">✅ 本尊：</span>
+                            <span className="text-xs font-bold text-green-800">{selectedMasterName}</span>
+                            <button
+                                onClick={() => { setSelectedMasterId(null); setSelectedMasterName(''); }}
+                                className="ml-auto text-[10px] text-gray-400 hover:text-red-400"
+                            >
+                                解除
+                            </button>
+                        </div>
+                    )}
+
+                    {/* タイプ選択 */}
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black text-gray-400 uppercase">タイプ（任意）</p>
+                        <div className="flex gap-2">
+                            {[
+                                { value: 'DOERS', label: '🎸 Doers', desc: '実践者・演奏者' },
+                                { value: 'FANS',  label: '💜 Fans',  desc: '推し・ファン' },
+                            ].map((type) => (
+                                <button
+                                    key={type.value}
+                                    type="button"
+                                    onClick={() => setSelectedRoleType(
+                                        selectedRoleType === type.value ? null : type.value
+                                    )}
+                                    className={`flex-1 py-2.5 rounded-2xl text-[11px] font-black transition-all border-2 ${
+                                        selectedRoleType === type.value
+                                            ? 'bg-pink-500 text-white border-pink-500'
+                                            : 'bg-gray-50 text-gray-500 border-gray-100'
+                                    }`}
+                                >
+                                    <div>{type.label}</div>
+                                    <div className="text-[9px] opacity-70">{type.desc}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* ボタン */}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => {
+                                setShowSubChatModal(false);
+                                setSubChatName('');
+                                setSelectedMasterId(null);
+                                setSelectedMasterName('');
+                                setSearchResults([]);
+                            }}
+                            className="flex-1 py-3 bg-gray-100 text-gray-500 rounded-2xl text-[12px] font-black"
+                        >
+                            キャンセル
+                        </button>
+                        <button
+                            onClick={handleCreateSubChat}
+                            disabled={!subChatName.trim() || isCreating}
+                            className="flex-1 py-3 bg-pink-600 text-white rounded-2xl text-[12px] font-black disabled:opacity-40 hover:bg-pink-700 transition-colors"
+                        >
+                            {isCreating ? '作成中...' : '作成する'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        {/* MEETUP投稿 支払い確認モーダル */}
+        {showPaymentConfirm && (
+            <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-[32px] shadow-2xl p-6 w-full max-w-sm space-y-4">
+                    
+                    {/* タイトル */}
+                    <h3 className="text-sm font-black text-gray-800 flex items-center gap-2">
+                        <Coins size={16} className="text-orange-500" />
+                        MEETUP投稿の確認
+                    </h3>
+
+                    {/* 投稿内容サマリー */}
+                    <div className="bg-orange-50 rounded-2xl p-4 space-y-1">
+                        <p className="text-[11px] font-black text-orange-800">{meetupDetails.title}</p>
+                        {meetupDetails.date && (
+                            <p className="text-[10px] text-orange-600">
+                                📅 {meetupDetails.date.slice(0, 10).replace(/-/g, '/')}
+                            </p>
+                        )}
+                        {meetupDetails.pref && (
+                            <p className="text-[10px] text-orange-600">
+                                📍 {meetupDetails.pref} {meetupDetails.city_town}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* 料金説明 */}
+                    <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-600">MEETUP掲載料</span>
+                            <span className="text-sm font-black text-gray-800">¥500</span>
+                        </div>
+                        <div className="border-t border-gray-200 pt-2 flex justify-between items-center">
+                            <span className="text-xs font-black text-gray-800">合計</span>
+                            <span className="text-base font-black text-orange-600">¥500</span>
+                        </div>
+                    </div>
+
+                    {/* Stripe説明 */}
+                    <p className="text-[10px] text-gray-400 text-center">
+                        Stripeの安全な決済画面に移動します。
+                    </p>
+
+                    {/* ボタン */}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setShowPaymentConfirm(false)}
+                            className="flex-1 py-3 bg-gray-100 text-gray-500 rounded-2xl text-[12px] font-black"
+                        >
+                            キャンセル
+                        </button>
+                        <button
+                            onClick={submitPost}
+                            className="flex-1 py-3 bg-orange-500 text-white rounded-2xl text-[12px] font-black hover:bg-orange-600 transition-colors"
+                        >
+                            💳 ¥500 支払って投稿
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
         </div>
     );
 };

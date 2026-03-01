@@ -1,6 +1,8 @@
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000';
+const OFFLINE_POSTS_KEY = 'osidou_offline_posts'; // ★追加
+const OFFLINE_MOODS_KEY = 'osidou_offline_moods'; 
 
 export const authApi = axios.create({
     baseURL: API_BASE_URL,
@@ -58,6 +60,19 @@ export interface HobbyCategory {
     children: HobbyCategory[]; 
     unique_code: string;
 }
+
+// ★追加：オフライン投稿の保存ロジック
+const saveToOfflineQueue = (data: PostCreate) => {
+    const queue = JSON.parse(localStorage.getItem(OFFLINE_POSTS_KEY) || '[]');
+    // 投稿された瞬間の時刻を記録する
+    const offlineData = { 
+        ...data, 
+        created_at: new Date().toISOString(), // バックエンドに渡す「真の投稿時刻」
+        is_offline_original: true 
+    };
+    queue.push(offlineData);
+    localStorage.setItem(OFFLINE_POSTS_KEY, JSON.stringify(queue));
+};
 
 export interface MoodLog {
     id: number;
@@ -202,7 +217,35 @@ export const fetchMyCommunities = async (): Promise<HobbyCategory[]> => {
 
 export const fetchFollowingMoods = async (): Promise<UserMoodResponse[]> => (await authApi.get('/users/following/moods')).data;
 export const fetchMyMoodHistory = async (): Promise<MoodLog[]> => (await authApi.get('/users/me/mood-history')).data;
-export const postMoodLog = async (data: MoodPostPayload): Promise<void> => await authApi.post('/users/moods', data);
+// 貯金箱の名前
+export const postMoodLog = async (data: MoodPostPayload): Promise<void | { isOfflineSaved: true }> => {
+    // ★ 送信前にオフラインか確認
+    if (!navigator.onLine) {
+        console.warn("オフライン検知。ローカルに保存します...");
+        const queue = JSON.parse(localStorage.getItem(OFFLINE_MOODS_KEY) || '[]');
+        queue.push({
+            ...data,
+            created_at: new Date().toISOString() // プランA：投稿時刻を記録
+        });
+        localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(queue));
+        return { isOfflineSaved: true };
+    }
+
+    // オンラインなら通常送信
+    try {
+        await authApi.post('users/moods', data);
+    } catch (error) {
+        // 送信中にネットワークが切れた場合のフォールバック
+        console.warn("送信失敗。ローカルに保存します...");
+        const queue = JSON.parse(localStorage.getItem(OFFLINE_MOODS_KEY) || '[]');
+        queue.push({
+            ...data,
+            created_at: new Date().toISOString()
+        });
+        localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(queue));
+        return { isOfflineSaved: true };
+    }
+};
 export const searchUsers = async (query: string): Promise<UserProfileType[]> => (await authApi.get('/users/search', { params: { query } })).data;
 export const sendFriendRequest = async (userId: number): Promise<void> => await authApi.post(`/friends/${userId}/friend_request`);
 export const fetchFriendRequests = async (): Promise<FriendRequest[]> => (await authApi.get('/friends/me/friend-requests')).data;
@@ -217,7 +260,69 @@ export const rejectFriendRequest = async (requestId: number): Promise<void> => {
 
 export const fetchMyFriends = async (): Promise<Friendship[]> => (await authApi.get('/friends/me/friends')).data;
 
-export const createPost = async (data: PostCreate): Promise<Post> => (await authApi.post('/posts', data)).data;
+export const createPost = async (data: PostCreate): Promise<Post | { isOfflineSaved: true }> => {
+    try {
+        const response = await authApi.post<Post>('/posts', data);
+        return response.data;
+    } catch (error) {
+        // オフラインまたはネットワークエラーの場合
+        if (!navigator.onLine || axios.isAxiosError(error)) {
+            console.warn("Offline detected. Saving post to local storage...");
+            saveToOfflineQueue(data);
+            return { isOfflineSaved: true };
+        }
+        throw error;
+    }
+};
+
+export const syncOfflinePosts = async () => {
+    const queue: (PostCreate & { created_at: string })[] = JSON.parse(localStorage.getItem(OFFLINE_POSTS_KEY) || '[]');
+    if (queue.length === 0) return;
+
+    console.log(`Syncing ${queue.length} offline posts...`);
+    let successCount = 0;
+
+    for (const post of [...queue]) {
+        try {
+            await authApi.post('/posts', post);
+            successCount++;
+            // 送信成功したものをキューから削除
+            queue.shift(); 
+            localStorage.setItem(OFFLINE_POSTS_KEY, JSON.stringify(queue));
+        } catch (e) {
+            console.error("Sync failed for a post. Stopping sync to retry later.", e);
+            break; // 1件失敗したら通信環境がまだ不安定と判断して中断
+        }
+    }
+
+    if (successCount > 0) {
+        console.log(`${successCount} posts synced successfully!`);
+    }
+};
+
+export const syncOfflineData = async () => {
+    const moodQueue = JSON.parse(localStorage.getItem(OFFLINE_MOODS_KEY) || '[]');
+    if (moodQueue.length === 0) return;
+
+    console.log(`🌐 ${moodQueue.length} 件のオフライン気分ログを同期中...`);
+    
+    const remainingQueue = [...moodQueue];
+    for (const mood of moodQueue) {
+        try {
+            await authApi.post('/users/moods', mood); // ← /moods を /users/moods に修正
+            remainingQueue.shift();
+            localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(remainingQueue));
+        } catch (e) {
+            console.error("同期に失敗しました。次回の復帰を待ちます。", e);
+            break; 
+        }
+    }
+
+    if (remainingQueue.length === 0) {
+        console.log("✅ すべての気分ログが同期されました！");
+    }
+};
+
 export const fetchPostsByCategory = async (categoryId: number): Promise<Post[]> => (await authApi.get(`/posts/category/${categoryId}`)).data;
 
 /** 💡 参加表明（JOIN REQUEST）の作成 */
@@ -264,5 +369,15 @@ export const adInteraction = async (postId: number, action: 'like' | 'pin' | 'cl
 
 export const fetchMyAdInteractions = async () => {
     const response = await authApi.get('/posts/my-ad-interactions');
+    return response.data;
+};
+
+export const createSubCategory = async (data: {
+    name: string;
+    parent_id: number;
+    master_id?: number;
+    role_type?: string;
+}): Promise<{ id: number; name: string; parent_id: number; message: string }> => {
+    const response = await authApi.post('/hobby-categories/create-sub', data);
     return response.data;
 };

@@ -152,12 +152,25 @@ def get_my_communities(db: Session = Depends(get_db), current_user: models.User 
     return list(unique_masters.values())
 
 @router.get("/check-join/{category_id}")
-def check_join_status(category_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def check_join_status(
+    category_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
     """参加状態の確認"""
+    # カテゴリのmaster_idを取得
+    category = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.id == category_id
+    ).first()
+    
+    # master_idがあればそちらで確認、なければcategory_id本体で確認
+    check_id = category.master_id if category and category.master_id else category_id
+    
     joined = db.query(models.UserHobbyLink).filter(
         models.UserHobbyLink.user_id == current_user.id,
-        models.UserHobbyLink.hobby_category_id == category_id
+        models.UserHobbyLink.master_id == check_id
     ).first()
+    
     return {"is_joined": joined is not None}
 
 # ------------------------------------------------------------------

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 
 from .. import models
@@ -18,9 +18,10 @@ router = APIRouter()
 
 class MoodLogCreate(BaseModel):
     """気分ログ作成"""
-    mood_type: str  # "happy", "excited", "calm", "tired", "sad", "anxious", "angry", "neutral", "grateful", "motivated"
-    comment: Optional[str] = None  # ひとことコメント（200文字以内）
-    is_visible: bool = True  # 公開設定
+    mood_type: str
+    comment: Optional[str] = None
+    is_visible: bool = True
+    created_at: Optional[datetime] = None  # ★フロントから過去時刻を受け取れるように追加
 
 class MoodLogResponse(BaseModel):
     id: int
@@ -57,20 +58,24 @@ def create_mood_log(
     if mood.mood_type not in valid_moods:
         raise HTTPException(status_code=400, detail="無効な気分タイプです")
 
+    # ★ プランA：時刻のハンドリング
+    # フロントから送られてきた created_at があればそれを使用、なければ現在のサーバー時刻。
+    post_time = mood.created_at if mood.created_at else datetime.now(timezone.utc)
+
     # 1. 新しいログレコードを作成
     db_mood = models.MoodLog(
         user_id=current_user.id,
         mood_type=mood.mood_type,
         comment=mood.comment,
         is_visible=mood.is_visible,
-        created_at=datetime.now() # ここを明示
+        created_at=post_time  # ★ 確定した時刻（過去または現在）を注入
     )
     db.add(db_mood)
 
     # 2. ユーザーテーブルの「現在の状態」を更新
     current_user.current_mood = mood.mood_type
     current_user.current_mood_comment = mood.comment
-    current_user.mood_updated_at = datetime.now()
+    current_user.mood_updated_at = post_time  # ★ ユーザーの最新更新時刻も合わせる
     current_user.is_mood_visible = mood.is_visible
 
     try:
@@ -80,7 +85,7 @@ def create_mood_log(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"保存に失敗しました: {str(e)}")
 
-    # 古いログの削除（バックグラウンドで動くので失敗しても無視してOK）
+    # 古いログの削除（既存ロジック）
     try:
         cleanup_old_mood_logs(db, current_user.id)
     except:

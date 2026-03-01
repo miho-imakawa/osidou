@@ -25,16 +25,16 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     }, []);
 
     const MOOD_TYPES: Record<string, { label: string; emoji: string }> = {
-        'motivated': { label: 'On Fire!/活',   emoji: '🔥' },
-        'excited':   { label: 'Yay/上々!',      emoji: '🤩' },
-        'happy':     { label: 'Happy/幸',       emoji: '😊' },
-        'calm':      { label: 'Relax/温',       emoji: '😌' },
-        'neutral':   { label: '±Meh/中',         emoji: '😐' },
-        'anxious':   { label: 'Hmm/焦',          emoji: '😟' },
-        'tired':     { label: 'No Power/疲',     emoji: '😥' },
-        'sad':       { label: 'SAD/悲',          emoji: '😭' }, 
-        'angry':     { label: 'Grrr!/怒',        emoji: '😠' },
-        'grateful':  { label: 'Aww/感謝',        emoji: '🙏' }, 
+        'motivated': { label: 'On Fire!_活',   emoji: '🔥' },
+        'excited':   { label: 'Yay_上々!',      emoji: '🤩' },
+        'happy':     { label: 'Happy_幸',       emoji: '😊' },
+        'calm':      { label: 'Relax_温',       emoji: '😌' },
+        'neutral':   { label: '±Meh_中',         emoji: '😐' },
+        'anxious':   { label: 'Hmm_焦',          emoji: '😟' },
+        'tired':     { label: 'No Power_疲',     emoji: '😥' },
+        'sad':       { label: 'SAD_悲',          emoji: '😭' }, 
+        'angry':     { label: 'Grrr!_怒',        emoji: '😠' },
+        'grateful':  { label: 'Aww_感謝',        emoji: '🙏' }, 
     };
 
     return (

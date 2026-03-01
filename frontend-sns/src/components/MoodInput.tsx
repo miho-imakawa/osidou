@@ -1,18 +1,20 @@
+// frontend-sns/src/components/MoodInput.tsx
+
 import React, { useState } from 'react';
-import { postMoodLog, MoodPostPayload } from '../api.ts'; 
+import { postMoodLog } from '../api'; // ← authApi ではなく postMoodLog に変更
 import { Send, Smile } from 'lucide-react';
 
 const MOOD_TYPES = [
-    { type: 'motivated', label: 'On Fire!/活',     emoji: '🔥' },
-    { type: 'excited',   label: 'Yay/上々!',         emoji: '🤩' },
-    { type: 'happy',     label: 'Happy/幸',        emoji: '😊' },
-    { type: 'calm',      label: 'Relax/温',       emoji: '😌' },
-    { type: 'neutral',   label: '±Meh/中',          emoji: '😐' },
-    { type: 'anxious',   label: 'Hmm/焦',       emoji: '😟' },
-    { type: 'tired',     label: 'No Power/疲',       emoji: '😥' },
-    { type: 'sad',       label: 'SAD/悲',   emoji: '😭' }, 
-    { type: 'angry',     label: 'Grrr!/怒',        emoji: '😠' },
-    { type: 'grateful',  label: 'Aww/感謝',      emoji: '🙏' }, 
+    { type: 'on_fire',    label: 'On Fire!_活',  emoji: '🔥' },
+    { type: 'excited',    label: 'Yay_上々！',   emoji: '🤩' },
+    { type: 'happy',      label: 'Happy_幸',     emoji: '😊' },
+    { type: 'calm',       label: 'Relax_温',     emoji: '😌' },
+    { type: 'neutral',    label: '±Meh_中',      emoji: '😶' },
+    { type: 'anxious',    label: 'Hmm_焦',       emoji: '😟' },
+    { type: 'tired',      label: 'No Power_疲',  emoji: '😥' },
+    { type: 'sad',        label: 'SAD_悲',       emoji: '😭' },
+    { type: 'angry',      label: 'Grrr!_怒',     emoji: '😠' },
+    { type: 'grateful',   label: 'Aww_感謝',     emoji: '🙏' },
 ];
 
 interface MoodInputProps {
@@ -28,24 +30,20 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            const payload: MoodPostPayload = {
+            // ★ postMoodLog 経由で呼ぶ（オフライン処理が効く）
+            const result = await postMoodLog({
                 mood_type: selectedMood,
-                comment: comment || null,
-                is_visible: true  // 🔥 追加: デフォルトで公開
-            };
-            
-            await postMoodLog(payload);
+                comment: comment,
+                is_visible: true,
+            });
 
-            console.log(`気分「${MOOD_TYPES.find(m => m.type === selectedMood)?.label || selectedMood}」を投稿しました！`);
-            
             onSuccess();
-            
             setSelectedMood('neutral');
             setComment('');
 
         } catch (err) {
             console.error('Failed to submit mood:', err);
-            console.error('気分の投稿に失敗しました。詳細をコンソールで確認してください。'); 
+            alert('気分の投稿に失敗しました。');
         } finally {
             setIsSubmitting(false);
         }
@@ -58,7 +56,6 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-4">
-                {/* 気分選択 */}
                 <div className="flex flex-wrap gap-2 justify-center p-2 bg-white rounded-lg shadow-inner">
                     {MOOD_TYPES.map((mood) => (
                         <button
@@ -78,22 +75,16 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
                     ))}
                 </div>
 
-                {/* コメント入力 */}
-                <div>
-                    <textarea
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        placeholder={`「${MOOD_TYPES.find(m => m.type === selectedMood)?.label || '普通'}」を選びました。一言コメントを残しましょう！`}
-                        rows={2}
-                        maxLength={200}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition"
-                    ></textarea>
-                    <p className="text-xs text-gray-500 mt-1">
-                        {comment.length}/200文字
-                    </p>
-                </div>
+                <textarea
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder={`「${MOOD_TYPES.find(m => m.type === selectedMood)?.label || '普通'}」を選びました。一言コメントを残しましょう！`}
+                    rows={2}
+                    maxLength={200}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition"
+                />
+                <p className="text-xs text-gray-400 text-right">{comment.length}/200文字</p>
 
-                {/* 投稿ボタン */}
                 <div className="flex justify-end">
                     <button
                         type="submit"
@@ -106,7 +97,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
                             }
                         `}
                     >
-                        {isSubmitting ? '投稿中...' : '気分を投稿'}
+                        {isSubmitting ? '投稿中...' : '気分を投稿 ✈'}
                         <Send className="w-4 h-4 ml-2" />
                     </button>
                 </div>
@@ -115,4 +106,4 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
     );
 };
 
-export default MoodInput;
+export default MoodInput;   

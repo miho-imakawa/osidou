@@ -5,11 +5,10 @@ import HomeFeed from './components/HomeFeed';
 import FriendManager from './components/FriendManager';
 import CommunityList from './components/CommunityList';
 import CommunityDetail from './components/CommunityDetail';
-import { authApi, UserProfile as UserProfileType } from './api';
+import { authApi, UserProfile as UserProfileType, syncOfflinePosts, syncOfflineData  } from './api';
 import CategoryDetailPage from './components/CategoryDetailPage';
-import AdQuoteCalculator from './components/AdQuoteCalculator';
 
-// 💡 TypeScriptのエラー を防ぐための完全な初期値
+// 💡 初期値の設定
 const initialProfile: UserProfileType = {
     id: 0,
     username: 'loading',
@@ -30,10 +29,11 @@ const initialProfile: UserProfileType = {
     current_mood: 'neutral', 
     current_mood_comment: null,
     mood_updated_at: null,
-    // 💡 以下の2行を追加することで api.ts との不整合を解消
     birth_year_month: null,
     gender: null
 };
+
+// --- サブコンポーネント (Header / Footer) ---
 
 const Header: React.FC = () => {
     const location = useLocation();
@@ -65,6 +65,8 @@ const Footer: React.FC = () => (
     </footer>
 );
 
+// --- メインコンポーネント ---
+
 const AppLayout: React.FC = () => {
     const [profile, setProfile] = useState<UserProfileType>(initialProfile);
     const [loading, setLoading] = useState(true);
@@ -75,35 +77,54 @@ const AppLayout: React.FC = () => {
         try {
             const response = await authApi.get<UserProfileType>('/users/me');
             setProfile(response.data);
+            // 成功したらLocalStorageにバックアップを取っておく
+            localStorage.setItem('cached_profile', JSON.stringify(response.data));
             setError(null);
         } catch (err) {
-            console.error(err);
-            setError('プロフィールの読み込みに失敗しました。認証状態を確認してください。');
+            console.warn("Offline: Using cached profile");
+            const cached = localStorage.getItem('cached_profile');
+            if (cached) {
+                setProfile(JSON.parse(cached));
+                setError(null); // キャッシュがあればエラー画面にしない
+            } else {
+                setError('オフラインです。一度オンラインでログインしてください。');
+            }
         } finally {
             setLoading(false);
         }
     };
 
-// frontend-sns/src/AppLayout.tsx
-
     useEffect(() => {
         const initializeApp = async () => {
-            // 💡 開発用の強制トークンセット
-            // 先ほど取得した access_token をここに貼り付けます
-            const devToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJraW5raV9mYW5AZXhhbXBsZS5jb20iLCJleHAiOjE3NzIzODczNzR9.cvhDLAIiP2tJjz1lEJGL89BT9JjEdHhuIUDv6bgnNLI"
-
+            const devToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJraW5raV9mYW5AZXhhbXBsZS5jb20iLCJleHAiOjE3NzI0MzEyMjl9.BDqmbDn2fMaD7rKQjCtxAtPBdaxMRBYDL6TpqOwvd3k"
             if (devToken) {
-                // api.ts が見に行く 'access_token' というキー名で保存
                 localStorage.setItem('access_token', devToken);
                 console.log("🛠️ 開発用トークンをセットしました");
             }
+
+            // ★ 起動時にオフライン投稿があれば同期を試みる
+            await syncOfflinePosts();
 
             // トークンがセットされた後にプロフィールを取得
             await fetchProfile();
         };
 
         initializeApp();
-    }, []);
+
+        // ★ オンライン復帰イベントの監視
+        const handleOnline = () => {
+            console.log("🌐 オンライン復帰を検知しました。同期を開始します...");
+            syncOfflinePosts();
+            syncOfflineData();
+        };
+
+        window.addEventListener('online', handleOnline);
+        
+        // クリーンアップ関数
+        return () => {
+            window.removeEventListener('online', handleOnline);
+        };
+    }, []); // ここで useEffect がしっかり閉じられます
 
     const renderContent = () => {
         if (loading) return <div className="p-8 text-center text-gray-500">全体を読み込み中...</div>;
