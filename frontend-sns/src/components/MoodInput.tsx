@@ -5,16 +5,16 @@ import { postMoodLog } from '../api'; // ← authApi ではなく postMoodLog �
 import { Send, Smile } from 'lucide-react';
 
 const MOOD_TYPES = [
-    { type: 'on_fire',    label: 'On Fire!_活',  emoji: '🔥' },
-    { type: 'excited',    label: 'Yay_上々！',   emoji: '🤩' },
-    { type: 'happy',      label: 'Happy_幸',     emoji: '😊' },
-    { type: 'calm',       label: 'Relax_温',     emoji: '😌' },
-    { type: 'neutral',    label: '±Meh_中',      emoji: '😶' },
-    { type: 'anxious',    label: 'Hmm_焦',       emoji: '😟' },
-    { type: 'tired',      label: 'No Power_疲',  emoji: '😥' },
-    { type: 'sad',        label: 'SAD_悲',       emoji: '😭' },
-    { type: 'angry',      label: 'Grrr!_怒',     emoji: '😠' },
-    { type: 'grateful',   label: 'Aww_感謝',     emoji: '🙏' },
+    { type: 'on_fire',    label: 'On Fire! 熱',  emoji: '🔥' },
+    { type: 'excited',    label: 'Yay! 喜',   emoji: '🤩' },
+    { type: 'happy',      label: 'Happy 幸',     emoji: '😊' },
+    { type: 'calm',       label: 'Relax 穏',     emoji: '😌' },
+    { type: 'neutral',    label: 'Meh 凪',     emoji: '😶' },
+    { type: 'anxious',    label: 'Hmm 憂',       emoji: '😟' },
+    { type: 'tired',      label: 'Ugh 倦',  emoji: '😥' },
+    { type: 'sad',        label: 'Sigh 悲',       emoji: '😭' },
+    { type: 'angry',      label: 'Grrr! 怒',     emoji: '😠' },
+    { type: 'grateful',   label: 'Aww 感謝',     emoji: '🙏' },
 ];
 
 interface MoodInputProps {

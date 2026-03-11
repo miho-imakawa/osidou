@@ -7,6 +7,8 @@ import CommunityList from './components/CommunityList';
 import CommunityDetail from './components/CommunityDetail';
 import { authApi, UserProfile as UserProfileType, syncOfflinePosts, syncOfflineData  } from './api';
 import CategoryDetailPage from './components/CategoryDetailPage';
+import { Menu, X } from 'lucide-react';
+import LoginPage from './components/LoginPage';
 
 // 💡 初期値の設定
 const initialProfile: UserProfileType = {
@@ -36,22 +38,88 @@ const initialProfile: UserProfileType = {
 // --- サブコンポーネント (Header / Footer) ---
 
 const Header: React.FC = () => {
+    const [isOpen, setIsOpen] = useState(false);
     const location = useLocation();
+    
+    // 💡 ログイン状態の判定（トークンがあれば true）
+    const isLoggedIn = !!localStorage.getItem('access_token');
+
     const isActive = (path: string) => location.pathname === path;
 
+    const navItems = [
+        { path: '/', label: 'HOME' },
+        { path: '/community', label: 'コミュニティ' },
+        { path: '/friends', label: 'ともだち' },
+        { path: '/mypage', label: 'MY PAGE' },
+    ];
+
+    // 💡 ログアウト処理
+    const handleLogout = () => {
+        localStorage.removeItem('access_token');
+        setIsOpen(false);
+        window.location.href = '/'; // トップへリダイレクトして状態をリセット
+    };
+
     return (
-        <header className="bg-white shadow-md fixed top-0 w-full z-10">
+        <header className="bg-white shadow-md fixed top-0 w-full z-20">
             <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                <Link to="/" className="text-2xl font-extrabold text-pink-600 tracking-wider">
+                <Link to="/" className="text-xl sm:text-2xl font-extrabold text-pink-600 tracking-wider">
                     推し道 (Osidou.com)
                 </Link>
-                <nav className="space-x-4 text-sm sm:text-base">
-                    <Link to="/" className={`text-gray-600 hover:text-pink-600 ${isActive('/') ? 'font-bold border-b-2 border-pink-600' : ''}`}>HOME</Link>
-                    <Link to="/community" className={`text-gray-600 hover:text-pink-600 ${isActive('/community') ? 'font-bold border-b-2 border-pink-600' : ''}`}>コミュニティ</Link>
-                    <Link to="/friends" className={`text-gray-600 hover:text-pink-600 ${isActive('/friends') ? 'font-bold border-b-2 border-pink-600' : ''}`}>ともだち</Link>
-                    <Link to="/mypage" className={`text-gray-600 hover:text-pink-600 ${isActive('/mypage') ? 'font-bold border-b-2 border-pink-600' : ''}`}>MY PAGE</Link>
+
+                {/* PC版：ログイン/ログアウトを右端に追加 */}
+                <nav className="hidden md:flex items-center space-x-6">
+                    {navItems.map((item) => (
+                        <Link key={item.path} to={item.path} className={`text-gray-600 hover:text-pink-600 ${isActive(item.path) ? 'font-bold border-b-2 border-pink-600' : ''}`}>
+                            {item.label}
+                        </Link>
+                    ))}
+                    {isLoggedIn ? (
+                        <button onClick={handleLogout} className="text-gray-500 hover:text-red-500 text-sm border px-3 py-1 rounded">ログアウト</button>
+                    ) : (
+                        <Link to="/login" className="text-pink-600 font-bold text-sm">ログイン</Link>
+                    )}
                 </nav>
+
+                <div className="md:hidden">
+                    <button onClick={() => setIsOpen(!isOpen)} className="text-gray-600 p-2">
+                        {isOpen ? <X size={28} /> : <Menu size={28} />}
+                    </button>
+                </div>
             </div>
+
+            {/* スマホ版メニュー */}
+            {isOpen && (
+                <div className="md:hidden bg-white border-t border-gray-100 shadow-lg">
+                    <nav className="flex flex-col p-4 space-y-4">
+                        {navItems.map((item) => (
+                            <Link key={item.path} to={item.path} onClick={() => setIsOpen(false)} className={`text-base py-2 px-4 rounded-lg ${isActive(item.path) ? 'bg-pink-50 text-pink-600 font-bold' : 'text-gray-600'}`}>
+                                {item.label}
+                            </Link>
+                        ))}
+                        
+                        <hr className="border-gray-100" />
+                        
+                        {/* 💡 ここで出し分け */}
+                        {isLoggedIn ? (
+                            <button 
+                                onClick={handleLogout}
+                                className="text-left py-2 px-4 text-red-500 font-bold"
+                            >
+                                ログアウト
+                            </button>
+                        ) : (
+                            <Link 
+                                to="/login" 
+                                onClick={() => setIsOpen(false)}
+                                className="py-2 px-4 text-pink-600 font-bold bg-pink-50 rounded-lg text-center"
+                            >
+                                ログイン / 新規登録
+                            </Link>
+                        )}
+                    </nav>
+                </div>
+            )}
         </header>
     );
 };
@@ -71,6 +139,7 @@ const AppLayout: React.FC = () => {
     const [profile, setProfile] = useState<UserProfileType>(initialProfile);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [guideId, setGuideId] = useState<number | null>(null);
     
     const fetchProfile = async () => {
         setLoading(true);
@@ -96,57 +165,90 @@ const AppLayout: React.FC = () => {
 
     useEffect(() => {
         const initializeApp = async () => {
-            const devToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJraW5raV9mYW5AZXhhbXBsZS5jb20iLCJleHAiOjE3NzI0MzEyMjl9.BDqmbDn2fMaD7rKQjCtxAtPBdaxMRBYDL6TpqOwvd3k"
-            if (devToken) {
-                localStorage.setItem('access_token', devToken);
-                console.log("🛠️ 開発用トークンをセットしました");
-            }
-
-            // ★ 起動時にオフライン投稿があれば同期を試みる
             await syncOfflinePosts();
-
-            // トークンがセットされた後にプロフィールを取得
             await fetchProfile();
         };
-
         initializeApp();
 
-        // ★ オンライン復帰イベントの監視
+        // ← useEffect入れ子を削除して、fetchだけここに書く
+        fetch('/api/community/guide')
+            .then(res => res.json())
+            .then(data => setGuideId(data.id))
+            .catch(() => setGuideId(1));
+
         const handleOnline = () => {
-            console.log("🌐 オンライン復帰を検知しました。同期を開始します...");
             syncOfflinePosts();
             syncOfflineData();
         };
-
         window.addEventListener('online', handleOnline);
-        
-        // クリーンアップ関数
         return () => {
             window.removeEventListener('online', handleOnline);
         };
-    }, []); // ここで useEffect がしっかり閉じられます
+    }, []);
 
     const renderContent = () => {
         if (loading) return <div className="p-8 text-center text-gray-500">全体を読み込み中...</div>;
-        if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
+
+        const token = localStorage.getItem('access_token');
+
+        const welcomeScreen = (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+                <h2 className="text-2xl font-black text-gray-900">推し道へようこそ</h2>
+                <p className="text-sm text-gray-500">ログインして始めましょう</p>
+                <a href="/login" className="bg-pink-500 text-white px-8 py-3 rounded-full font-bold">
+                    ログイン / サインアップ
+                </a>
+            </div>
+        );
+
+        // 初回ログイン判定
+        const hasSeenGuide = localStorage.getItem('has_seen_guide');
+        if (token && !hasSeenGuide) {
+            return (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
+                    <h2 className="text-2xl font-bold text-gray-900">ようこそ、推し道へ！🌸</h2>
+                    <p className="text-sm text-gray-500">はじめに使い方をご確認ください</p>
+                    <a
+                        href={`/community/${guideId ?? 1}`}  // ← ここを修正
+                        onClick={() => localStorage.setItem('has_seen_guide', 'true')}
+                        className="bg-pink-500 text-white px-8 py-3 rounded-full font-bold hover:bg-pink-600 transition-colors"
+                    >
+                        📖 SEE THE GUIDE
+                    </a>
+                    <button
+                        onClick={() => localStorage.setItem('has_seen_guide', 'true')}
+                        className="text-gray-400 text-sm underline"
+                    >
+                        スキップ
+                    </button>
+                </div>
+            );
+        }
 
         return (
             <Routes>
-                <Route path="/" element={<HomeFeed profile={profile} />} />
-                <Route path="/friends" element={<FriendManager />} />
-                <Route path="/mypage" element={<UserProfile profile={profile} fetchProfile={fetchProfile} />} />
-                <Route path="/profile/:userId" element={<UserProfile profile={profile} fetchProfile={fetchProfile} />} />
-                <Route path="/community" element={<CommunityList />} />
-                <Route path="/community/:categoryId" element={<CommunityDetail />} />
-                <Route path="*" element={<HomeFeed profile={profile} />} />
-                <Route path="/community/:categoryId/detail" element={<CategoryDetailPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                {!token || error ? (
+                    <Route path="*" element={welcomeScreen} />
+                ) : (
+                    <>
+                        <Route path="/" element={<HomeFeed profile={profile} />} />
+                        <Route path="/friends" element={<FriendManager />} />
+                        <Route path="/mypage" element={<UserProfile profile={profile} fetchProfile={fetchProfile} />} />
+                        <Route path="/profile/:userId" element={<UserProfile profile={profile} fetchProfile={fetchProfile} />} />
+                        <Route path="/community" element={<CommunityList />} />
+                        <Route path="/community/:categoryId" element={<CommunityDetail />} />
+                        <Route path="/community/:categoryId/detail" element={<CategoryDetailPage />} />
+                        <Route path="*" element={<HomeFeed profile={profile} />} />
+                    </>
+                )}
             </Routes>
         );
     };
 
-return (
+    return (
         <div className="min-h-screen bg-gray-100 font-sans pt-20">
-            <Header /> 
+            <Header />
             <main className="container mx-auto px-4">
                 {renderContent()}
             </main>

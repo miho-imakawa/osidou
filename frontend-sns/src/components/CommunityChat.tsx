@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPost, fetchPostsByCategory, Post, authApi, toggleAttendance, adInteraction, fetchMyAdInteractions, createSubCategory  } from '../api';
 import { 
-  Send, MessageSquare, MapPin, Users, CheckSquare, Square, Clock, Coins, Pin, Calendar
+  Send, MessageSquare, MapPin, Users, CheckSquare, Square, Clock, Coins, Pin, Calendar, EyeOff, AlertTriangle
 } from 'lucide-react';
 import MeetupChatModal from './MeetupChatModal';
 import AdPostModal from './AdPostModal';
@@ -11,11 +11,14 @@ interface CommunityChatProps {
     masterId?: number | null;
     currentUserId: number;
     currentCategoryName?: string;
+    isPublic?: boolean;
 }
 
-const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryId, masterId, currentUserId, currentCategoryName }) => {
+const CommunityChat: React.FC<CommunityChatProps> = ({
+    categoryId: propCategoryId, masterId, currentUserId, currentCategoryName, isPublic }) => {
     const chatTargetId = masterId ? String(masterId) : propCategoryId;
-
+    const communityId = propCategoryId; 
+    const [communityInfo, setCommunityInfo] = useState<any>(null);
     const [posts, setPosts] = useState<Post[]>([]);
     const [newPost, setNewPost] = useState<string>(''); 
     const [loading, setLoading] = useState(true);
@@ -45,6 +48,23 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryI
     const [selectedMasterName, setSelectedMasterName] = useState<string>('');
     const [selectedRoleType, setSelectedRoleType] = useState<string | null>(null);
     const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
+    // 1. 通報 (バックエンドの段階的制限を叩く)
+    const handleReportPost = async (postId: number) => {
+        if (!window.confirm("この投稿を不適切として通報しますか？\n(通報が重なると自動的に非表示になります)")) return;
+        try {
+            await authApi.post(`/posts/${postId}/report`, { reason: "User reported" });
+            alert("通報を受け付けました。ご協力ありがとうございます。");
+            fetchPosts(); // 非表示が発動したかもしれないので再取得
+        } catch (err: any) {
+            alert(err.response?.data?.detail || "通報に失敗しました。");
+        }
+    };
+
+    // 2. ローカル非表示 (とりあえず今の画面から消す)
+    const handleLocalHide = (postId: number) => {
+        if (!window.confirm("この投稿を非表示にしますか？\n(リロードするまで表示されなくなります)")) return;
+        setPosts(prev => prev.filter(p => p.id !== postId));
+    };
 
     const MEETUP_TEMPLATE = `📍 集合場所：
 
@@ -94,7 +114,11 @@ const CommunityChat: React.FC<CommunityChatProps> = ({ categoryId: propCategoryI
         };
         loadInteractions();
     }, []);
-
+    const fetchCommunityDetail = async (id: string) => {
+        const res = await authApi.get(`/communities/${id}`);
+        return res.data;
+    };
+ 
     // 🔄 リロード時やデータ更新時に、PIN済みのものをリストに復元する
     useEffect(() => {
         if (posts.length > 0) {
@@ -235,7 +259,13 @@ const submitPost = async () => {
         );
     }
 
-    const parentPosts = posts.filter(p => !p.parent_id);
+    const allParentPosts = posts.filter(p => !p.parent_id);
+
+    // 2. その中で「システム投稿(ガイド)」と「通常の投稿」に分けて並び替える
+    const parentPosts = [
+        ...allParentPosts.filter(p => p.is_system), // 💡 ガイドを一番上へ
+        ...allParentPosts.filter(p => !p.is_system) // 💡 通常の投稿をその下へ
+    ];
 
     return (
         <div className="flex flex-col h-[650px] bg-white border rounded-3xl shadow-xl overflow-hidden text-left font-sans relative">
@@ -531,15 +561,51 @@ const submitPost = async () => {
                                         </div>
                                     )}
                                 </div>
-                            ) : (                                /* 通常チャット */
-                                <div className="flex items-start gap-2 max-w-[85%] mb-4">
-                                    <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
-                                        <span className="font-black text-[10px] text-pink-500 uppercase mb-1 block">{post.author_nickname}</span>
-                                        <p className="text-gray-700 text-[13px] leading-relaxed">{post.content}</p>
+                                /* --- 既存コードの 340行目付近（通常チャットの開始部分） --- */
+                                ) : ( /* 通常チャット */
+                                    <div className="flex items-start gap-2 max-w-[85%] mb-4 group relative">
+                                        {/* 💡 is_system が true なら背景を green-50（薄いグリーン）にする */}
+                                        <div className={`${post.is_system ? 'bg-green-50 border-green-200 shadow-green-100' : 'bg-white border-gray-100'} p-4 rounded-3xl shadow-sm border min-w-[140px]`}>
+                                            
+                                            <div className="flex justify-between items-start mb-1">
+                                                {/* 💡 システム投稿なら「OFFICIAL GUIDE」ラベルとピンを表示、そうでなければニックネーム */}
+                                                {post.is_system ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <Pin size={12} className="text-amber-500 fill-amber-500" />
+                                                        <span className="font-black text-[10px] text-amber-600 uppercase block tracking-widest">
+                                                            Official Guide
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="font-black text-[10px] text-pink-500 uppercase block">
+                                                        {post.author_nickname}
+                                                    </span>
+                                                )}
+
+                                                {/* 🛡️ 安全機能ボタン（ホバー時に現れる） */}
+                                                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
+                                                    <button 
+                                                        onClick={() => handleLocalHide(post.id)}
+                                                        className="p-1 hover:bg-gray-100 rounded-full text-gray-300 hover:text-gray-600 transition-colors"
+                                                        title="自分だけに非表示"
+                                                    >
+                                                        <EyeOff size={12} />
+                                                    </button>
+                                                    
+                                                    <button 
+                                                        onClick={() => handleReportPost(post.id)}
+                                                        className="p-1 hover:bg-red-50 rounded-full text-gray-300 hover:text-red-400 transition-colors"
+                                                        title="通報する"
+                                                    >
+                                                        <AlertTriangle size={12} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <p className="text-gray-700 text-[13px] leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
+                                )}                        </div>
                     );
                 })}
             </div>
@@ -578,8 +644,14 @@ const submitPost = async () => {
                     </div>
                     <div className="flex gap-2">
                         <button type="button" onClick={() => switchPostType('normal')} className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${postType === 'normal' ? 'bg-gray-800 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>CHAT</button>
+                        {/* ★ isPublic が false の時だけ MEETUP を表示 */}
+                        {!isPublic && (
                         <button type="button" onClick={() => switchPostType('meetup')} className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${postType === 'meetup' ? 'bg-orange-500 text-white shadow-md' : 'bg-orange-50 text-orange-300'}`}>MEETUP</button>
+                        )}
+                        {/* ★ isPublic が false の時だけ AD を表示 */}
+                        {!isPublic && (
                         <button type="button" onClick={() => setShowAdModal(true)} className="flex-1 py-2 rounded-xl text-[10px] font-black transition-all bg-green-50 text-green-400 hover:bg-green-500 hover:text-white">AD</button>
+                        )}
                     </div>
                 </form>
             </div>

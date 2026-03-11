@@ -19,6 +19,8 @@ export default defineConfig({
     },
   },
   server: {
+    // 💡 追加: 外部（スマホなど）からのアクセスを許可する設定
+    host: true,
     // 開発サーバーのポート設定
     port: 5173,
   },

@@ -4,7 +4,6 @@ import {
   User, Globe, Twitter, Facebook, Instagram, BookOpen,
   Edit, MessageSquare, Heart, Download, Save, X, Eye, EyeOff, AtSign, MapPin, Clock, Flame, Calendar
 } from 'lucide-react';
-
 import { 
   authApi, 
   fetchMyCommunities,
@@ -12,6 +11,7 @@ import {
   fetchMyMoodHistory, 
   MoodLog 
 } from '../api';
+import PendingFriendBanner from './PendingFriendBanner'; // 💡 パスは環境に合わせて調整してください
 
 interface UserProfileProps {
   profile: any; 
@@ -30,6 +30,55 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   const [myCategories, setMyCategories] = useState<HobbyCategory[]>([]);
   const [moodLogs, setMoodLogs] = useState<MoodLog[]>([]);
   const [myMeetups, setMyMeetups] = useState<any[]>([]); 
+
+  const [myAdsStats, setMyAdsStats] = useState<any[]>([]);
+
+  // 💡 State を追加
+const [pendingCount, setPendingCount] = useState(0);
+
+useEffect(() => {
+  if (!displayProfile?.id) return;
+
+  const loadData = async () => {
+      try {
+          const categories = await fetchMyCommunities();
+          setMyCategories(categories);
+
+          const [joinedRes, hostedRes] = await Promise.all([
+              authApi.get('/posts/my-meetups'),
+              authApi.get('/posts/my-hosted-meetups')
+          ]);
+
+          const joined = joinedRes.data || [];
+          const hosted = hostedRes.data || [];
+          
+          const allMeetups = [...hosted];
+          joined.forEach((m: any) => {
+              if (!allMeetups.find((existing: any) => existing.id === m.id)) {
+                  allMeetups.push(m);
+              }
+          });
+          setMyMeetups(allMeetups);
+
+          const logs = await fetchMyMoodHistory();
+          setMoodLogs(logs);
+
+          if (isMe) {
+              const res = await authApi.get('/friends/pending/count');
+              setPendingCount(res.data.pending_count);
+          }
+          if (isMe) {
+              const adsRes = await authApi.get('/posts/my-ads-stats');
+              setMyAdsStats(adsRes.data);
+          }
+      } catch (err) {
+          console.error("データ取得失敗:", err);
+      }
+  };
+
+  loadData();
+}, [displayProfile?.id, isMe, location.pathname]);
+
 
   const getRankClasses = (count: number) => {
     if (count >= 10000) return "bg-yellow-50 text-yellow-700 border-yellow-300 shadow-sm";
@@ -143,17 +192,19 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-          <User className="text-pink-600" size={32} />
-          {displayProfile.nickname || displayProfile.username} 's PAGE
+      <div className="flex justify-between items-start mb-4">
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <User className="text-pink-600" size={24} />
+            <span>
+                {displayProfile.nickname || displayProfile.username}'s PAGE
+            </span>
         </h1>
         {isMe && (
-          <button onClick={toggleEdit} className="px-5 py-2.5 bg-pink-600 text-white rounded-2xl flex items-center gap-2 transition-all hover:bg-pink-700 shadow-md font-bold active:scale-95">
-            {isEditing ? <><X size={20}/> 戻る</> : <><Edit size={20}/> プロフィール編集</>}
-          </button>
+            <button onClick={toggleEdit} className="ml-4 px-3 py-2 bg-pink-600 text-white rounded-2xl flex items-center gap-1.5 text-sm font-bold shrink-0 transition-all hover:bg-pink-700 shadow-md active:scale-95">
+                {isEditing ? <><X size={16}/> 戻る</> : <><Edit size={16}/> 編集</>}
+            </button>
         )}
-      </div>
+    </div>
 
       {isEditing && tempProfile ? (
         /* EDIT MODE */
@@ -279,6 +330,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               )}
             </div>
           </div>
+          {/* 🔔 自分の時だけ表示される申請バナー */}
+          {isMe && <PendingFriendBanner count={pendingCount} />}
 
           {/* Communities */}
           <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
@@ -340,6 +393,32 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
             </div>
           )}
 
+          {/* MY ADS STATS */}
+          {isMe && myAdsStats.length > 0 && (
+              <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
+                  <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
+                      <span className="text-green-500">📢</span> My AD Stats
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                      {myAdsStats.map(ad => (
+                      <div key={ad.id} className="flex items-center gap-3 px-4 py-1.5 bg-green-50 border border-green-200 rounded-full hover:bg-green-100 transition-all">
+                          <span className="text-[11px] font-bold text-green-800 truncate max-w-[120px]">
+                              {ad.title}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0 border-l border-green-200 pl-2">
+                              <span className="text-[11px] font-black text-pink-500">👍 {ad.like_count}</span>
+                              <span className="text-[11px] font-black text-yellow-500">📌 {ad.pin_count}</span>
+                              {ad.ad_end_date && (
+                                  <span className="text-[9px] text-green-400">
+                                      〜{ad.ad_end_date.slice(0, 10)}
+                                  </span>
+                              )}
+                          </div>
+                      </div>
+                      ))}
+                  </div>
+              </div>
+          )}
           {/* Activity Logs */}
           {displayProfile.is_mood_visible && (
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-2">

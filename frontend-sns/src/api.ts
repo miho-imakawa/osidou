@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const OFFLINE_POSTS_KEY = 'osidou_offline_posts'; // ★追加
 const OFFLINE_MOODS_KEY = 'osidou_offline_moods'; 
 
@@ -59,6 +59,7 @@ export interface HobbyCategory {
     member_count: number;
     children: HobbyCategory[]; 
     unique_code: string;
+    is_public?: boolean;
 }
 
 // ★追加：オフライン投稿の保存ロジック
@@ -157,6 +158,7 @@ export interface Post {
     user_id: number;
     hobby_category_id: number;
     author_nickname: string;
+    is_system: boolean;
     public_code?: string;
     created_at: string;
     is_meetup: boolean;

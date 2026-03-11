@@ -12,7 +12,7 @@ from ..models import User
 from ..schemas.auth import TokenData # スキーマファイルにTokenDataが存在すると仮定
 
 # 認証設定
-SECRET_KEY = "SUPER_SECURE_AND_UNIQUE_KEY_FOR_OSIDOU_PROJECT" # 💡 修正: 一意の値に変更
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 # アクセストークンの有効期限
 

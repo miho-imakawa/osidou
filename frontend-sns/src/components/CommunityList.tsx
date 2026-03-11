@@ -25,9 +25,11 @@ const CommunityList: React.FC = () => {
         try {
             let response;
             if (query.trim()) {
+                // 検索時は既存のsearchエンドポイント
                 response = await authApi.get(`/hobby-categories/search?keyword=${encodeURIComponent(query)}`);
             } else {
-                response = await authApi.get('/hobby-categories');
+                // ★ 初期表示は軽量版エンドポイント
+                response = await authApi.get('/hobby-categories/top-categories');
             }
             setCategories(response.data);
         } catch (err) {
@@ -47,7 +49,9 @@ const CommunityList: React.FC = () => {
     // 重複している本尊（master_id）を1つにまとめるロジック
     const filteredCategories = categories.filter((cat, index, self) => {
         const masterId = cat.master_id || cat.id;
-        return index === self.findIndex((t) => (t.master_id || t.id) === masterId);
+        const isDuplicateMaster = index !== self.findIndex((t) => (t.master_id || t.id) === masterId);
+        const isDuplicateName = index !== self.findIndex((t) => t.name === cat.name);
+        return !isDuplicateMaster && !isDuplicateName;
     });
 
     const handleCreateNew = async () => {

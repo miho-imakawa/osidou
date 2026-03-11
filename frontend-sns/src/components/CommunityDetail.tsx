@@ -34,7 +34,7 @@ const CommunityDetail: React.FC = () => {
 
             const targetId = categoryData.master_id || categoryId;
             const joinStatus = await authApi.get(`/hobby-categories/check-join/${targetId}`);
-            setIsJoined(joinStatus.data.is_joined);
+            setIsJoined(joinStatus.data.is_joined || categoryData.is_public);
 
             const me = await authApi.get('/users/me');
             setCurrentUserId(me.data.id);
@@ -155,6 +155,7 @@ const CommunityDetail: React.FC = () => {
                                 categoryId={categoryId!} 
                                 masterId={category.master_id} 
                                 currentUserId={currentUserId}
+                                isPublic={category.is_public}
                             />
                         </div>
                     </div>
