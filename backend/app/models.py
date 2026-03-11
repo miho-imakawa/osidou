@@ -43,6 +43,21 @@ class FriendRequestStatus(str, enum.Enum):
 # 💡 2. SNS・コミュニティ機能モデル
 # ==========================================
 
+# backend/app/models.py
+
+class Community(Base):
+    __tablename__ = "communities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    description = Column(Text, nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+
+    # リレーションシップ（必要であれば）
+    owner = relationship("User", back_populates="communities")
+
 class HobbyCategory(Base):
     __tablename__ = "hobby_categories"
     
@@ -52,10 +67,11 @@ class HobbyCategory(Base):
     parent_id = Column(Integer, ForeignKey('hobby_categories.id'), nullable=True)
     depth = Column(Integer, nullable=False, default=0)  # 💡 default追加
     master_id = Column(Integer, ForeignKey('hobby_categories.id'), nullable=True)
-    unique_code = Column(String(7), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
+    unique_code = Column(String(7), unique=True, index=True, nullable=False) 
     role_type = Column(SQLEnum(HobbyRoleType), nullable=True)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    is_public = Column(Boolean, default=False)
     
     parent = relationship(
         "HobbyCategory", 
@@ -195,6 +211,7 @@ class HobbyPost(Base):
     
     # --- 広告・リポスト関連 (ここをスッキリ整理しました) ---
     is_ad = Column(Boolean, default=False, nullable=False)
+    is_hidden = Column(Boolean, default=False, nullable=False)  
     ad_color = Column(String(20), nullable=True, default="green")  # ★メンカラ用
     ad_start_date = Column(DateTime, nullable=True)
     ad_end_date = Column(DateTime, nullable=True)
@@ -458,6 +475,11 @@ class User(Base):
     friendships = relationship("Friendship", foreign_keys="Friendship.user_id")
     follows = relationship("Follow", overlaps="user") #
 
+    paid_friend_slots = Column(Integer, default=0)
+    is_premium = Column(Boolean, default=False)
+
+    communities = relationship("Community", back_populates="owner")
+    friendships = relationship("Friendship", back_populates="user", foreign_keys="[Friendship.user_id]", overlaps="user")
     notifications_received = relationship(
         "Notification", 
         back_populates="recipient", 

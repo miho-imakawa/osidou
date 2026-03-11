@@ -154,6 +154,28 @@ def get_total_member_count(db, category, all_categories=None) -> int:
     
     return count if count > 0 else "-"
 
+
+# --------------------------------------------------
+# 💡 トップレベルのカテゴリ取得
+# --------------------------------------------------
+
+@router.get("/top-categories")
+def get_top_categories(db: Session = Depends(get_db)):
+    """トップレベルのカテゴリのみ取得（軽量版）"""
+    categories = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.parent_id == None,
+        models.HobbyCategory.master_id == None
+    ).all()
+    
+    result = []
+    for cat in categories:
+        schema = HobbyCategoryResponse.model_validate(cat)
+        schema.member_count = get_total_member_count(db, cat, categories)
+        schema.children = []
+        result.append(schema)
+    
+    return result
+
 # --------------------------------------------------
 # 💡 全カテゴリ取得エンドポイント
 # --------------------------------------------------

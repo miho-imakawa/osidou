@@ -103,3 +103,13 @@ def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
             detail="管理者権限が必要です。",
         )
     return current_user
+
+def get_optional_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Optional[User]:
+    """ログインしていなくてもエラーにしない任意認証"""
+    if not token:
+        return None
+    token_data = decode_access_token(token)
+    if token_data is None:
+        return None
+    user = db.query(User).filter(User.email == token_data["sub"]).first()
+    return user

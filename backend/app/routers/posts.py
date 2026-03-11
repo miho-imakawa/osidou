@@ -3,10 +3,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-
+from app.models import PostReport, HobbyPost, User # モデル名が HobbyPost であることを確認
+from app.utils.security import get_current_user # 認証用関数名を確認
 from .. import models, schemas
 from ..database import get_db
-from .auth import get_current_user
 from ..logics.notifications import notify_ancestors, check_town_member_limit, create_region_notifications_for_post 
 from .community import validate_special_post_limit
 from datetime import datetime, timedelta
@@ -84,7 +84,10 @@ def create_hobby_post(
 @router.get("/posts/category/{category_id}", response_model=List[schemas.HobbyPostResponse])
 def get_posts_by_category(category_id: int, db: Session = Depends(get_db)):
     """カテゴリの投稿一覧（💡参加者名・作者名をフォールバック付きで紐付け）"""
-    posts = db.query(models.HobbyPost).filter(models.HobbyPost.hobby_category_id == category_id).order_by(models.HobbyPost.created_at.desc()).all()
+    posts = db.query(models.HobbyPost).filter(
+        models.HobbyPost.hobby_category_id == category_id,
+        models.HobbyPost.is_hidden == False  # ★ 追加
+    ).order_by(models.HobbyPost.created_at.desc()).all()
     
     for post in posts:
         # --- 1. 投稿主（Author）の情報を紐付け ---
@@ -381,3 +384,93 @@ def get_my_ad_interactions(
         "is_pinned": i.is_pinned,
         "is_closed": i.is_closed
     } for i in interactions}
+
+
+# いいね、PINの数
+@router.get("/posts/my-ads-stats")
+def get_my_ads_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    from datetime import datetime, timedelta
+    
+    # 自分のAD投稿を取得（終了後1週間以内のものも含む）
+    one_week_ago = datetime.now() - timedelta(days=7)
+    
+    my_ads = db.query(models.HobbyPost).filter(
+        models.HobbyPost.user_id == current_user.id,
+        models.HobbyPost.is_ad == True,
+        # 掲載終了後1週間以内 または まだ終了していない
+        (models.HobbyPost.ad_end_date == None) | 
+        (models.HobbyPost.ad_end_date >= one_week_ago)
+    ).all()
+    
+    result = []
+    for ad in my_ads:
+        like_count = db.query(models.UserAdInteraction).filter(
+            models.UserAdInteraction.post_id == ad.id,
+            models.UserAdInteraction.is_liked == True
+        ).count()
+        
+        pin_count = db.query(models.UserAdInteraction).filter(
+            models.UserAdInteraction.post_id == ad.id,
+            models.UserAdInteraction.is_pinned == True
+        ).count()
+        
+        result.append({
+            "id": ad.id,
+            "title": ad.content.split('\n')[0],
+            "ad_end_date": ad.ad_end_date.isoformat() if ad.ad_end_date else None,
+            "like_count": like_count,
+            "pin_count": pin_count,
+        })
+    
+    return result
+
+# ============================================================
+# レポート機能
+# ============================================================
+
+@router.post("/posts/{post_id}/report")
+async def report_post(
+    post_id: int, 
+    reason: str = None, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    target_post = db.query(HobbyPost).filter(HobbyPost.id == post_id).first()
+    if not target_post:
+        raise HTTPException(status_code=404, detail="報告対象の投稿が見つかりません。")
+
+    existing_report = db.query(PostReport).filter(
+        PostReport.post_id == post_id,
+        PostReport.reporter_id == current_user.id
+    ).first()
+    
+    if existing_report:
+        raise HTTPException(status_code=400, detail="この投稿は既に報告済みです。")
+
+    new_report = PostReport(
+        post_id=post_id,
+        reporter_id=current_user.id,
+        reason=reason[:200] if reason else None
+    )
+    db.add(new_report)
+    db.commit()
+
+    report_count = db.query(PostReport).filter(PostReport.post_id == post_id).count()
+    
+    # ★ 自動非表示ロジック
+    if report_count >= 5:
+        target_post.is_hidden = True
+        db.commit()
+        print(f"⚠️ [AUTO-HIDDEN] Post ID {post_id} is now hidden. (Reports: {report_count})")
+    elif report_count >= 3:
+        print(f"📢 [ADMIN-NOTIFY] Post ID {post_id} received {report_count} reports.")
+
+    return {
+        "status": "success",
+        "detail": "通報を受け付けました。ご協力ありがとうございます。",
+        "report_count": report_count,
+        "is_hidden": target_post.is_hidden
+    }

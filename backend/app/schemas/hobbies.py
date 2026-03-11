@@ -27,6 +27,8 @@ class HobbyCategoryBase(BaseModel):
     # 💡 unique_code もフロントで表示に使っているので追加しておきましょう
     unique_code: Optional[str] = None 
 
+    is_public: Optional[bool] = False 
+
     class Config:
         from_attributes = True
 

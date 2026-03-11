@@ -1,13 +1,28 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 from sqlalchemy import func, or_
 from .. import models, schemas
 from ..database import get_db
-from .auth import get_current_user
+from ..utils.security import get_current_user, get_optional_user
 
 router = APIRouter(tags=["community"])
+
+# ==========================================
+# 💡 0. GUIDE カテゴリID取得
+# ==========================================
+@router.get("/guide")
+def get_guide_category(db: Session = Depends(get_db)):
+    """GUIDEカテゴリのIDを動的に返す"""
+    guide_cat = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.name == "GUIDE (推し道の歩き方)"
+    ).first()
+
+    if not guide_cat:
+        raise HTTPException(status_code=404, detail="GUIDEカテゴリが見つかりません")
+
+    return {"id": guide_cat.id}
 
 # ==========================================
 # 💡 1. 投稿制限チェックロジック (Helper)
@@ -155,20 +170,25 @@ def get_my_communities(db: Session = Depends(get_db), current_user: models.User 
 def check_join_status(
     category_id: int, 
     db: Session = Depends(get_db), 
-    current_user: models.User = Depends(get_current_user)
+    current_user: Optional[models.User] = Depends(get_optional_user)  # ★ 変更
 ):
-    """参加状態の確認"""
-    # カテゴリのmaster_idを取得
     category = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.id == category_id
     ).first()
+
+    # is_public は誰でも通過
+    if category and category.is_public:
+        return {"is_joined": True}
+
+    # 未ログインはFalse
+    if not current_user:
+        return {"is_joined": False}
     
-    # master_idがあればそちらで確認、なければcategory_id本体で確認
     check_id = category.master_id if category and category.master_id else category_id
     
     joined = db.query(models.UserHobbyLink).filter(
         models.UserHobbyLink.user_id == current_user.id,
-        models.UserHobbyLink.master_id == check_id
+        models.UserHobbyLink.hobby_category_id == check_id
     ).first()
     
     return {"is_joined": joined is not None}

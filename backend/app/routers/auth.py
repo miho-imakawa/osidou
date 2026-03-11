@@ -15,6 +15,7 @@ from ..schemas.users import UserCreate, UserMe, UserPublic # ユーザー登録/
 
 # ✅ security.py から認証関連の関数/定数をインポート
 # security.pyは utils/security.py に移動済み
+from ..utils.auth import generate_public_code
 from ..utils.security import (
     authenticate_user,
     create_access_token,
@@ -44,7 +45,9 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
         db_user = models.User(
             username=user_in.username,
             email=user_in.email,
-            hashed_password=hashed_password # DBモデルの列名に合わせる
+            hashed_password=hashed_password,
+            public_code=generate_public_code(),
+            is_active=True,
         )
 
         # 3. DBに保存

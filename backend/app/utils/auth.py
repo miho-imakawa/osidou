@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 
 from passlib.context import CryptContext
 from jose import jwt, JWTError
+import random
+import string
+
 
 # JWT settings (本番では環境変数から読み込むこと)
 SECRET_KEY = "YOUR-SUPER-SECRET-AND-COMPLEX-KEY"
@@ -45,3 +48,6 @@ def decode_access_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+    
+def generate_public_code() -> str:
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))

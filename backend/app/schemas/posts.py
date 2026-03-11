@@ -3,6 +3,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
+from fastapi import HTTPException, Depends
 
 # ============================================================
 # 1. 最初にレスポンス（参加者）側を定義する
@@ -61,6 +62,8 @@ class HobbyPostResponse(HobbyPostBase):
     public_code: Optional[str] = None
     response_count: Optional[int] = 0
     participation_count: Optional[int] = 0
+    is_system: Optional[bool] = False  # ★ 追加
+    is_hidden: Optional[bool] = False
     
     # 💡 参加者リストをフロントエンドに送る
     responses: List[PostResponseResponse] = []

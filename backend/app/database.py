@@ -4,26 +4,27 @@ from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
 
-# 環境変数をロード
 load_dotenv()
 
-# 💡 修正：実行場所に関わらず、backend直下のosidou.dbを絶対パスで指定します
-# Windowsのパス形式に合わせて、ドライブレターから指定します
-SQLALCHEMY_DATABASE_URL = "sqlite:///C:/osidou/backend/osidou.db"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# データベースエンジンの作成
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, 
-    connect_args={"check_same_thread": False}
-)
+if DATABASE_URL:
+    # 本番：Supabase（PostgreSQL）
+    # RailwayがDATABASE_URLを "postgres://" で渡す場合があるので修正
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(DATABASE_URL)
+else:
+    # ローカル開発：SQLite
+    DATABASE_URL = "sqlite:///C:/osidou/backend/osidou.db"
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False}
+    )
 
-# セッション作成のためのクラス
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# 全てのモデルの基底クラス
 Base = declarative_base()
 
-# ✅ DBセッションを取得するための依存関数
 def get_db():
     db = SessionLocal()
     try:

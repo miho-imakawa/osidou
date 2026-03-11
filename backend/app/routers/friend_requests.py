@@ -1,4 +1,4 @@
-from pydantic import BaseModel  # 💡 これを一番上に追加！
+from pydantic import BaseModel, ConfigDict  # 💡 これを一番上に追加！
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
@@ -91,7 +91,7 @@ def get_friend_requests(
 # -----------------------------------------------------
 @router.put(
     "/friend_requests/{request_id}/status",
-    response_model=schemas.FriendRequestResponse,
+    # response_model=schemas.FriendRequestResponse, # 💡 エラー時も考慮して一度外すか、Unionにするのが一般的です
 )
 def update_friend_request_status(
     request_id: int,
@@ -115,8 +115,34 @@ def update_friend_request_status(
         raise HTTPException(status_code=400, detail="既に処理済みです。")
 
     if payload.status == models.FriendRequestStatus.ACCEPTED:
-        request_obj.status = models.FriendRequestStatus.ACCEPTED
+        
+        # 💡 --- ここから人数制限ロジックを追加 ---
+        # 1. 現在のともだち人数を数える
+        friend_count = db.query(models.Friendship).filter(
+            models.Friendship.user_id == current_user.id
+        ).count()
 
+        # 2. 上限を計算 (無料10人 + 購入済みスロット)
+        allowed_limit = 10 + (current_user.paid_friend_slots or 0)
+
+        # 3. 上限チェック
+        if friend_count >= allowed_limit:
+            # Mihoさん流：英語圏の人にも一瞬で伝わるスマートな表記
+            # 例: 「10 + 1 x Cost ¥100 /Month」
+            upgrade_msg = f"{friend_count} + 1 x Cost ¥100 /Month"
+            
+            # 先ほど定義した箱（FriendLimitResponse）に近い形でエラーを投げます
+            raise HTTPException(
+                status_code=402, # Payment Required
+                detail={
+                    "upgrade_msg": upgrade_msg,
+                    "current_count": friend_count,
+                    "allowed_limit": allowed_limit
+                }
+            )
+        # 💡 --- ここまで追加 ---
+
+        request_obj.status = models.FriendRequestStatus.ACCEPTED
         friendships = [
             models.Friendship(
                 user_id=request_obj.requester_id,
@@ -131,7 +157,6 @@ def update_friend_request_status(
                 is_hidden=False,
             ),
         ]
-
         db.add_all(friendships)
         db.commit()
 
@@ -244,3 +269,33 @@ def update_friendship(
     
     db.commit() # 💡 ここで実際に保存されます
     return {"message": "保存しました"}
+
+
+# --- ともだち申請から承認 ---
+# --- ともだち申請から承認 カウント ---
+
+@router.get("/pending/count", summary="未承認のフレンド申請数を取得")
+def get_pending_friend_requests_count(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """承認待ち（PENDING）の申請数を返します。"""
+    count = db.query(models.FriendRequest).filter(
+        models.FriendRequest.receiver_id == current_user.id,
+        models.FriendRequest.status == models.FriendRequestStatus.PENDING
+    ).count()
+    return {"pending_count": count}
+
+# --- ファイルの最後に追加 ---
+
+class FriendLimitResponse(BaseModel):
+    """
+    上限に達した際にフロントエンドへ返す、課金誘導用の情報をまとめた箱。
+    Mihoさん流：10 + 1 x Cost ¥100 /Month というメッセージを運びます。
+    """
+    current_count: int
+    allowed_limit: int
+    upgrade_msg: str  # 💡 ここに "27 + 1 x Cost ¥100 /Month" が入ります
+    stripe_url: Optional[str] = None # 将来的に決済リンクを直接送る場合用
+
+    model_config = ConfigDict(from_attributes=True)
