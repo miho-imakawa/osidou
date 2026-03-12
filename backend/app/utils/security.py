@@ -10,6 +10,11 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User
 from ..schemas.auth import TokenData # スキーマファイルにTokenDataが存在すると仮定
+import os
+
+# 環境変数（Railwayの設定）から SECRET_KEY を読み込む
+# もし設定がなければ "temporary-key" を使うという命令
+SECRET_KEY = os.getenv("SECRET_KEY", "temporary-key-for-local")
 
 # 認証設定
 
