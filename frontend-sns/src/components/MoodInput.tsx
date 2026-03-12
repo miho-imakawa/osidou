@@ -52,7 +52,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
     return (
         <div className="p-6 bg-blue-50 rounded-xl border border-blue-200 shadow-md">
             <h3 className="text-xl font-bold text-blue-800 flex items-center mb-4">
-                <Smile className="w-6 h-6 mr-2 text-blue-500" /> TODAY's FEELING
+                <Smile className="w-6 h-6 mr-2 text-blue-500" /> CURRENT FEELING
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-4">

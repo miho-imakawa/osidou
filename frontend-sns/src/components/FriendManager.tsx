@@ -232,7 +232,7 @@ const FriendManager: React.FC = () => {
             .then(res => setPendingCount(res.data.pending_count))
             .catch(() => {});
     }, []);
-    
+
     return (
         <div className="p-6">
             <h1 className="text-2xl font-bold mb-4">ともだち管理</h1>

@@ -1079,18 +1079,18 @@ def create_initial_data(db: Session):
         
         new_content = """🏠 HOME の使い方
 
-【TODAY's FEELING】
+【CURRENT FEELING】
 200文字で今の気持ちを記録しよう。
 Record your mood in 200 characters.
 
-【ACTIVITY LOGS】
-Feeling/Activity LOGは最長3か月・最大1000件保存可能です。
+【FEELING LOGS】
+Feeling LOGは最長3か月・最大1000件保存可能です。
 保管場所はMY PAGEです。
 公開/非公開の設定はMY PAGEのプロフィール編集から行えます。
 Feeling/Activity LOG is saved for up to 3 months / 1,000 entries.
 You can manage visibility in MY PAGE > Profile Settings.
 
-【ともだち's LOG】
+【ともだちs' LOG】
 繋がったともだち・身近な人の気持ちが表示されます。
 （公開設定をしている人のみ）
 See how your friends are feeling today.
@@ -1227,8 +1227,8 @@ If charging attendees via Stripe, a 5% fee applies.
 ---
 
 【AD（広告）】
-広告を発信するにはStripeの登録が必要です。
-Stripe registration is required to post ads.
+広告の発信は有料です。
+Posting advertisements is a paid service.
 
 参加者599人まで → ¥500
 参加者600人以上 → 1人 × 1円（下2桁切り捨て）

@@ -253,8 +253,8 @@ useEffect(() => {
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Gender</label>
                   <select className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" value={tempProfile.gender || ''} onChange={e => setTempProfile({...tempProfile, gender: e.target.value})}>
                     <option value="">未設定</option>
-                    <option value="male">男性</option>
-                    <option value="female">女性</option>
+                    <option value="male">男🚹</option>
+                    <option value="female">女🚺</option>
                     <option value="other">その他</option>
                   </select>
                 </div>
@@ -280,7 +280,7 @@ useEffect(() => {
                   <div className={`p-2 rounded-xl transition-all ${tempProfile.is_mood_visible ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-400'}`}>
                     {tempProfile.is_mood_visible ? <Eye size={18}/> : <EyeOff size={18}/>}
                   </div>
-                  <span className="text-xs font-bold text-gray-500">Activity Logs を表示する</span>
+                  <span className="text-xs font-bold text-gray-500">Feeling Logs を表示する</span>
                 </label>
               </div>
 
@@ -355,7 +355,7 @@ useEffect(() => {
                     </div>
                   </Link>
                 );
-              }) : <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Activity</p>}
+              }) : <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Feeling posts</p>}
             </div>
           </div>
 
@@ -419,12 +419,12 @@ useEffect(() => {
                   </div>
               </div>
           )}
-          {/* Activity Logs */}
+          {/* Feeling Logs */}
           {displayProfile.is_mood_visible && (
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-2">
               <div className="flex justify-between items-center border-b border-gray-50 pb-2 mb-2">
                 <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
-                  <Heart className="text-pink-600" size={14}/> Activity Logs
+                  <Heart className="text-pink-600" size={14}/> Feeling Logs
                 </h2>
                 <button className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm" onClick={() => alert("DL準備中")}>
                   <Download size={14} /> <span>DL-200JPY</span>
