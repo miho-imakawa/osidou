@@ -420,7 +420,7 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    public_code = Column(String(7), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
+    public_code = Column(String(8), unique=True, index=True, nullable=False)
     username = Column(String(50), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
     email = Column(String(120), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
     hashed_password = Column(String(255), nullable=False)  # 💡 nullable=False追加
