@@ -80,14 +80,19 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                         const date = friendMood.mood_updated_at ? new Date(friendMood.mood_updated_at) : null;
                         return (
                             <div key={friendMood.user_id} className="flex items-center gap-4 py-3 border-b border-gray-50">
-                                <div className="w-20 flex-shrink-0">
+                                <div className="w-28 flex-shrink-0">
                                     <span className="text-xs font-black text-gray-800">
                                         {friendMood.nickname || friendMood.username}
                                     </span>
+                                    {friendMood.friend_note && (
+                                        <span className="text-[9px] text-gray-400 font-medium ml-1">
+                                            ({friendMood.friend_note})
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-1 w-24 flex-shrink-0">
                                     {date && <>
-                                        <span className="text-[12px] font-black text-gray-800 tabular-nums">{String(date.getDate()).padStart(2, '0')}</span>
+                                        <span className="text-[12px] font-black text-gray-800 tabular-nums">{String(date.getMonth() + 1)}/{String(date.getDate()).padStart(2, '0')}</span>
                                         <span className="text-[10px] font-bold text-gray-400 tabular-nums flex items-center gap-1">
                                             <Clock size={10} />{date.getHours()}:{String(date.getMinutes()).padStart(2, '0')}
                                         </span>
