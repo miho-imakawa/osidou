@@ -450,7 +450,7 @@ useEffect(() => {
                             <span className="text-xl transform hover:scale-125 transition-transform cursor-default">
                               {moodMap[log.mood_type] || '✨'}
                             </span>
-                            <p className="text-gray-500 font-semibold flex-1 truncate">{log.comment}</p>
+                            <p className="text-gray-500 font-semibold flex-1">{log.comment}</p>
                           </div>
                         );
                       })}
