@@ -153,7 +153,7 @@ useEffect(() => {
   }, [displayProfile?.id, isMe, location.pathname]);
 
   const groupedLogs = moodLogs.reduce((acc: any, log) => {
-    const date = new Date(log.created_at + 'Z');
+    const date = new Date(log.created_at);
     const monthKey = `${date.getFullYear()} - ${String(date.getMonth() + 1).padStart(2, '0')}`;
     if (!acc[monthKey]) acc[monthKey] = [];
     acc[monthKey].push(log);
@@ -439,7 +439,7 @@ useEffect(() => {
                     </div>
                     <div className="space-y-4 pl-1">
                       {groupedLogs[month].map((log: any) => {
-                        const date = new Date(log.created_at + 'Z');
+                        const date = new Date(log.created_at);
                         const moodMap: any = { motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌', neutral: '😐', anxious: '😟', tired: '😥', sad: '😭', angry: '😠', grateful: '🙏' };
                         return (
                           <div key={log.id} className="flex items-center gap-5 text-sm">
