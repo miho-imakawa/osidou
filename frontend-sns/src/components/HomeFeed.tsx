@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, UserMoodResponse, fetchFollowingMoods, authApi } from '../api';
-import { UserCircle } from 'lucide-react';
+import { UserCircle, Clock } from 'lucide-react';
 import MoodInput from './MoodInput';
 import PendingFriendBanner from './PendingFriendBanner';
 
@@ -74,41 +74,30 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                     </div>
                 )}
 
-                <div className="grid gap-4">
+                <div className="grid gap-2">
                     {friendMoods.map((friendMood) => {
                         const moodDetail = MOOD_TYPES[friendMood.current_mood] || { label: '?', emoji: '✨' };
+                        const date = friendMood.mood_updated_at ? new Date(friendMood.mood_updated_at) : null;
                         return (
-                            <div
-                                key={friendMood.user_id}
-                                className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 transition-all hover:shadow-md group"
-                            >
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-8 h-8 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-pink-50 transition-colors">
-                                        <UserCircle className="w-5 h-5 text-gray-300 group-hover:text-pink-300" />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="font-black text-xs text-gray-900 tracking-tight uppercase">
-                                            {friendMood.nickname || friendMood.username}
-                                            {friendMood.friend_note && <span className="text-[9px] text-gray-400 font-medium ml-1">({friendMood.friend_note})</span>}
-                                        </span>
-                                        <span className="text-[8px] font-mono text-gray-300 uppercase">
-                                            {friendMood.mood_updated_at && new Date(friendMood.mood_updated_at).toLocaleDateString()}
-                                        </span>
-                                    </div>
+                            <div key={friendMood.user_id} className="flex items-center gap-4 py-3 border-b border-gray-50">
+                                <div className="w-20 flex-shrink-0">
+                                    <span className="text-xs font-black text-gray-800">
+                                        {friendMood.nickname || friendMood.username}
+                                    </span>
                                 </div>
-                                <div className="pl-11">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <span className="text-2xl">{moodDetail.emoji}</span>
-                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{moodDetail.label}</span>
-                                    </div>
-                                    {friendMood.current_mood_comment && (
-                                        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-50">
-                                            <p className="text-sm text-gray-600 font-medium leading-relaxed">
-                                                {friendMood.current_mood_comment}
-                                            </p>
-                                        </div>
-                                    )}
+                                <div className="flex items-center gap-1 w-24 flex-shrink-0">
+                                    {date && <>
+                                        <span className="text-[12px] font-black text-gray-800 tabular-nums">{String(date.getDate()).padStart(2, '0')}</span>
+                                        <span className="text-[10px] font-bold text-gray-400 tabular-nums flex items-center gap-1">
+                                            <Clock size={10} />{date.getHours()}:{String(date.getMinutes()).padStart(2, '0')}
+                                        </span>
+                                    </>}
                                 </div>
+                                <span className="text-xl">{moodDetail.emoji}</span>
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{moodDetail.label}</span>
+                                {friendMood.is_mood_comment_visible && friendMood.current_mood_comment && (
+                                    <p className="text-sm text-gray-600 font-medium flex-1 truncate">{friendMood.current_mood_comment}</p>
+                                )}
                             </div>
                         );
                     })}
