@@ -5,10 +5,13 @@ from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
-
+import time
 from .. import models
 from ..database import get_db
 from .auth import get_current_user
+
+_following_moods_cache: dict = {}
+MOOD_CACHE_TTL = 30  # 30秒
 
 router = APIRouter()
 
@@ -276,6 +279,15 @@ def get_following_moods(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+
+    # キャッシュチェック
+    cache_key = str(current_user.id)
+    now = time.time()
+    if cache_key in _following_moods_cache:
+        cached_data, cached_time = _following_moods_cache[cache_key]
+        if now - cached_time < MOOD_CACHE_TTL:
+            return cached_data
+        
     """
     承認済みの友達（Friendship）の中で、非表示・更新停止されていないユーザーの最新気分を取得。
     """
@@ -329,4 +341,7 @@ def get_following_moods(
     print(f"[DEBUG] 返すデータの数: {len(result)}")
     print("=" * 50)
     
+    # キャッシュに保存
+    _following_moods_cache[cache_key] = (result, now)
+
     return result
