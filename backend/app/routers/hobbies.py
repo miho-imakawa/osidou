@@ -167,10 +167,18 @@ def get_top_categories(db: Session = Depends(get_db)):
         models.HobbyCategory.master_id == None
     ).all()
     
+    # 1回のDBアクセスで全メンバー数を取得
+    counts = db.query(
+        models.UserHobbyLink.hobby_category_id,
+        func.count(distinct(models.UserHobbyLink.user_id))
+    ).group_by(models.UserHobbyLink.hobby_category_id).all()
+    
+    count_map = {cat_id: cnt for cat_id, cnt in counts}
+    
     result = []
     for cat in categories:
         schema = HobbyCategoryResponse.model_validate(cat)
-        schema.member_count = get_total_member_count(db, cat, categories)
+        schema.member_count = count_map.get(cat.id, 0) or "-"
         schema.children = []
         result.append(schema)
     
