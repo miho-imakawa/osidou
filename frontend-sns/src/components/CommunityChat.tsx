@@ -491,7 +491,7 @@ const submitPost = async () => {
                                             </div>
 
                                             {/* ボタン類 */}
-                                            <div className="flex gap-1.5">
+                                            <div className="flex flex-col gap-1 items-end">
                                                 {(isJoined || isOwner) && (
                                                     <button 
                                                         onClick={() => setActiveChat({ id: post.id, title: post.content.split('\n')[0] })}
