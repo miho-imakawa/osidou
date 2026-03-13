@@ -386,13 +386,13 @@ const submitPost = async () => {
                                                     onClick={() => handleAdAction(post.id, 'like')}
                                                     className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-400 border border-gray-200'}`}
                                                 >
-                                                    👍 {interaction?.is_liked ? 'イイネ済' : 'イイネ'}
+                                                    👍 Vibe
                                                 </button>
                                                 <button
                                                     onClick={() => handleAdAction(post.id, 'pin')}
                                                     className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-400 border border-gray-200'}`}
                                                 >
-                                                    📌 {interaction?.is_pinned ? 'PIN済' : 'PIN'}
+                                                    📌 PIN
                                                 </button>
                                                 {post.ad_end_date && (
                                                     <span className="text-[9px] text-gray-400 ml-auto">〜{post.ad_end_date.slice(0, 10)}</span>
@@ -413,30 +413,28 @@ const submitPost = async () => {
                                             <p className="text-[12px] opacity-90 whitespace-pre-wrap leading-relaxed mt-2 mb-3">
                                                 {post.content.split('\n').slice(1).join('\n')}
                                             </p>
-                                            <div className="flex justify-between items-center pt-3 border-t border-black/5">
-                                                <div className="flex gap-2">
+                                            <div className="pt-3 border-t border-black/5 space-y-1">
+                                                {post.ad_end_date && (
+                                                    <span className="text-[9px] font-bold opacity-60 block">{post.ad_end_date.slice(0, 10)} 終了</span>
+                                                )}
+                                                <div className="flex gap-2 items-center">
                                                     <button
                                                         onClick={() => handleAdAction(post.id, 'like')}
                                                         className={`px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}
                                                     >
-                                                        👍 {interaction?.is_liked ? 'イイネ済' : 'イイネ'}
+                                                        👍 Vibe
                                                     </button>
                                                     <button
                                                         onClick={() => handleAdAction(post.id, 'pin')}
                                                         className={`px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}
                                                     >
-                                                        📌 {interaction?.is_pinned ? 'PIN済' : 'PIN'}
+                                                        📌 PIN
                                                     </button>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    {post.ad_end_date && (
-                                                        <span className="text-[9px] font-bold opacity-60">{post.ad_end_date.slice(0, 10)} 終了</span>
-                                                    )}
                                                     <button
                                                         onClick={() => toggleAdCollapse(post.id)}
-                                                        className="px-3 py-1.5 bg-white/70 border border-gray-200 rounded-full text-[10px] font-black text-gray-500"
+                                                        className="px-3 py-1.5 bg-white/70 border border-gray-200 rounded-full text-[10px] font-black text-gray-500 ml-auto"
                                                     >
-                                                        ✕ 
+                                                        ✕
                                                     </button>
                                                 </div>
                                             </div>
