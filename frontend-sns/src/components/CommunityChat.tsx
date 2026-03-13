@@ -436,7 +436,7 @@ const submitPost = async () => {
                                                         onClick={() => toggleAdCollapse(post.id)}
                                                         className="px-3 py-1.5 bg-white/70 border border-gray-200 rounded-full text-[10px] font-black text-gray-500"
                                                     >
-                                                        ✕ 閉じる
+                                                        ✕ 
                                                     </button>
                                                 </div>
                                             </div>
@@ -446,7 +446,7 @@ const submitPost = async () => {
                             ) : post.is_meetup ? (
                                 /* 🟠 MEETUP カード 完全復活版 */
                                 <div className="space-y-2 mb-4">
-                                    <div className={`p-3 rounded-[24px] border-2 shadow-sm bg-orange-50 border-orange-200 max-w-[95%] text-left`}>
+                                    <div className={`p-3 rounded-[24px] border-2 shadow-sm bg-orange-50 border-orange-200 text-left`}>
                                         
                                         {/* 💡 1行目：開催名 & 日時 */}
                                         <div className="flex justify-between items-center mb-1.5 px-1">
