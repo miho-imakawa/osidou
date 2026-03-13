@@ -95,7 +95,7 @@ def get_posts_by_category(category_id: int, db: Session = Depends(get_db)):
         if user:
             # 💡 修正：ニックネーム未設定なら「User[ID]@[ドメイン]」を表示
             domain = user.email.split('@')[-1] if user.email else "unknown"
-            post.author_nickname = user.nickname or f"User{user.id}@{domain}"
+            post.author_nickname = user.nickname or f"User{user.id}"
             post.public_code = user.public_code or "-------"
         else:
             post.author_nickname = "Unknown"
@@ -107,7 +107,7 @@ def get_posts_by_category(category_id: int, db: Session = Depends(get_db)):
             if res_user:
                 # 💡 修正：ここも同様にフォールバック処理を追加
                 res_domain = res_user.email.split('@')[-1] if res_user.email else "unknown"
-                res.author_nickname = res_user.nickname or f"User{res_user.id}@{res_domain}"
+                res.author_nickname = res_user.nickname or f"User{res_user.id}"
             else:
                 res.author_nickname = "Unknown"
             
