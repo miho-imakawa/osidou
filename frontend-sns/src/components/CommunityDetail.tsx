@@ -145,7 +145,7 @@ const CommunityDetail: React.FC = () => {
                 ) : (
                     <div className="relative">
                         {/* 右上はLEAVEのみにしてスッキリ */}
-                        <div className="absolute -top-12 right-0">
+                        <div className="absolute -top-6 right-0">
                             <button onClick={handleLeave} className="text-[9px] font-bold text-gray-300 hover:text-red-400 uppercase tracking-widest">
                                 Leave
                             </button>
