@@ -451,7 +451,7 @@ const submitPost = async () => {
                                             <h3 className="text-[13px] font-black text-orange-800 truncate flex-1 leading-tight">
                                                 {post.content.split('\n')[0]}
                                             </h3>
-                                            <div className="flex items-center gap-1 text-orange-700 font-black text-[11px] shrink-0 ml-4 leading-none">
+                                            <div className="flex items-center gap-1 text-orange-700 font-black text-[11px] shrink-0 leading-none">
                                                 <Clock size={12} className="text-orange-500" />
                                                 <span>
                                                     {post.meetup_date 
@@ -474,17 +474,12 @@ const submitPost = async () => {
                                                     <Users size={11} className="text-orange-400" />
                                                     <span>{dbParticipants.length}/{post.meetup_capacity}人</span>
                                                     
-                                                    <Coins size={11} className="text-orange-400 ml-1" />
-                                                    <span className="text-orange-600 font-black">
-                                                        {post.meetup_fee_info && !isNaN(Number(post.meetup_fee_info)) && Number(post.meetup_fee_info) > 0 ? (
-                                                            <span className="flex items-center gap-1">
-                                                                ¥{post.meetup_fee_info}
-                                                                <span className="bg-blue-500 text-white px-1 rounded-[3px] text-[7px] italic font-black">STRIPE</span>
-                                                            </span>
-                                                        ) : (
-                                                            post.meetup_fee_info || 'お茶代'
-                                                        )}
-                                                    </span>
+                                                <Coins size={11} className="text-orange-400 ml-1" />
+                                                <span className="text-orange-600 font-black text-[10px]">
+                                                    {post.meetup_fee_info && !isNaN(Number(post.meetup_fee_info)) && Number(post.meetup_fee_info) > 0 
+                                                        ? `¥${post.meetup_fee_info}` 
+                                                        : (post.meetup_fee_info || 'お茶代')}
+                                                </span>
                                                 </div>
                                             </div>
 
@@ -510,7 +505,7 @@ const submitPost = async () => {
 
                                     {/* 📖 詳細展開エリア（参加ボタン・参加者リストを含む） */}
                                     {isExpanded && (
-                                        <div className="ml-4 p-4 bg-white rounded-3xl border border-orange-100 shadow-inner animate-in fade-in slide-in-from-top-1 text-left">
+                                        <div className="p-4 bg-white rounded-3xl border border-orange-100 shadow-inner animate-in fade-in slide-in-from-top-1 text-left">
                                             <p className="text-[12px] text-gray-700 whitespace-pre-wrap mb-4 leading-relaxed">
                                                 {post.content}
                                             </p>
