@@ -97,7 +97,7 @@ const CommunityDetail: React.FC = () => {
             </div>
 
             {/* 💡 ポイント4: DETAIL、子要素、そして【出演作品】をチップとして並べる */}
-            <div className="mb-8 flex flex-wrap gap-2">
+            <div className="mb-2 flex flex-wrap gap-2">
                 {/* 1. DETAILボタン */}
                 <Link 
                     to={`/community/${categoryId}/detail`} 
@@ -136,7 +136,7 @@ const CommunityDetail: React.FC = () => {
             </div>
 
             {/* チャットエリア */}
-            <div className="min-h-[600px] border-t border-gray-100 pt-6">
+            <div className="min-h-[600px] border-t border-gray-100 pt-2">
                 {!isJoined ? (
                     <div className="flex flex-col items-center justify-center h-[500px] bg-gray-50/30 rounded-[40px] border border-gray-100">
                         <p className="text-gray-400 text-sm mb-8">参加して会話を見る</p>
@@ -145,7 +145,7 @@ const CommunityDetail: React.FC = () => {
                 ) : (
                     <div className="relative">
                         {/* 右上はLEAVEのみにしてスッキリ */}
-                        <div className="absolute -top-6 right-0">
+                        <div className="absolute -top-10 right-0">
                             <button onClick={handleLeave} className="text-[9px] font-bold text-gray-300 hover:text-red-400 uppercase tracking-widest">
                                 Leave
                             </button>
