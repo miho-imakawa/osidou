@@ -15,7 +15,7 @@ from .auth import get_current_user
 from pydantic import BaseModel
 from functools import lru_cache
 import time
-import anthropic
+ 
 
 # キャッシュ（5分間有効）
 _top_categories_cache = None
@@ -566,34 +566,3 @@ def create_sub_category(
         "parent_id": new_cat.parent_id,
         "message": f"「{new_cat.name}」を作成しました！"
     }
-
-# Chat追加 AI搭載
-
-@router.post("/review-subchat-name")
-async def review_subchat_name(
-    data: dict,
-    current_user: models.User = Depends(get_current_user)
-):
-    client = anthropic.Anthropic()
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=200,
-        messages=[{
-            "role": "user",
-            "content": f"""推しのコミュニティ名の審査をしてください。
-コミュニティ名：「{data['name']}」
-推し活動期間：{data['period']}
-推しのベースの国：{data['country']}
-
-判定条件：
-- 差別的・侮辱的・性的な表現を含まない
-- スパムや広告目的でない
-- 意味のある名前である
-
-JSONのみで返してください：{{"ok": true/false, "reason": "理由（日本語）"}}"""
-        }]
-    )
-    text = message.content[0].text
-    import json, re
-    clean = re.sub(r'```json|```', '', text).strip()
-    return json.loads(clean)
