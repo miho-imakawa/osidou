@@ -553,7 +553,7 @@ def create_sub_category(
         parent_id=data.parent_id,
         master_id=data.master_id,
         depth=(parent.depth or 0) + 1,
-        unique_code=str(uuid.uuid4())[:8],  # ★ 追加
+        unique_code=str(uuid.uuid4())[:7],  # ★ 追加
         role_type=data.role_type,  # ★追加
     )
     db.add(new_cat)
