@@ -68,14 +68,15 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
 
     const MEETUP_TEMPLATE = `📍 集合場所：
 
-📍 開催場所：
+📍 開催場所： 住所・ZOOM開催
 
-🗺️ 開催場所URLまたはMapURL：
+🗺️ 開催場所 MapURL 又はURL：
 
 💰【支払い方法】： 当日現金 / Stripe決済 / お茶代のみ各自
 ※カフェ開催のためお茶代が必要です。
 
-❌【キャンセルポリシー】： 当日0時以降のキャンセル50%、NoShow100%`;
+❌【キャンセルポリシー】： Stripe決済の場合
+    当日0時以降のキャンセル50%、NoShow100%`;
 
     const toggleAdCollapse = (postId: number) => {
         setClosedAds(prev => {
@@ -463,23 +464,22 @@ const submitPost = async () => {
 
                                         {/* 💡 2行目：場所 & 人数 & 費用 & ボタン */}
                                         <div className="flex items-center justify-between px-1">
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex flex-col gap-1">
                                                 {/* 場所 */}
                                                 <div className="flex items-center gap-1 text-[10px] text-gray-600 font-bold">
                                                     <MapPin size={11} className="text-orange-500" />
-                                                    <span className="truncate max-w-[100px]">{post.meetup_location || '場所未定'}</span>
+                                                    <span className="truncate max-w-[180px]">{post.meetup_location || '場所未定'}</span>
                                                 </div>
                                                 {/* 人数 & 費用 */}
-                                                <div className="flex items-center gap-2 border-l pl-2 border-orange-200/50 text-[10px] text-gray-600 font-bold">
+                                                <div className="flex items-center gap-2 text-[10px] text-gray-600 font-bold">
                                                     <Users size={11} className="text-orange-400" />
                                                     <span>{dbParticipants.length}/{post.meetup_capacity}人</span>
-                                                    
-                                                <Coins size={11} className="text-orange-400 ml-1" />
-                                                <span className="text-orange-600 font-black text-[10px]">
-                                                    {post.meetup_fee_info && !isNaN(Number(post.meetup_fee_info)) && Number(post.meetup_fee_info) > 0 
-                                                        ? `¥${post.meetup_fee_info}` 
-                                                        : (post.meetup_fee_info || 'お茶代')}
-                                                </span>
+                                                    <Coins size={11} className="text-orange-400" />
+                                                    <span className="text-orange-600 font-black text-[10px]">
+                                                        {post.meetup_fee_info && !isNaN(Number(post.meetup_fee_info)) && Number(post.meetup_fee_info) > 0 
+                                                            ? `¥${post.meetup_fee_info}` 
+                                                            : (post.meetup_fee_info || 'お茶代')}
+                                                    </span>
                                                 </div>
                                             </div>
 
