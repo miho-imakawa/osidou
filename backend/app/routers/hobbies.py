@@ -170,7 +170,6 @@ def get_total_member_count(db, category, all_categories=None) -> int:
 def get_top_categories(db: Session = Depends(get_db)):
     global _top_categories_cache, _top_categories_cache_time
     
-    # キャッシュが有効なら返す
     if _top_categories_cache and (time.time() - _top_categories_cache_time) < CACHE_TTL:
         return _top_categories_cache
     
@@ -179,21 +178,16 @@ def get_top_categories(db: Session = Depends(get_db)):
         models.HobbyCategory.master_id == None
     ).all()
     
-    counts = db.query(
-        models.UserHobbyLink.hobby_category_id,
-        func.count(distinct(models.UserHobbyLink.user_id))
-    ).group_by(models.UserHobbyLink.hobby_category_id).all()
-    
-    count_map = {cat_id: cnt for cat_id, cnt in counts}
+    # 全カテゴリIDを取得してget_total_member_countを使う
+    all_categories = db.query(models.HobbyCategory).all()
     
     result = []
     for cat in categories:
         schema = HobbyCategoryResponse.model_validate(cat)
-        schema.member_count = count_map.get(cat.id, 0) or 0
+        schema.member_count = get_total_member_count(db, cat, all_categories=all_categories)
         schema.children = []
         result.append(schema)
     
-    # キャッシュに保存
     _top_categories_cache = result
     _top_categories_cache_time = time.time()
     
