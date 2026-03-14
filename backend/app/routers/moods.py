@@ -279,7 +279,9 @@ def get_following_moods(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-
+    """
+    承認済みの友達（Friendship）の中で、非表示・更新停止されていないユーザーの最新気分を取得。
+    """
     # キャッシュチェック
     cache_key = str(current_user.id)
     now = time.time()
@@ -287,17 +289,7 @@ def get_following_moods(
         cached_data, cached_time = _following_moods_cache[cache_key]
         if now - cached_time < MOOD_CACHE_TTL:
             return cached_data
-        
-    """
-    承認済みの友達（Friendship）の中で、非表示・更新停止されていないユーザーの最新気分を取得。
-    """
-    # 🔍 デバッグ: 必ず最初に実行される
-    print("=" * 50)
-    print("[DEBUG] get_following_moods が呼ばれました")
-    print(f"[DEBUG] current_user.id: {current_user.id}")
-    print(f"[DEBUG] current_user.nickname: {current_user.nickname}")
-    print("=" * 50)
-    
+
     # 1. Friendshipテーブルから「友達のID」を取得
     friend_relations = db.query(models.Friendship).filter(
         models.Friendship.user_id == current_user.id,
@@ -305,13 +297,9 @@ def get_following_moods(
         models.Friendship.is_muted == False
     ).all()
 
-    print(f"[DEBUG] Friendship の数: {len(friend_relations)}")
-    
     friend_ids = [rel.friend_id for rel in friend_relations]
-    print(f"[DEBUG] 友達のID: {friend_ids}")
 
     if not friend_ids:
-        print("[DEBUG] 友達が見つかりません - 空のリストを返します")
         return []
 
     # 2. 友達の最新情報を取得
@@ -319,11 +307,6 @@ def get_following_moods(
         models.User.id.in_(friend_ids),
         models.User.is_mood_visible == True
     ).order_by(models.User.mood_updated_at.desc()).all()
-    
-    print(f"[DEBUG] 気分公開中の友達の数: {len(friends_with_mood)}")
-    
-    for user in friends_with_mood:
-        print(f"[DEBUG] - ユーザーID: {user.id}, ニックネーム: {user.nickname}, 気分: {user.current_mood}, 更新: {user.mood_updated_at}")
 
     # 3. レスポンス形式に変換
     result = [
@@ -337,10 +320,7 @@ def get_following_moods(
         )
         for user in friends_with_mood
     ]
-    
-    print(f"[DEBUG] 返すデータの数: {len(result)}")
-    print("=" * 50)
-    
+
     # キャッシュに保存
     _following_moods_cache[cache_key] = (result, now)
 
