@@ -779,12 +779,12 @@ const submitPost = async () => {
                 </div>
 
                 <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-gray-700">推しのベースの国は？</label>
+                    <label className="text-[11px] font-bold text-gray-700">活動拠点 / Base Country</label>
                     <input
                         type="text"
                         value={subChatAnswers.baseCountry}
                         onChange={e => setSubChatAnswers({...subChatAnswers, baseCountry: e.target.value})}
-                        placeholder="例：日本、韓国、アメリカ..."
+                        placeholder="例：日本、한국（韓国）、US、UK..."
                         className="w-full p-2 rounded-xl border border-pink-200 bg-white text-[12px] outline-none"
                     />
                 </div>
