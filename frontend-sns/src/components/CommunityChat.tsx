@@ -205,34 +205,12 @@ const handleCreateSubChat = async () => {
     setIsReviewing(true);
     try {
         // AI審査
-        const reviewRes = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: "claude-sonnet-4-20250514",
-                max_tokens: 200,
-                messages: [{
-                    role: "user",
-                    content: `推しのコミュニティ名の審査をしてください。
-コミュニティ名：「${subChatName}」
-推し活動期間：${subChatAnswers.period}
-推しのベースの国：${subChatAnswers.baseCountry}
-
-判定条件：
-- 差別的・侮辱的・性的な表現を含まない
-- スパムや広告目的でない
-- 推しの正式名または合理的な略称である
-- 意味のある名前である
-
-JSONのみで返してください（前後に余分なテキスト不要）：{"ok": true/false, "reason": "理由（日本語）"}`
-                }]
-            })
-        });
-        const reviewData = await reviewRes.json();
-        const text = reviewData.content?.[0]?.text || '{}';
-        const clean = text.replace(/```json|```/g, '').trim();
-        const result = JSON.parse(clean);
-
+const reviewRes = await authApi.post('/hobby-categories/review-subchat-name', {
+    name: subChatName,
+    period: subChatAnswers.period,
+    country: subChatAnswers.baseCountry,
+});
+const result = reviewRes.data;
         if (!result.ok) {
             setAiReviewError(`⚠️ ${result.reason}`);
             return;
