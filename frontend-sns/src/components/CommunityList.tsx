@@ -137,7 +137,7 @@ const CommunityList: React.FC = () => {
                                             {/* 💡 点滅を消し、0人の時はグレーになるバッジ */}
                                             <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border ${heatStyle}`}>
                                                 <Users size={12} className="opacity-60" />
-                                                <span className="tabular-nums">{count.toLocaleString()}</span>
+                                                <span className="tabular-nums">{count === 0 ? '-' : count.toLocaleString()}</span>
                                                 {count >= 500 && <Flame size={12} className="ml-0.5 text-orange-500" />}
                                             </div>
                                         </div>
