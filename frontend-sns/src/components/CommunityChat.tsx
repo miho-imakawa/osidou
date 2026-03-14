@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPost, fetchPostsByCategory, Post, authApi, toggleAttendance, adInteraction, fetchMyAdInteractions, createSubCategory  } from '../api';
 import { 
   Send, MessageSquare, MapPin, Users, CheckSquare, Square, Clock, Coins, Pin, Calendar, EyeOff, AlertTriangle
@@ -48,6 +49,15 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
     const [selectedMasterName, setSelectedMasterName] = useState<string>('');
     const [selectedRoleType, setSelectedRoleType] = useState<string | null>(null);
     const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
+    const [subChatAnswers, setSubChatAnswers] = useState({
+        period: '',      // 推し活動期間
+        baseCountry: '', // 推しのベースの国
+        noHarm: false,   // 傷つく人はいないか
+        noHarassment: false, // ハラスメント等に関わっていないか
+        correctParent: false, // 親との関係は正しいか
+    });
+    const [aiReviewError, setAiReviewError] = useState<string | null>(null);
+    const [isReviewing, setIsReviewing] = useState(false);
     // 1. 通報 (バックエンドの段階的制限を叩く)
     const handleReportPost = async (postId: number) => {
         if (!window.confirm("この投稿を不適切として通報しますか？\n(通報が重なると自動的に非表示になります)")) return;
@@ -189,28 +199,66 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
         setSearchResults([]);
     };
 
-    const handleCreateSubChat = async () => {
-        if (!subChatName.trim()) return;
-        setIsCreating(true);
-        try {
-            const result = await createSubCategory({
-                name: subChatName,
-                parent_id: parseInt(chatTargetId),
-                master_id: selectedMasterId || undefined,
-                role_type: selectedRoleType || undefined,  
-            });
-            alert(`✅ 「${result.name}」を作成しました！`);
-            setShowSubChatModal(false);
-            setSubChatName('');
-            setSelectedMasterId(null);
-            setSelectedMasterName('');
-            window.location.href = `/community/${result.id}`;
-        } catch (err: any) {
-            alert(err.response?.data?.detail || 'Sub Chatの作成に失敗しました');
-        } finally {
-            setIsCreating(false);
+const handleCreateSubChat = async () => {
+    if (!subChatName.trim()) return;
+    setAiReviewError(null);
+    setIsReviewing(true);
+    try {
+        // AI審査
+        const reviewRes = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 200,
+                messages: [{
+                    role: "user",
+                    content: `推しのコミュニティ名の審査をしてください。
+コミュニティ名：「${subChatName}」
+推し活動期間：${subChatAnswers.period}
+推しのベースの国：${subChatAnswers.baseCountry}
+
+判定条件：
+- 差別的・侮辱的・性的な表現を含まない
+- スパムや広告目的でない
+- 推しの正式名または合理的な略称である
+- 意味のある名前である
+
+JSONのみで返してください（前後に余分なテキスト不要）：{"ok": true/false, "reason": "理由（日本語）"}`
+                }]
+            })
+        });
+        const reviewData = await reviewRes.json();
+        const text = reviewData.content?.[0]?.text || '{}';
+        const clean = text.replace(/```json|```/g, '').trim();
+        const result = JSON.parse(clean);
+
+        if (!result.ok) {
+            setAiReviewError(`⚠️ ${result.reason}`);
+            return;
         }
-    };
+
+        setIsCreating(true);
+        const created = await createSubCategory({
+            name: subChatName,
+            parent_id: parseInt(chatTargetId),
+            master_id: selectedMasterId || undefined,
+            role_type: selectedRoleType || undefined,
+        });
+        alert(`✅ 「${created.name}」を作成しました！`);
+        setShowSubChatModal(false);
+        setSubChatName('');
+        setSelectedMasterId(null);
+        setSelectedMasterName('');
+        setSubChatAnswers({ period: '', baseCountry: '', noHarm: false, noHarassment: false, correctParent: false });
+        window.location.href = `/community/${created.id}`;
+    } catch (err: any) {
+        setAiReviewError(err.response?.data?.detail || 'Sub Chatの作成に失敗しました');
+    } finally {
+        setIsReviewing(false);
+        setIsCreating(false);
+    }
+};
 
 const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -662,28 +710,36 @@ const submitPost = async () => {
             )}
 {showSubChatModal && (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-[32px] shadow-2xl p-6 w-full max-w-sm space-y-4">
+        <div className="bg-white rounded-[32px] shadow-2xl p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-sm font-black text-gray-800 flex items-center gap-2">
                 <MessageSquare size={16} className="text-pink-500" />
                 Sub Chat を作成
             </h3>
 
+            {/* GUIDEへの案内 */}
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+                新しいカテゴリーの追加をご希望の場合は、
+                <Link to="/community/6" className="text-pink-500 font-bold underline">GUIDE</Link>
+                のお問い合わせからご申請ください。
+            </p>
+
             {/* 名前入力 */}
-            <input
-                type="text"
-                value={subChatName}
-                onChange={(e) => handleSubChatNameChange(e.target.value)}
-                placeholder="例：佐藤健、関東エリア、初心者歓迎..."
-                className="w-full p-4 bg-gray-50 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-pink-300"
-                autoFocus
-            />
+            <div className="space-y-1">
+                <p className="text-[10px] font-black text-gray-400 uppercase">推しの正式名で入力ください</p>
+                <input
+                    type="text"
+                    value={subChatName}
+                    onChange={(e) => handleSubChatNameChange(e.target.value)}
+                    placeholder="例：佐藤健、関東エリア、初心者歓迎..."
+                    className="w-full p-4 bg-gray-50 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-pink-300"
+                    autoFocus
+                />
+            </div>
 
             {/* 本尊の候補リスト */}
             {searchResults.length > 0 && (
                 <div className="space-y-2">
-                    <p className="text-[10px] font-black text-gray-400 uppercase">
-                        既存の本尊が見つかりました
-                    </p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase">既存の本尊が見つかりました</p>
                     {searchResults.map((s) => (
                         <div key={s.id} className="flex justify-between items-center p-3 bg-pink-50 rounded-2xl">
                             <span className="text-xs font-bold text-gray-700">{s.name}</span>
@@ -701,72 +757,137 @@ const submitPost = async () => {
                 </div>
             )}
 
-                {/* 本尊が選択された場合の表示 */}
-                    {selectedMasterId && (
-                        <div className="flex items-center gap-2 p-3 bg-green-50 rounded-2xl border border-green-200">
-                            <span className="text-[10px] font-black text-green-600">✅ 本尊：</span>
-                            <span className="text-xs font-bold text-green-800">{selectedMasterName}</span>
-                            <button
-                                onClick={() => { setSelectedMasterId(null); setSelectedMasterName(''); }}
-                                className="ml-auto text-[10px] text-gray-400 hover:text-red-400"
-                            >
-                                解除
-                            </button>
-                        </div>
-                    )}
+            {/* 本尊が選択された場合 */}
+            {selectedMasterId && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 rounded-2xl border border-green-200">
+                    <span className="text-[10px] font-black text-green-600">✅ 本尊：</span>
+                    <span className="text-xs font-bold text-green-800">{selectedMasterName}</span>
+                    <button
+                        onClick={() => { setSelectedMasterId(null); setSelectedMasterName(''); }}
+                        className="ml-auto text-[10px] text-gray-400 hover:text-red-400"
+                    >
+                        解除
+                    </button>
+                </div>
+            )}
 
-                    {/* タイプ選択 */}
-                    <div className="space-y-2">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">タイプ（任意）</p>
-                        <div className="flex gap-2">
-                            {[
-                                { value: 'DOERS', label: '🎸 Doers', desc: '実践者・演奏者' },
-                                { value: 'FANS',  label: '💜 Fans',  desc: '推し・ファン' },
-                            ].map((type) => (
-                                <button
-                                    key={type.value}
-                                    type="button"
-                                    onClick={() => setSelectedRoleType(
-                                        selectedRoleType === type.value ? null : type.value
-                                    )}
-                                    className={`flex-1 py-2.5 rounded-2xl text-[11px] font-black transition-all border-2 ${
-                                        selectedRoleType === type.value
-                                            ? 'bg-pink-500 text-white border-pink-500'
-                                            : 'bg-gray-50 text-gray-500 border-gray-100'
-                                    }`}
-                                >
-                                    <div>{type.label}</div>
-                                    <div className="text-[9px] opacity-70">{type.desc}</div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* ボタン */}
-                    <div className="flex gap-2">
+            {/* タイプ選択 */}
+            <div className="space-y-2">
+                <p className="text-[10px] font-black text-gray-400 uppercase">タイプ（任意）</p>
+                <div className="flex gap-2">
+                    {[
+                        { value: 'DOERS', label: '🎸 Doers', desc: '実践者・演奏者' },
+                        { value: 'FANS',  label: '💜 Fans',  desc: '推し・ファン' },
+                    ].map((type) => (
                         <button
-                            onClick={() => {
-                                setShowSubChatModal(false);
-                                setSubChatName('');
-                                setSelectedMasterId(null);
-                                setSelectedMasterName('');
-                                setSearchResults([]);
-                            }}
-                            className="flex-1 py-3 bg-gray-100 text-gray-500 rounded-2xl text-[12px] font-black"
+                            key={type.value}
+                            type="button"
+                            onClick={() => setSelectedRoleType(selectedRoleType === type.value ? null : type.value)}
+                            className={`flex-1 py-2.5 rounded-2xl text-[11px] font-black transition-all border-2 ${
+                                selectedRoleType === type.value
+                                    ? 'bg-pink-500 text-white border-pink-500'
+                                    : 'bg-gray-50 text-gray-500 border-gray-100'
+                            }`}
                         >
-                            キャンセル
+                            <div>{type.label}</div>
+                            <div className="text-[9px] opacity-70">{type.desc}</div>
                         </button>
-                        <button
-                            onClick={handleCreateSubChat}
-                            disabled={!subChatName.trim() || isCreating}
-                            className="flex-1 py-3 bg-pink-600 text-white rounded-2xl text-[12px] font-black disabled:opacity-40 hover:bg-pink-700 transition-colors"
-                        >
-                            {isCreating ? '作成中...' : '作成する'}
-                        </button>
-                    </div>
+                    ))}
                 </div>
             </div>
-        )}
+
+            {/* 質問フォーム */}
+            <div className="bg-pink-50 rounded-2xl p-4 space-y-3 border border-pink-100">
+                <p className="text-[10px] font-black text-pink-600 uppercase tracking-widest">作成前の確認</p>
+                
+                <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-gray-700">あなたの推し活動期間は？</label>
+                    <select
+                        value={subChatAnswers.period}
+                        onChange={e => setSubChatAnswers({...subChatAnswers, period: e.target.value})}
+                        className="w-full p-2 rounded-xl border border-pink-200 bg-white text-[12px] outline-none"
+                    >
+                        <option value="">選択してください</option>
+                        <option value="1年未満">1年未満</option>
+                        <option value="1〜3年">1〜3年</option>
+                        <option value="3〜5年">3〜5年</option>
+                        <option value="5年以上">5年以上</option>
+                    </select>
+                </div>
+
+                <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-gray-700">推しのベースの国は？</label>
+                    <input
+                        type="text"
+                        value={subChatAnswers.baseCountry}
+                        onChange={e => setSubChatAnswers({...subChatAnswers, baseCountry: e.target.value})}
+                        placeholder="例：日本、韓国、アメリカ..."
+                        className="w-full p-2 rounded-xl border border-pink-200 bg-white text-[12px] outline-none"
+                    />
+                </div>
+
+                <div className="space-y-2 pt-1">
+                    {[
+                        { key: 'noHarm', label: 'このコミュニティを作ることで傷つく人はいません' },
+                        { key: 'noHarassment', label: 'ハラスメント・アビューズ・差別に関わっていません' },
+                        { key: 'correctParent', label: 'このカテゴリーでの親との関係は間違いありません' },
+                    ].map(item => (
+                        <label key={item.key} className="flex items-start gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={subChatAnswers[item.key as keyof typeof subChatAnswers] as boolean}
+                                onChange={e => setSubChatAnswers({...subChatAnswers, [item.key]: e.target.checked})}
+                                className="mt-0.5 accent-pink-500"
+                            />
+                            <span className="text-[11px] text-gray-600">{item.label}</span>
+                        </label>
+                    ))}
+                </div>
+            </div>
+
+            {/* AIエラー表示 */}
+            {aiReviewError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-2xl text-[11px] text-red-600 font-bold">
+                    {aiReviewError}
+                </div>
+            )}
+
+            {/* ボタン */}
+            <div className="flex gap-2">
+                <button
+                    onClick={() => {
+                        setShowSubChatModal(false);
+                        setSubChatName('');
+                        setSelectedMasterId(null);
+                        setSelectedMasterName('');
+                        setSearchResults([]);
+                        setSubChatAnswers({ period: '', baseCountry: '', noHarm: false, noHarassment: false, correctParent: false });
+                        setAiReviewError(null);
+                    }}
+                    className="flex-1 py-3 bg-gray-100 text-gray-500 rounded-2xl text-[12px] font-black"
+                >
+                    キャンセル
+                </button>
+                <button
+                    onClick={handleCreateSubChat}
+                    disabled={
+                        !subChatName.trim() ||
+                        !subChatAnswers.period ||
+                        !subChatAnswers.baseCountry ||
+                        !subChatAnswers.noHarm ||
+                        !subChatAnswers.noHarassment ||
+                        !subChatAnswers.correctParent ||
+                        isCreating ||
+                        isReviewing
+                    }
+                    className="flex-1 py-3 bg-pink-600 text-white rounded-2xl text-[12px] font-black disabled:opacity-40 hover:bg-pink-700 transition-colors"
+                >
+                    {isReviewing ? '🤖 AI審査中...' : isCreating ? '作成中...' : '作成する'}
+                </button>
+            </div>
+        </div>
+    </div>
+)}
         {/* MEETUP投稿 支払い確認モーダル */}
         {showPaymentConfirm && (
             <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
