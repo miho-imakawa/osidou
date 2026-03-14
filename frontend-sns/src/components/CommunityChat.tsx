@@ -201,39 +201,24 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
 
 const handleCreateSubChat = async () => {
     if (!subChatName.trim()) return;
-    setAiReviewError(null);
-    setIsReviewing(true);
+    setIsCreating(true);
     try {
-        // AI審査
-const reviewRes = await authApi.post('/hobby-categories/review-subchat-name', {
-    name: subChatName,
-    period: subChatAnswers.period,
-    country: subChatAnswers.baseCountry,
-});
-const result = reviewRes.data;
-        if (!result.ok) {
-            setAiReviewError(`⚠️ ${result.reason}`);
-            return;
-        }
-
-        setIsCreating(true);
-        const created = await createSubCategory({
+        const result = await createSubCategory({
             name: subChatName,
             parent_id: parseInt(chatTargetId),
             master_id: selectedMasterId || undefined,
             role_type: selectedRoleType || undefined,
         });
-        alert(`✅ 「${created.name}」を作成しました！`);
+        alert(`✅ 「${result.name}」を作成しました！`);
         setShowSubChatModal(false);
         setSubChatName('');
         setSelectedMasterId(null);
         setSelectedMasterName('');
         setSubChatAnswers({ period: '', baseCountry: '', noHarm: false, noHarassment: false, correctParent: false });
-        window.location.href = `/community/${created.id}`;
+        window.location.href = `/community/${result.id}`;
     } catch (err: any) {
-        setAiReviewError(err.response?.data?.detail || 'Sub Chatの作成に失敗しました');
+        alert(err.response?.data?.detail || 'Sub Chatの作成に失敗しました');
     } finally {
-        setIsReviewing(false);
         setIsCreating(false);
     }
 };
@@ -779,17 +764,17 @@ const submitPost = async () => {
                 <p className="text-[10px] font-black text-pink-600 uppercase tracking-widest">作成前の確認</p>
                 
                 <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-gray-700">あなたの推し活動期間は？</label>
+                    <label className="text-[11px] font-bold text-gray-700">ファン歴 / Fan Period</label>
                     <select
                         value={subChatAnswers.period}
                         onChange={e => setSubChatAnswers({...subChatAnswers, period: e.target.value})}
                         className="w-full p-2 rounded-xl border border-pink-200 bg-white text-[12px] outline-none"
                     >
-                        <option value="">選択してください</option>
-                        <option value="1年未満">1年未満</option>
-                        <option value="1〜3年">1〜3年</option>
-                        <option value="3〜5年">3〜5年</option>
-                        <option value="5年以上">5年以上</option>
+                        <option value="">選択 / Select</option>
+                        <option value="1年未満"> Less than 1yr </option>
+                        <option value="1〜3年"> 1-3yrs </option>
+                        <option value="3〜5年"> 3-5yrs </option>
+                        <option value="5年以上"> More than 5yrs</option>
                     </select>
                 </div>
 
@@ -806,9 +791,9 @@ const submitPost = async () => {
 
                 <div className="space-y-2 pt-1">
                     {[
-                        { key: 'noHarm', label: 'このコミュニティを作ることで傷つく人はいません' },
-                        { key: 'noHarassment', label: 'ハラスメント・アビューズ・差別に関わっていません' },
-                        { key: 'correctParent', label: 'このカテゴリーでの親との関係は間違いありません' },
+                        { key: 'noHarm', label: '誰も傷つけない / No one will be hurt' },
+                        { key: 'noHarassment', label: '嫌がらせ禁止 / No harassment' },
+                        { key: 'correctParent', label: '親カテゴリの確認 / Category is correct' },
                     ].map(item => (
                         <label key={item.key} className="flex items-start gap-2 cursor-pointer">
                             <input
