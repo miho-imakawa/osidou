@@ -98,7 +98,7 @@ const LoginPage: React.FC = () => {
                     )}
                     <input
                         type="email"
-                        placeholder="E-Msil Address"
+                        placeholder="E-MAIL ADDRESS"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-pink-300"
