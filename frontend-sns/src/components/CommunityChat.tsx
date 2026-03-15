@@ -269,7 +269,11 @@ const submitPost = async () => {
         );
     }
 
-    const allParentPosts = posts.filter(p => !p.parent_id);
+    const allParentPosts = posts.filter(p => {
+        if (p.parent_id) return false;
+        if (p.is_meetup && p.meetup_date && new Date(p.meetup_date) < new Date()) return false;
+        return true;
+    });
 
     // 2. その中で「システム投稿(ガイド)」と「通常の投稿」に分けて並び替える
     const parentPosts = [
@@ -298,7 +302,10 @@ const submitPost = async () => {
             <div className="bg-rose-50/50 border-b border-rose-100 px-4 py-2 flex flex-col gap-2 shrink-0">
                 {/* ミートアップ表示エリア */}
                 <div className="flex flex-wrap gap-2">
-                    {posts.filter(p => p.is_meetup && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended)).map(meetup => (
+                    {posts.filter(p => p.is_meetup 
+                        && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended)
+                        && (!p.meetup_date || new Date(p.meetup_date) > new Date())
+                    ).map(meetup => (
                         <button
                             key={`meet-link-${meetup.id}`}
                             onClick={() => document.getElementById(`post-${meetup.id}`)?.scrollIntoView({ behavior: 'smooth' })}
