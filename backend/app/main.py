@@ -71,3 +71,7 @@ app.include_router(access_logs.router)
 @app.get("/")
 def read_root():
     return {"message": "推し道 APIが正常に動作中です"}
+
+@app.head("/")
+def head_root():
+    return {}
