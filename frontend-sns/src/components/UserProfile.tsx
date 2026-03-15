@@ -58,7 +58,10 @@ useEffect(() => {
                   allMeetups.push(m);
               }
           });
-          setMyMeetups(allMeetups);
+          const futureMeetups = allMeetups.filter((m: any) => 
+              !m.meetup_date || new Date(m.meetup_date) > new Date()
+          );
+          setMyMeetups(futureMeetups);
 
           const logs = await fetchMyMoodHistory();
           setMoodLogs(logs);
@@ -140,7 +143,10 @@ useEffect(() => {
         });
 
         console.log("主催:", hosted.length, "参加:", joined.length, "合計:", allMeetups.length);
-        setMyMeetups(allMeetups);
+        const futureMeetups = allMeetups.filter((m: any) => 
+          !m.meetup_date || new Date(m.meetup_date) > new Date()
+        );
+        setMyMeetups(futureMeetups);
 
         const logs = await fetchMyMoodHistory();
         setMoodLogs(logs);
