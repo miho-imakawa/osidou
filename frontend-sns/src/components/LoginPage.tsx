@@ -90,7 +90,7 @@ const LoginPage: React.FC = () => {
                     {mode === 'signup' && (
                         <input
                             type="text"
-                            placeholder="ユーザーネーム（英数字）"
+                            placeholder="USER ID（🔤 A-z 🔢 0-9）"
                             value={username}
                             onChange={e => setUsername(e.target.value)}
                             className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-pink-300"
@@ -98,7 +98,7 @@ const LoginPage: React.FC = () => {
                     )}
                     <input
                         type="email"
-                        placeholder="メールアドレス"
+                        placeholder="E-Msil Address"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-pink-300"
@@ -106,7 +106,7 @@ const LoginPage: React.FC = () => {
                     <div className="relative">
                         <input
                             type={showPassword ? 'text' : 'password'}
-                            placeholder="パスワード"
+                            placeholder="PASSWORD（8+ A-z 0-9）"
                             value={password}
                             onChange={e => setPassword(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && (mode === 'login' ? handleLogin() : handleSignup())}
