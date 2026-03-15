@@ -130,6 +130,16 @@ const LoginPage: React.FC = () => {
                     >
                         {loading ? '処理中...' : mode === 'login' ? 'ログイン' : '登録する'}
                     </button>
+
+                    {mode === 'login' && (
+                        <p className="text-center text-[11px] text-gray-400">
+                            パスワードをお忘れの方は{' '}
+                            <a href="/community/6" className="text-pink-500 underline font-bold">
+                                GUIDEのお問い合わせ
+                            </a>
+                            {' '}からご連絡ください。
+                        </p>
+                    )}
                 </div>
             </div>
         </div>
