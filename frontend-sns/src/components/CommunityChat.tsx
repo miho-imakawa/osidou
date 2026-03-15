@@ -56,8 +56,6 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
         noHarassment: false, // ハラスメント等に関わっていないか
         correctParent: false, // 親との関係は正しいか
     });
-    const [aiReviewError, setAiReviewError] = useState<string | null>(null);
-    const [isReviewing, setIsReviewing] = useState(false);
     // 1. 通報 (バックエンドの段階的制限を叩く)
     const handleReportPost = async (postId: number) => {
         if (!window.confirm("この投稿を不適切として通報しますか？\n(通報が重なると自動的に非表示になります)")) return;
@@ -808,13 +806,6 @@ const submitPost = async () => {
                 </div>
             </div>
 
-            {/* AIエラー表示 */}
-            {aiReviewError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-2xl text-[11px] text-red-600 font-bold">
-                    {aiReviewError}
-                </div>
-            )}
-
             {/* ボタン */}
             <div className="flex gap-2">
                 <button
@@ -825,27 +816,15 @@ const submitPost = async () => {
                         setSelectedMasterName('');
                         setSearchResults([]);
                         setSubChatAnswers({ period: '', baseCountry: '', noHarm: false, noHarassment: false, correctParent: false });
-                        setAiReviewError(null);
                     }}
                     className="flex-1 py-3 bg-gray-100 text-gray-500 rounded-2xl text-[12px] font-black"
                 >
                     キャンセル
                 </button>
                 <button
-                    onClick={handleCreateSubChat}
-                    disabled={
-                        !subChatName.trim() ||
-                        !subChatAnswers.period ||
-                        !subChatAnswers.baseCountry ||
-                        !subChatAnswers.noHarm ||
-                        !subChatAnswers.noHarassment ||
-                        !subChatAnswers.correctParent ||
-                        isCreating ||
-                        isReviewing
-                    }
                     className="flex-1 py-3 bg-pink-600 text-white rounded-2xl text-[12px] font-black disabled:opacity-40 hover:bg-pink-700 transition-colors"
                 >
-                    {isReviewing ? '🤖 AI審査中...' : isCreating ? '作成中...' : '作成する'}
+                    {isCreating ? '作成中...' : '作成する'}
                 </button>
             </div>
         </div>
