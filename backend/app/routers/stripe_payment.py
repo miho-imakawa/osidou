@@ -60,7 +60,7 @@ async def download_feeling_log(session_id: str, db: Session = Depends(get_db)):
     """)
     
     # パラメータ名も user_id に合わせると分かりやすいです
-    result = db.execute(query, {"user_id": profile_id})
+    result = db.execute(query, {"user_id": user_id})
     logs = result.fetchall()
 
     # 3. CSV生成 (メモリ上のバッファに書き込み)
