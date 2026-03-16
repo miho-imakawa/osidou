@@ -36,51 +36,51 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   // 💡 State を追加
 const [pendingCount, setPendingCount] = useState(0);
 
-useEffect(() => {
-  if (!displayProfile?.id) return;
+// useEffect(() => {
+//   if (!displayProfile?.id) return;
 
-  const loadData = async () => {
-      try {
-          const categories = await fetchMyCommunities();
-          setMyCategories(categories);
+//   const loadData = async () => {
+//       try {
+//           const categories = await fetchMyCommunities();
+//           setMyCategories(categories);
 
-          const [joinedRes, hostedRes] = await Promise.all([
-              authApi.get('/posts/my-meetups'),
-              authApi.get('/posts/my-hosted-meetups')
-          ]);
+//           const [joinedRes, hostedRes] = await Promise.all([
+//               authApi.get('/posts/my-meetups'),
+//               authApi.get('/posts/my-hosted-meetups')
+//           ]);
 
-          const joined = joinedRes.data || [];
-          const hosted = hostedRes.data || [];
+//           const joined = joinedRes.data || [];
+//           const hosted = hostedRes.data || [];
           
-          const allMeetups = [...hosted];
-          joined.forEach((m: any) => {
-              if (!allMeetups.find((existing: any) => existing.id === m.id)) {
-                  allMeetups.push(m);
-              }
-          });
-          const futureMeetups = allMeetups.filter((m: any) => 
-              !m.meetup_date || new Date(m.meetup_date) > new Date()
-          );
-          setMyMeetups(futureMeetups);
+//           const allMeetups = [...hosted];
+//           joined.forEach((m: any) => {
+//               if (!allMeetups.find((existing: any) => existing.id === m.id)) {
+//                   allMeetups.push(m);
+//               }
+//           });
+//           const futureMeetups = allMeetups.filter((m: any) => 
+//               !m.meetup_date || new Date(m.meetup_date) > new Date()
+//           );
+//           setMyMeetups(futureMeetups);
 
-          const logs = await fetchMyMoodHistory();
-          setMoodLogs(logs);
+//           const logs = await fetchMyMoodHistory();
+//           setMoodLogs(logs);
 
-          if (isMe) {
-              const res = await authApi.get('/friends/pending/count');
-              setPendingCount(res.data.pending_count);
-          }
-          if (isMe) {
-              const adsRes = await authApi.get('/posts/my-ads-stats');
-              setMyAdsStats(adsRes.data);
-          }
-      } catch (err) {
-          console.error("データ取得失敗:", err);
-      }
-  };
+//           if (isMe) {
+//               const res = await authApi.get('/friends/pending/count');
+//               setPendingCount(res.data.pending_count);
+//           }
+//           if (isMe) {
+//               const adsRes = await authApi.get('/posts/my-ads-stats');
+//               setMyAdsStats(adsRes.data);
+//           }
+//       } catch (err) {
+//           console.error("データ取得失敗:", err);
+//       }
+//   };
 
-  loadData();
-}, [displayProfile?.id, isMe, location.pathname]);
+//   loadData();
+// }, [displayProfile?.id, isMe, location.pathname]);
 
 
   const getRankClasses = (count: number) => {
@@ -99,6 +99,26 @@ useEffect(() => {
         : "bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white"
     };
   };
+
+const handleFeelingLogDownload = async (profileId: string) => {
+  try {
+    const res = await fetch('/api/stripe/feeling-log-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: profileId,
+        successUrl: `${window.location.origin}/download/feeling-log?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: window.location.href,
+      }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    }
+  } catch (e) {
+    alert('エラーが発生しました。もう一度お試しください。');
+  }
+};
 
   useEffect(() => {
     if (userId) {
@@ -432,7 +452,10 @@ useEffect(() => {
                 <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
                   <Heart className="text-pink-600" size={14}/> Feeling Logs
                 </h2>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm" onClick={() => alert("DL準備中")}>
+                <button 
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm" 
+                  onClick={() => handleFeelingLogDownload(displayProfile.id)}
+                >
                   <Download size={14} /> <span>DL-200JPY</span>
                 </button>
               </div>
