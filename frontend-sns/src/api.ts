@@ -14,8 +14,14 @@ authApi.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error?.response?.status === 401) {
-            localStorage.removeItem('access_token');
-            window.location.href = '/login'; // ログインページへ
+            // ✅ ログイン・登録APIは除外
+            const url = error.config?.url || '';
+            const isAuthEndpoint = url.includes('/auth/');
+            
+            if (!isAuthEndpoint) {
+                localStorage.removeItem('access_token');
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }
