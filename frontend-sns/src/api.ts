@@ -14,11 +14,11 @@ authApi.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error?.response?.status === 401) {
-            // ✅ ログイン・登録APIは除外
             const url = error.config?.url || '';
             const isAuthEndpoint = url.includes('/auth/');
+            const isAlreadyOnLogin = window.location.pathname === '/login';  // ← 追加
             
-            if (!isAuthEndpoint) {
+            if (!isAuthEndpoint && !isAlreadyOnLogin) {  // ← 条件追加
                 localStorage.removeItem('access_token');
                 window.location.href = '/login';
             }
