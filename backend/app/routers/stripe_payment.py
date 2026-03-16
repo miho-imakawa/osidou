@@ -10,7 +10,7 @@ from ..database import get_db
 
 router = APIRouter(prefix="/api", tags=["stripe"])
 
-stripe.api_key = os.getenv("sk_test_51TBXfNRzhOiCMT8UTYUVoIICtevBC3XIcf78LXQmyfunLCSZGDSRu93z0HIvOsCnXhbGPrXDzAV3J3F0wttZkn8400Ls0Nvdet")
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 @router.post("/stripe/feeling-log-checkout")
 async def create_checkout_session(data: dict):
