@@ -10,7 +10,7 @@ from ..database import get_db
 
 router = APIRouter(prefix="/api", tags=["stripe"])
 
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+stripe.api_key = os.getenv("sk_test_51TBXfNRzhOiCMT8UTYUVoIICtevBC3XIcf78LXQmyfunLCSZGDSRu93z0HIvOsCnXhbGPrXDzAV3J3F0wttZkn8400Ls0Nvdet")
 
 @router.post("/stripe/feeling-log-checkout")
 async def create_checkout_session(data: dict):
@@ -28,7 +28,7 @@ async def create_checkout_session(data: dict):
             mode='payment',
             success_url=data['successUrl'],
             cancel_url=data['cancelUrl'],
-            metadata={'profileId': data['profileId']}
+            metadata={'user_id': data['userId']}
         )
         return {"url": session.url}
     except Exception as e:
@@ -44,17 +44,18 @@ async def download_feeling_log(session_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=400, detail="無効なセッションです")
 
-    profile_id = session.metadata.get('profileId')
+    user_id = session.metadata.get('user_id')
     
     # 2. DBからログを取得（最大1000件、直近3ヶ月）
     # ※テーブル名やカラム名は環境に合わせて調整してください
     # stripe_payment.py 内のクエリを以下に合わせる
     query = text("""
-        SELECT created_at, mood_type, comment 
-        FROM mood_logs 
-        WHERE user_id = :user_id 
+        SELECT created_at, mood_type, comment
+        FROM mood_logs
+        WHERE user_id = :user_id
+        AND is_visible = true
         AND created_at > NOW() - INTERVAL '3 months'
-        ORDER BY created_at DESC 
+        ORDER BY created_at DESC
         LIMIT 1000
     """)
     
@@ -64,23 +65,46 @@ async def download_feeling_log(session_id: str, db: Session = Depends(get_db)):
 
     # 3. CSV生成 (メモリ上のバッファに書き込み)
     output = io.StringIO()
+
     # Excelで開いた時に文字化けしないようBOM(UTF-8)を付与
     output.write('\ufeff')
+
     writer = csv.writer(output)
-    
+
     # ヘッダー
-    writer.writerow(["date", "time", "mood", "comment"])
-    
+    writer.writerow(["date", "time", "mood", "emoji", "comment"])
+
+    # 絵文字マップ
+    MOOD_EMOJI = {
+        "happy": "😊",
+        "excited": "🤩",
+        "calm": "😌",
+        "tired": "😥",
+        "sad": "😭",
+        "anxious": "😟",
+        "angry": "😠",
+        "neutral": "😐",
+        "grateful": "🙏",
+        "motivated": "🔥"
+    }
+
     # データ行
     for log in logs:
-        # created_at (datetime) を日付と時刻に分ける
         dt = log.created_at
+
         date_str = dt.strftime('%Y-%m-%d')
         time_str = dt.strftime('%H:%M')
-        writer.writerow([date_str, time_str, log.mood_type, log.comment])
+
+        writer.writerow([
+            date_str,
+            time_str,
+            log.mood_type,
+            MOOD_EMOJI.get(str(log.mood_type), ""),
+            log.comment or ""
+        ])
 
     output.seek(0)
-    
+
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode('utf-8-sig')),
         media_type="text/csv",
