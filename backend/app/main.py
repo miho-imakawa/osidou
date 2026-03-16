@@ -12,7 +12,8 @@ from .routers import (
     hobbies, posts, notifications,
     moods, 
     friend_requests, community,
-    meetup_chat  # 💡 1. チャット用ルーターをインポート
+    meetup_chat,
+    stripe_payment
 )
 
 # データベーステーブルの作成
@@ -64,6 +65,7 @@ app.include_router(branches.router)
 app.include_router(events.router) 
 app.include_router(reservations.router)
 app.include_router(invoices.router)
+app.include_router(stripe_payment.router)
 
 # アクセスログ
 app.include_router(access_logs.router) 

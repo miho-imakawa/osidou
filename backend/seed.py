@@ -1022,7 +1022,8 @@ def create_initial_data(db: Session):
         ).first()
 
         new_guide_content = """「推し道」では写真、画像の投稿はできません。テキストのみ投稿可能です。
-
+English follows Japanese.
+        
 「推し道」のアプリケーションは以下の4つのページで構成されています。
 
 【HOME】じぶんの気分を登録し、直近のともだちの気分を知る。
@@ -1038,8 +1039,32 @@ def create_initial_data(db: Session):
 ご登録いただく情報には、メールアドレス、年齢、住所（都道府県・市区町村）、ジェンダーなどが含まれます。
 これらの個人情報は、適切な安全管理措置を講じて管理し、法令に基づく場合を除き、本人の同意なく第三者へ提供することはありません。
 
-なお、決済には安全な決済サービスであるStripeを利用しており、クレジットカード情報を当サービス側で保存することはありません。"""
+なお、決済には安全な決済サービスであるStripeを利用しており、クレジットカード情報を当サービス側で保存することはありません。
 
+---
+
+Important Notice:
+Please note that "Oshidou" is a text-only platform. Photo and image uploads are not supported.
+
+App Overview:
+The Oshidou application consists of the following four main pages:
+
+【HOME】 Update your own status and see the recent "Feelings" of your friends.
+
+【COMMUNITY】 Connect with fellow fans who share your interests (Dou-tan).
+
+【FRIENDS】 Register and manage your friends within the app.
+
+【MY PAGE】 Edit your profile, access page links, and view your personal Feeling/Activity LOG history.
+
+Our Concept & Operations:
+We created this application with the goal of fostering gentle, trust-based connections with reliable people.
+To ensure sustainable operations, we have established a fee structure that includes features such as an "Ad-free Plan," "MEET UP" events, "Advertisements," and "Corporate usage of friend logs."
+
+Privacy & Security:
+Information registered on your MY PAGE may be used for service improvements and as statistical data. This information includes your email address, age, location (prefecture/city), and gender. We manage all personal data with strict security measures and will not provide it to third parties without your consent, except as required by law.
+
+Furthermore, we use Stripe, a secure payment service, for all transactions. Your credit card information is never stored on our servers."""
     if not existing_guide_top:
         db.add(models.HobbyPost(
             content=new_guide_content,
