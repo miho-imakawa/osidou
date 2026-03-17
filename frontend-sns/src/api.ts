@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-const OFFLINE_POSTS_KEY = 'osidou_offline_posts'; // ★追加
+const OFFLINE_POSTS_KEY = 'osidou_offline_posts';
 const OFFLINE_MOODS_KEY = 'osidou_offline_moods'; 
 
 export const authApi = axios.create({
@@ -9,16 +9,24 @@ export const authApi = axios.create({
     headers: { 'Content-Type': 'application/json' },
 });
 
-// api.ts に追加
+// ✅ リクエストインターセプター：全リクエストにトークンを付ける
+authApi.interceptors.request.use((config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+// レスポンスインターセプター（401時のリダイレクト）は意図的にコメントアウト中
 // authApi.interceptors.response.use(
 //     (response) => response,
 //     (error) => {
 //         if (error?.response?.status === 401) {
 //             const url = error.config?.url || '';
 //             const isAuthEndpoint = url.includes('/auth/');
-//             const isMeEndpoint = url.includes('/users/me'); // ← 追加
+//             const isMeEndpoint = url.includes('/users/me');
 //             const isAlreadyOnLogin = window.location.pathname === '/login';
-            
 //             if (!isAuthEndpoint && !isMeEndpoint && !isAlreadyOnLogin) {
 //                 localStorage.removeItem('access_token');
 //                 window.location.href = '/login';
@@ -27,7 +35,6 @@ export const authApi = axios.create({
 //         return Promise.reject(error);
 //     }
 // );
-
 
 export const publicApi = axios.create({
     baseURL: API_BASE_URL,
@@ -73,13 +80,11 @@ export interface HobbyCategory {
     is_public?: boolean;
 }
 
-// ★追加：オフライン投稿の保存ロジック
 const saveToOfflineQueue = (data: PostCreate) => {
     const queue = JSON.parse(localStorage.getItem(OFFLINE_POSTS_KEY) || '[]');
-    // 投稿された瞬間の時刻を記録する
     const offlineData = { 
         ...data, 
-        created_at: new Date().toISOString(), // バックエンドに渡す「真の投稿時刻」
+        created_at: new Date().toISOString(),
         is_offline_original: true 
     };
     queue.push(offlineData);
@@ -147,7 +152,6 @@ export interface UserMoodResponse {
     is_mood_comment_visible?: boolean;
 }
 
-/** 💡 参加表明・レスポンスの詳細型 */
 export interface PostResponse {
     id: number;
     content: string;
@@ -155,14 +159,13 @@ export interface PostResponse {
     is_attended: boolean;
     user_id: number;
     post_id: number;
-    author_nickname: string; // バックエンドから返される名前
+    author_nickname: string;
     created_at: string;
-    ad_start_date?: string; // ★追加
-    like_count?: number;    // ★追加
-    pin_count?: number;     // ★追加
+    ad_start_date?: string;
+    like_count?: number;
+    pin_count?: number;
 }
 
-/** 💡 投稿（Post）型：バックエンドの修正に合わせて responses を追加 */
 export interface Post {
     id: number;
     content: string;
@@ -181,19 +184,18 @@ export interface Post {
     meetup_status?: string;
     meetup_capacity?: number;
     ad_end_date?: string;
-    ad_start_date?: string; // ★追加：掲載開始日
-    like_count?: number;    // ★追加：いいね数
-    pin_count?: number;     // ★追加：PIN数
+    ad_start_date?: string;
+    like_count?: number;
+    pin_count?: number;
     parent_id?: number | null;
     response_count?: number; 
     participation_count?: number;
     is_joined: boolean;
-    region_tag_pref?: string; // 都道府県タグ
-    region_tag_city?: string; // 市区町村タグ（これが足りない！）    
+    region_tag_pref?: string;
+    region_tag_city?: string;
     responses: PostResponse[];
 }
 
-/** 💡 参加表明の作成用 */
 export interface PostResponseCreate {
     content?: string;
     is_participation: boolean;
@@ -229,39 +231,31 @@ export const fetchMyCommunities = async (): Promise<HobbyCategory[]> => {
 };
 
 export const fetchFollowingMoods = async (): Promise<UserMoodResponse[]> => (await authApi.get('/users/following/moods')).data;
+
 export const fetchMyMoodHistory = async (): Promise<MoodLog[]> => {
-  const res = await authApi.get('/users/moods/my-logs'); // 正しいエンドポイント
-  return res.data;
+    const res = await authApi.get('/users/moods/my-logs');
+    return res.data;
 };
-// 貯金箱の名前
+
 export const postMoodLog = async (data: MoodPostPayload): Promise<void | { isOfflineSaved: true }> => {
-    // ★ 送信前にオフラインか確認
     if (!navigator.onLine) {
         console.warn("オフライン検知。ローカルに保存します...");
         const queue = JSON.parse(localStorage.getItem(OFFLINE_MOODS_KEY) || '[]');
-        queue.push({
-            ...data,
-            created_at: new Date().toISOString() // プランA：投稿時刻を記録
-        });
+        queue.push({ ...data, created_at: new Date().toISOString() });
         localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(queue));
         return { isOfflineSaved: true };
     }
-
-    // オンラインなら通常送信
     try {
         await authApi.post('users/moods', data);
     } catch (error) {
-        // 送信中にネットワークが切れた場合のフォールバック
         console.warn("送信失敗。ローカルに保存します...");
         const queue = JSON.parse(localStorage.getItem(OFFLINE_MOODS_KEY) || '[]');
-        queue.push({
-            ...data,
-            created_at: new Date().toISOString()
-        });
+        queue.push({ ...data, created_at: new Date().toISOString() });
         localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(queue));
         return { isOfflineSaved: true };
     }
 };
+
 export const searchUsers = async (query: string): Promise<UserProfileType[]> => (await authApi.get('/users/search', { params: { query } })).data;
 export const sendFriendRequest = async (userId: number): Promise<void> => await authApi.post(`/friends/${userId}/friend_request`);
 export const fetchFriendRequests = async (): Promise<FriendRequest[]> => (await authApi.get('/friends/me/friend-requests')).data;
@@ -281,7 +275,6 @@ export const createPost = async (data: PostCreate): Promise<Post | { isOfflineSa
         const response = await authApi.post<Post>('/posts', data);
         return response.data;
     } catch (error) {
-        // オフラインまたはネットワークエラーの場合
         if (!navigator.onLine || axios.isAxiosError(error)) {
             console.warn("Offline detected. Saving post to local storage...");
             saveToOfflineQueue(data);
@@ -295,37 +288,29 @@ export const syncOfflinePosts = async () => {
     const queue: (PostCreate & { created_at: string })[] = JSON.parse(localStorage.getItem(OFFLINE_POSTS_KEY) || '[]');
     if (queue.length === 0) return;
 
-    console.log(`Syncing ${queue.length} offline posts...`);
     let successCount = 0;
-
     for (const post of [...queue]) {
         try {
             await authApi.post('/posts', post);
             successCount++;
-            // 送信成功したものをキューから削除
             queue.shift(); 
             localStorage.setItem(OFFLINE_POSTS_KEY, JSON.stringify(queue));
         } catch (e) {
             console.error("Sync failed for a post. Stopping sync to retry later.", e);
-            break; // 1件失敗したら通信環境がまだ不安定と判断して中断
+            break;
         }
     }
-
-    if (successCount > 0) {
-        console.log(`${successCount} posts synced successfully!`);
-    }
+    if (successCount > 0) console.log(`${successCount} posts synced successfully!`);
 };
 
 export const syncOfflineData = async () => {
     const moodQueue = JSON.parse(localStorage.getItem(OFFLINE_MOODS_KEY) || '[]');
     if (moodQueue.length === 0) return;
 
-    console.log(`🌐 ${moodQueue.length} 件のオフライン気分ログを同期中...`);
-    
     const remainingQueue = [...moodQueue];
     for (const mood of moodQueue) {
         try {
-            await authApi.post('/users/moods', mood); // ← /moods を /users/moods に修正
+            await authApi.post('/users/moods', mood);
             remainingQueue.shift();
             localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(remainingQueue));
         } catch (e) {
@@ -333,15 +318,11 @@ export const syncOfflineData = async () => {
             break; 
         }
     }
-
-    if (remainingQueue.length === 0) {
-        console.log("✅ すべての気分ログが同期されました！");
-    }
+    if (remainingQueue.length === 0) console.log("✅ すべての気分ログが同期されました！");
 };
 
 export const fetchPostsByCategory = async (categoryId: number): Promise<Post[]> => (await authApi.get(`/posts/category/${categoryId}`)).data;
 
-/** 💡 参加表明（JOIN REQUEST）の作成 */
 export const createPostResponse = async (postId: number, data: PostResponseCreate): Promise<PostResponse> => {
     return (await authApi.post(`/posts/${postId}/responses`, data)).data;
 };
@@ -351,7 +332,6 @@ export const fetchJoinStatus = async (categoryId: number): Promise<JoinStatus> =
 export const leaveCommunity = async (categoryId: number): Promise<void> => await authApi.delete(`/hobby-categories/leave/${categoryId}`);
 export const reportPost = async (postId: number): Promise<{ message: string }> => (await authApi.post(`/posts/${postId}/report`)).data;
 
-/** 💡 出席管理の切り替え（バックエンドのパスに合わせて修正） */
 export const toggleAttendance = async (responseId: number) => {
     return (await authApi.put(`/responses/${responseId}/attendance`)).data;
 };
@@ -366,16 +346,12 @@ export interface City { id: number; name: string; }
 export const fetchPrefectures = async (): Promise<Prefecture[]> => (await authApi.get('/admin/address/prefectures')).data;
 export const fetchCities = async (prefectureId: number): Promise<City[]> => (await authApi.get(`/admin/address/cities/${prefectureId}`)).data;
 
-// 💡 広告の見積もりを取得するAPI
 export const fetchAdQuote = async (categoryIds: number[]) => {
-    // ✅ 正しい書き方
     const response = await authApi.post('/hobby-categories/ad-quote', { category_ids: categoryIds });
     return response.data;
 };
 
-// 広告をマイリスト（保存）に追加
 export const pinAd = (postId: number) => authApi.post(`/posts/${postId}/pin`);
-// 広告の「いいね」
 export const likePost = (postId: number) => authApi.post(`/posts/${postId}/like`);
 
 export const adInteraction = async (postId: number, action: 'like' | 'pin' | 'close') => {
@@ -398,100 +374,90 @@ export const createSubCategory = async (data: {
     return response.data;
 };
 
-// -------------------------------------------------------
-// 📌 Stripe 課金API（api.ts の末尾に追加してください）
-// -------------------------------------------------------
-// 共通：Stripeチェックアウトページへリダイレクト
+// ----------------------------------------------------
+// 📌 Stripe 課金API
+// ----------------------------------------------------
+
 const redirectToStripe = async (endpoint: string, body: object) => {
-  const res = await authApi.post(endpoint, body);
-  if (res.data.url) {
-    window.location.href = res.data.url;
-  } else {
-    throw new Error("Stripe URLの取得に失敗しました");
-  }
+    const res = await authApi.post(endpoint, body);
+    if (res.data.url) {
+        window.location.href = res.data.url;
+    } else {
+        throw new Error("Stripe URLの取得に失敗しました");
+    }
 };
 
-/** 1. Feeling LOG ダウンロード（200円） */
 export const startFeelingLogCheckout = async (userId: string | number) => {
-  await redirectToStripe("/api/stripe/feeling-log-checkout", {
-    userId: String(userId),
-    successUrl: `${window.location.origin}/download/feeling-log?session_id={CHECKOUT_SESSION_ID}`,
-    cancelUrl: window.location.href,
-  });
+    await redirectToStripe("/api/stripe/feeling-log-checkout", {
+        userId: String(userId),
+        successUrl: `${window.location.origin}/download/feeling-log?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: window.location.href,
+    });
 };
 
-/** 2. Friends' Feeling Log（1,000円） */
 export const startFriendsLogCheckout = async (userId: string | number, targetUserId?: string | number) => {
-  await redirectToStripe("/api/stripe/friends-log-checkout", {
-    userId: String(userId),
-    targetUserId: targetUserId ? String(targetUserId) : undefined,
-    successUrl: targetUserId 
-      ? `${window.location.origin}/profile/${targetUserId}?friends_log_session={CHECKOUT_SESSION_ID}`
-      : undefined,
-    cancelUrl: window.location.href,
-  });
+    await redirectToStripe("/api/stripe/friends-log-checkout", {
+        userId: String(userId),
+        targetUserId: targetUserId ? String(targetUserId) : undefined,
+        successUrl: targetUserId 
+            ? `${window.location.origin}/profile/${targetUserId}?friends_log_session={CHECKOUT_SESSION_ID}`
+            : undefined,
+        cancelUrl: window.location.href,
+    });
 };
 
-/** 3. MEETUP 掲載料（500円） */
 export const startMeetupCheckout = async (userId: string | number, postId?: number) => {
-  await redirectToStripe("/api/stripe/meetup-checkout", {
-    userId: String(userId),
-    postId,
-    successUrl: `${window.location.origin}/community?meetup_paid=true`,
-    cancelUrl: window.location.href,
-  });
+    await redirectToStripe("/api/stripe/meetup-checkout", {
+        userId: String(userId),
+        postId,
+        successUrl: `${window.location.origin}/community?meetup_paid=true`,
+        cancelUrl: window.location.href,
+    });
 };
 
-/** 4. アフェリエイトなし掲載（200円） */
 export const startNoAffiliateCheckout = async (userId: string | number) => {
-  await redirectToStripe("/api/stripe/no-affiliate-checkout", {
-    userId: String(userId),
-    successUrl: `${window.location.origin}/profile?no_affiliate_paid=true`,
-    cancelUrl: window.location.href,
-  });
+    await redirectToStripe("/api/stripe/no-affiliate-checkout", {
+        userId: String(userId),
+        successUrl: `${window.location.origin}/profile?no_affiliate_paid=true`,
+        cancelUrl: window.location.href,
+    });
 };
 
-/** 5. AD 掲載（変動制） */
 export const startAdCheckout = async (userId: string | number, amount: number, adTitle: string) => {
-  await redirectToStripe("/api/stripe/ad-checkout", {
-    userId: String(userId),
-    amount,
-    adTitle,
-    successUrl: `${window.location.origin}/community?ad_paid=true`,
-    cancelUrl: window.location.href,
-  });
+    await redirectToStripe("/api/stripe/ad-checkout", {
+        userId: String(userId),
+        amount,
+        adTitle,
+        successUrl: `${window.location.origin}/community?ad_paid=true`,
+        cancelUrl: window.location.href,
+    });
 };
 
-/** 6. Friends' Feeling Log ステータス・検証系 */
-
-// 購入状態チェック
 export const fetchFriendsLogStatus = async (userId: number) => {
-  const res = await authApi.get(`/api/stripe/friends-log-status?user_id=${userId}`);
-  return res.data as {
-    has_active_purchase: boolean;
-    days_remaining?: number;
-    expires_at?: string;
-    can_download_today?: boolean;
-  };
+    const res = await authApi.get(`/api/stripe/friends-log-status?user_id=${userId}`);
+    return res.data as {
+        has_active_purchase: boolean;
+        days_remaining?: number;
+        expires_at?: string;
+        can_download_today?: boolean;
+    };
 };
 
-// アクティベート（Stripe成功後）
 export const activateFriendsLog = async (sessionId: string) => {
-  const res = await authApi.post('/api/stripe/friends-log-activate', { sessionId });
-  return res.data as {
-    status: string;
-    days_remaining: number;
-    expires_at: string;
-  };
+    const res = await authApi.post('/api/stripe/friends-log-activate', { sessionId });
+    return res.data as {
+        status: string;
+        days_remaining: number;
+        expires_at: string;
+    };
 };
 
-// 閲覧権限チェック
 export const verifyFriendsLogSession = async (sessionId: string): Promise<{
-  valid: boolean;
-  target_user_id?: string;
-  expires_at?: string;
-  reason?: string;
+    valid: boolean;
+    target_user_id?: string;
+    expires_at?: string;
+    reason?: string;
 }> => {
-  const res = await authApi.get(`/api/stripe/friends-log-verify?session_id=${sessionId}`);
-  return res.data;
+    const res = await authApi.get(`/api/stripe/friends-log-verify?session_id=${sessionId}`);
+    return res.data;
 };
