@@ -14,9 +14,8 @@ router = APIRouter(tags=["community"])
 # ==========================================
 @router.get("/guide")
 def get_guide_category(db: Session = Depends(get_db)):
-    """GUIDEカテゴリのIDを動的に返す"""
     guide_cat = db.query(models.HobbyCategory).filter(
-        models.HobbyCategory.name == "GUIDE (推し道の歩き方)"
+        models.HobbyCategory.name == "GUIDE （推し道の歩き方）"  # 全角カッコに修正
     ).first()
 
     if not guide_cat:
