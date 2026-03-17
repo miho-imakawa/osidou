@@ -229,7 +229,10 @@ export const fetchMyCommunities = async (): Promise<HobbyCategory[]> => {
 };
 
 export const fetchFollowingMoods = async (): Promise<UserMoodResponse[]> => (await authApi.get('/users/following/moods')).data;
-export const fetchMyMoodHistory = async (): Promise<MoodLog[]> => (await authApi.get('/users/me/mood-history')).data;
+export const fetchMyMoodHistory = async (): Promise<MoodLog[]> => {
+  const res = await authApi.get('/users/moods/my-logs'); // 正しいエンドポイント
+  return res.data;
+};
 // 貯金箱の名前
 export const postMoodLog = async (data: MoodPostPayload): Promise<void | { isOfflineSaved: true }> => {
     // ★ 送信前にオフラインか確認
