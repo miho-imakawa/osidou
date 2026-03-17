@@ -9,6 +9,7 @@ import { authApi, UserProfile as UserProfileType, syncOfflinePosts, syncOfflineD
 import CategoryDetailPage from './components/CategoryDetailPage';
 import { Menu, X } from 'lucide-react';
 import LoginPage from './components/LoginPage';
+import TokuteiPage from './components/TokuteiPage';
 
 // 💡 初期値の設定
 const initialProfile: UserProfileType = {
@@ -129,6 +130,11 @@ const Footer: React.FC = () => (
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm">
             <p>&copy; {new Date().getFullYear()} 推集炉 (Suishuro) 運営事務局</p>
             <p className="mt-1">推し道を行く人のための推集炉</p>
+            <p className="mt-3">
+                <Link to="/tokutei" className="text-gray-400 hover:text-white underline">
+                    特定商取引法に基づく表記
+                </Link>
+            </p>
         </div>
     </footer>
 );
@@ -235,6 +241,7 @@ useEffect(() => {
         return (
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/tokutei" element={<TokuteiPage />} /> 
                 {!token || error ? (
                     <Route path="*" element={welcomeScreen} />
                 ) : (
