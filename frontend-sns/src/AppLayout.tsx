@@ -170,28 +170,29 @@ const AppLayout: React.FC = () => {
         }
     };
 
-    useEffect(() => {
-        const initializeApp = async () => {
-            await syncOfflinePosts();
-            await fetchProfile();
-        };
-        initializeApp();
+useEffect(() => {
+    const initializeApp = async () => {
+        await syncOfflinePosts();
+        await fetchProfile();
+    };
+    initializeApp();
 
-        // ← useEffect入れ子を削除して、fetchだけここに書く
-        fetch('/api/community/guide')
-            .then(res => res.json())
-            .then(data => setGuideId(data.id))
-            .catch(() => setGuideId(1));
+    // ✅ 一度だけ取得、失敗してもsetGuideIdを1回だけ呼ぶ
+    fetch('/api/community/guide')
+        .then(res => {
+            if (!res.ok) throw new Error('failed');
+            return res.json();
+        })
+        .then(data => setGuideId(data.id ?? 1))
+        .catch(() => setGuideId(prev => prev ?? 1)); // ← 既に値があれば上書きしない
 
-        const handleOnline = () => {
-            syncOfflinePosts();
-            syncOfflineData();
-        };
-        window.addEventListener('online', handleOnline);
-        return () => {
-            window.removeEventListener('online', handleOnline);
-        };
-    }, []);
+    const handleOnline = () => {
+        syncOfflinePosts();
+        syncOfflineData();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+}, []); // ← [] が空であることを確認！
 
     const renderContent = () => {
         if (loading) return <div className="p-8 text-center text-gray-500">全体を読み込み中...</div>;
