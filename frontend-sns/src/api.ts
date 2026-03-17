@@ -16,9 +16,10 @@ authApi.interceptors.response.use(
         if (error?.response?.status === 401) {
             const url = error.config?.url || '';
             const isAuthEndpoint = url.includes('/auth/');
-            const isAlreadyOnLogin = window.location.pathname === '/login';  // ← 追加
+            const isMeEndpoint = url.includes('/users/me'); // ← 追加
+            const isAlreadyOnLogin = window.location.pathname === '/login';
             
-            if (!isAuthEndpoint && !isAlreadyOnLogin) {  // ← 条件追加
+            if (!isAuthEndpoint && !isMeEndpoint && !isAlreadyOnLogin) {
                 localStorage.removeItem('access_token');
                 window.location.href = '/login';
             }
@@ -26,6 +27,7 @@ authApi.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
 
 export const publicApi = axios.create({
     baseURL: API_BASE_URL,
