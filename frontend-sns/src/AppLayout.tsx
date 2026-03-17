@@ -177,14 +177,14 @@ useEffect(() => {
     };
     initializeApp();
 
-    // ✅ 一度だけ取得、失敗してもsetGuideIdを1回だけ呼ぶ
-    fetch('/api/community/guide')
+        // ✅ 一度だけ取得、失敗してもsetGuideIdを1回だけ呼ぶ
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/community/guide`)
         .then(res => {
             if (!res.ok) throw new Error('failed');
             return res.json();
         })
         .then(data => setGuideId(data.id ?? 1))
-        .catch(() => setGuideId(prev => prev ?? 1)); // ← 既に値があれば上書きしない
+        .catch(() => setGuideId(prev => prev ?? 1));
 
     const handleOnline = () => {
         syncOfflinePosts();
