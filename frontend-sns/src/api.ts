@@ -394,3 +394,101 @@ export const createSubCategory = async (data: {
     const response = await authApi.post('/hobby-categories/create-sub', data);
     return response.data;
 };
+
+// -------------------------------------------------------
+// 📌 Stripe 課金API（api.ts の末尾に追加してください）
+// -------------------------------------------------------
+// 共通：Stripeチェックアウトページへリダイレクト
+const redirectToStripe = async (endpoint: string, body: object) => {
+  const res = await authApi.post(endpoint, body);
+  if (res.data.url) {
+    window.location.href = res.data.url;
+  } else {
+    throw new Error("Stripe URLの取得に失敗しました");
+  }
+};
+
+/** 1. Feeling LOG ダウンロード（200円） */
+export const startFeelingLogCheckout = async (userId: string | number) => {
+  await redirectToStripe("/api/stripe/feeling-log-checkout", {
+    userId: String(userId),
+    successUrl: `${window.location.origin}/download/feeling-log?session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: window.location.href,
+  });
+};
+
+/** 2. Friends' Feeling Log（1,000円） */
+export const startFriendsLogCheckout = async (userId: string | number, targetUserId?: string | number) => {
+  await redirectToStripe("/api/stripe/friends-log-checkout", {
+    userId: String(userId),
+    targetUserId: targetUserId ? String(targetUserId) : undefined,
+    successUrl: targetUserId 
+      ? `${window.location.origin}/profile/${targetUserId}?friends_log_session={CHECKOUT_SESSION_ID}`
+      : undefined,
+    cancelUrl: window.location.href,
+  });
+};
+
+/** 3. MEETUP 掲載料（500円） */
+export const startMeetupCheckout = async (userId: string | number, postId?: number) => {
+  await redirectToStripe("/api/stripe/meetup-checkout", {
+    userId: String(userId),
+    postId,
+    successUrl: `${window.location.origin}/community?meetup_paid=true`,
+    cancelUrl: window.location.href,
+  });
+};
+
+/** 4. アフェリエイトなし掲載（200円） */
+export const startNoAffiliateCheckout = async (userId: string | number) => {
+  await redirectToStripe("/api/stripe/no-affiliate-checkout", {
+    userId: String(userId),
+    successUrl: `${window.location.origin}/profile?no_affiliate_paid=true`,
+    cancelUrl: window.location.href,
+  });
+};
+
+/** 5. AD 掲載（変動制） */
+export const startAdCheckout = async (userId: string | number, amount: number, adTitle: string) => {
+  await redirectToStripe("/api/stripe/ad-checkout", {
+    userId: String(userId),
+    amount,
+    adTitle,
+    successUrl: `${window.location.origin}/community?ad_paid=true`,
+    cancelUrl: window.location.href,
+  });
+};
+
+/** 6. Friends' Feeling Log ステータス・検証系 */
+
+// 購入状態チェック
+export const fetchFriendsLogStatus = async (userId: number) => {
+  const res = await authApi.get(`/api/stripe/friends-log-status?user_id=${userId}`);
+  return res.data as {
+    has_active_purchase: boolean;
+    days_remaining?: number;
+    expires_at?: string;
+    can_download_today?: boolean;
+  };
+};
+
+// アクティベート（Stripe成功後）
+export const activateFriendsLog = async (sessionId: string) => {
+  const res = await authApi.post('/api/stripe/friends-log-activate', { sessionId });
+  return res.data as {
+    status: string;
+    days_remaining: number;
+    expires_at: string;
+  };
+};
+
+// 閲覧権限チェック
+export const verifyFriendsLogSession = async (sessionId: string): Promise<{
+  valid: boolean;
+  target_user_id?: string;
+  expires_at?: string;
+  reason?: string;
+}> => {
+  const res = await authApi.get(`/api/stripe/friends-log-verify?session_id=${sessionId}`);
+  return res.data;
+};
