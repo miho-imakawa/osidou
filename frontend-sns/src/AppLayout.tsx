@@ -139,7 +139,6 @@ const AppLayout: React.FC = () => {
     const [profile, setProfile] = useState<UserProfileType>(initialProfile);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [guideId, setGuideId] = useState<number | null>(null);
     
     const fetchProfile = async () => {
         setLoading(true);
@@ -217,7 +216,7 @@ useEffect(() => {
                     <h2 className="text-2xl font-bold text-gray-900">ようこそ、推し道へ！🌸</h2>
                     <p className="text-sm text-gray-500">はじめに使い方をご確認ください</p>
                     <a
-                        href={`/community/${guideId ?? 1}`}  // ← ここを修正
+                        href={`/community/1`} // ← ここを修正
                         onClick={() => localStorage.setItem('has_seen_guide', 'true')}
                         className="bg-pink-500 text-white px-8 py-3 rounded-full font-bold hover:bg-pink-600 transition-colors"
                     >
