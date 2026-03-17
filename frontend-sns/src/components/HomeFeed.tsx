@@ -8,9 +8,8 @@ import {
   activateFriendsLog,
   startFriendsLogCheckout,
 } from '../api';
-import { Clock, Download, ShoppingCart, CheckCircle, Lock } from 'lucide-react';
+import { Clock, Download } from 'lucide-react';
 import MoodInput from './MoodInput';
-import PendingFriendBanner from './PendingFriendBanner';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 // -------------------------------------------------------
@@ -46,7 +45,6 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   const [friendMoods, setFriendMoods] = useState<UserMoodResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pendingCount, setPendingCount] = useState(0);
 
   // Friends' Feeling Log 関連
   const [friendsLogStatus, setFriendsLogStatus] = useState<FriendsLogStatus | null>(null);
@@ -60,12 +58,8 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   const loadMoods = async () => {
     try {
       setLoading(true);
-      const [data, pendingRes] = await Promise.all([
-        fetchFollowingMoods(),
-        authApi.get('/friends/pending/count'),
-      ]);
+      const data = await fetchFollowingMoods();
       setFriendMoods(data);
-      setPendingCount(pendingRes.data.pending_count);
     } catch (err) {
       setError('Failed to load logs.');
     } finally {
@@ -180,22 +174,16 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   // -------------------------------------------------------
   const renderFriendsLogBar = () => {
     if (isActivating) {
-      return (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-purple-50 rounded-2xl text-xs font-bold text-purple-500 animate-pulse">
-          <div className="w-3 h-3 rounded-full border-2 border-purple-400 border-t-transparent animate-spin" />
-          購入を確認中...
-        </div>
-      );
+      return <span className="text-[10px] text-purple-400 animate-pulse">確認中...</span>;
     }
 
     if (!friendsLogStatus?.has_active_purchase) {
       return (
         <button
           onClick={handlePurchase}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl text-xs font-bold hover:opacity-90 transition-all shadow-sm active:scale-95"
+          className="px-2.5 py-1 bg-purple-50 border border-purple-200 text-purple-600 rounded-lg text-[10px] font-bold hover:bg-purple-100 transition-all"
         >
-          <ShoppingCart size={14} />
-          Friends' Log DL — ¥1,000 / 30日
+          とも' Log DL — ¥1,000/30日
         </button>
       );
     }
@@ -203,38 +191,21 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     const { days_remaining = 0, can_download_today } = friendsLogStatus;
 
     return (
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-100 rounded-xl">
-          <CheckCircle size={12} className="text-purple-500" />
-          <span className="text-[10px] font-black text-purple-600 tabular-nums">
-            残り {days_remaining} 日
-          </span>
-          <div className="w-16 h-1.5 bg-purple-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-purple-400 rounded-full transition-all"
-              style={{ width: `${(days_remaining / 30) * 100}%` }}
-            />
-          </div>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-purple-400 tabular-nums">残り{days_remaining}日</span>
+        <div className="w-10 h-1 bg-purple-100 rounded-full overflow-hidden">
+          <div className="h-full bg-purple-400 rounded-full" style={{ width: `${(days_remaining / 30) * 100}%` }} />
         </div>
-
         {can_download_today ? (
           <button
             onClick={handleDownload}
             disabled={isDownloading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500 text-white rounded-xl text-[10px] font-black hover:bg-purple-600 transition-all active:scale-95 disabled:opacity-60"
+            className="px-2 py-0.5 bg-purple-500 text-white rounded text-[10px] font-bold hover:bg-purple-600 disabled:opacity-50"
           >
-            {isDownloading ? (
-              <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
-            ) : (
-              <Download size={12} />
-            )}
-            {isDownloading ? 'DL中...' : '今日分をDL'}
+            {isDownloading ? '...' : 'DL'}
           </button>
         ) : (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-400 rounded-xl text-[10px] font-black">
-            <Lock size={12} />
-            本日DL済 — 明日また
-          </div>
+          <span className="text-[10px] text-gray-300">本日済</span>
         )}
       </div>
     );
@@ -259,29 +230,14 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       <MoodInput onSuccess={loadMoods} />
 
       <div className="mt-12 space-y-6">
-        {/* Friends' Log ヘッダー & DLコントロール */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-[14px] font-black text-gray-900 tracking-[0.2em] uppercase leading-none">
-                ともだちs' LOG
-              </h2>
-              <p className="text-[8px] font-bold text-gray-400 mt-1 tracking-wider">
-                The latest Friends' feeling
-              </p>
-            </div>
-            <PendingFriendBanner count={pendingCount} />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            {renderFriendsLogBar()}
-            {dlMessage && (
-              <p className="text-[10px] font-bold text-gray-500 pl-1 animate-in fade-in">
-                {dlMessage}
-              </p>
-            )}
-          </div>
+        {/* Friends' Log ヘッダー */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-[14px] font-black text-gray-900 tracking-[0.2em] uppercase leading-none">
+            ともだちs' LOG
+          </h2>
+          {renderFriendsLogBar()}
         </div>
+        {dlMessage && <p className="text-[10px] text-gray-400">{dlMessage}</p>}
 
         {/* ローディング・エラー表示 */}
         {loading && (
