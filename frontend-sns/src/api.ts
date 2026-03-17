@@ -10,23 +10,23 @@ export const authApi = axios.create({
 });
 
 // api.ts に追加
-authApi.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        if (error?.response?.status === 401) {
-            const url = error.config?.url || '';
-            const isAuthEndpoint = url.includes('/auth/');
-            const isMeEndpoint = url.includes('/users/me'); // ← 追加
-            const isAlreadyOnLogin = window.location.pathname === '/login';
+// authApi.interceptors.response.use(
+//     (response) => response,
+//     (error) => {
+//         if (error?.response?.status === 401) {
+//             const url = error.config?.url || '';
+//             const isAuthEndpoint = url.includes('/auth/');
+//             const isMeEndpoint = url.includes('/users/me'); // ← 追加
+//             const isAlreadyOnLogin = window.location.pathname === '/login';
             
-            if (!isAuthEndpoint && !isMeEndpoint && !isAlreadyOnLogin) {
-                localStorage.removeItem('access_token');
-                window.location.href = '/login';
-            }
-        }
-        return Promise.reject(error);
-    }
-);
+//             if (!isAuthEndpoint && !isMeEndpoint && !isAlreadyOnLogin) {
+//                 localStorage.removeItem('access_token');
+//                 window.location.href = '/login';
+//             }
+//         }
+//         return Promise.reject(error);
+//     }
+// );
 
 
 export const publicApi = axios.create({
