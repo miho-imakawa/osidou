@@ -9,7 +9,8 @@ import {
   fetchMyCommunities,
   HobbyCategory, 
   fetchMyMoodHistory, 
-  MoodLog 
+  MoodLog,
+  startFeelingLogCheckout, startFriendsLogCheckout, verifyFriendsLogSession, 
 } from '../api';
 import PendingFriendBanner from './PendingFriendBanner'; // 💡 パスは環境に合わせて調整してください
 
@@ -32,6 +33,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   const [myMeetups, setMyMeetups] = useState<any[]>([]); 
 
   const [myAdsStats, setMyAdsStats] = useState<any[]>([]);
+
+  const [friendsLogUnlocked, setFriendsLogUnlocked] = useState(false);
+  const [friendsLogExpires, setFriendsLogExpires] = useState<string | null>(null);
 
   // 💡 State を追加
 const [pendingCount, setPendingCount] = useState(0);
@@ -100,21 +104,9 @@ const [pendingCount, setPendingCount] = useState(0);
     };
   };
 
-const handleFeelingLogDownload = async (profileId: string) => {
+const handleFeelingLogDownload = async (userId: string | number) => {
   try {
-    const res = await fetch('/api/stripe/feeling-log-checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        profileId: profileId,
-        successUrl: `${window.location.origin}/download/feeling-log?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: window.location.href,
-      }),
-    });
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
-    }
+    await startFeelingLogCheckout(userId);
   } catch (e) {
     alert('エラーが発生しました。もう一度お試しください。');
   }
