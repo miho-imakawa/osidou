@@ -143,10 +143,17 @@ const AppLayout: React.FC = () => {
     
     const fetchProfile = async () => {
         setLoading(true);
+        
+        // ✅ トークンがなければ即終了
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            setLoading(false);
+            return;
+        }
+        
         try {
             const response = await authApi.get<UserProfileType>('/users/me');
             setProfile(response.data);
-            // 成功したらLocalStorageにバックアップを取っておく
             localStorage.setItem('cached_profile', JSON.stringify(response.data));
             setError(null);
         } catch (err) {
@@ -154,7 +161,7 @@ const AppLayout: React.FC = () => {
             const cached = localStorage.getItem('cached_profile');
             if (cached) {
                 setProfile(JSON.parse(cached));
-                setError(null); // キャッシュがあればエラー画面にしない
+                setError(null);
             } else {
                 setError('オフラインです。一度オンラインでログインしてください。');
             }
