@@ -363,7 +363,7 @@ async def create_feeling_log_checkout(data: dict):
 
 
 # -------------------------------------------------------
-# 2. Friends' Feeling Log チェックアウト（1,000円 / 30日）
+# 2. Friends' Feeling Log チェックアウト（1,000円 / 30回）
 # -------------------------------------------------------
 @router.post("/stripe/friends-log-checkout")
 async def create_friends_log_checkout(data: dict, db: Session = Depends(get_db)):
@@ -371,19 +371,20 @@ async def create_friends_log_checkout(data: dict, db: Session = Depends(get_db))
     if not user_id:
         raise HTTPException(status_code=400, detail="userId が必要です")
 
+    # 残クレジットがある購入が既にあれば重複購入を防ぐ
     existing = db.execute(text("""
-        SELECT id, expires_at FROM friends_log_purchases
+        SELECT id, credits_remaining FROM friends_log_purchases
         WHERE buyer_user_id = :uid
           AND is_active = true
-          AND expires_at > NOW()
-        ORDER BY expires_at DESC
+          AND credits_remaining > 0
+        ORDER BY purchased_at DESC
         LIMIT 1
     """), {"uid": int(user_id)}).fetchone()
 
     if existing:
         raise HTTPException(
             status_code=409,
-            detail=f"有効な購入が既にあります。期限: {existing.expires_at.strftime('%Y/%m/%d')}"
+            detail=f"残り{existing.credits_remaining}回分の購入が有効です。使い切ってから再購入してください。"
         )
 
     try:
@@ -393,8 +394,8 @@ async def create_friends_log_checkout(data: dict, db: Session = Depends(get_db))
                 "price_data": {
                     "currency": "jpy",
                     "product_data": {
-                        "name": "Friends' Feeling Log（30日間・1日1回DL）",
-                        "description": "購入後30日間、友達全員のFeeling Logを毎日1回ダウンロードできます"
+                        "name": "Friends' Feeling Log（30回分）",
+                        "description": "友達全員のFeeling Logを30回ダウンロードできます（4時間ごとに1回）"
                     },
                     "unit_amount": PRICE_FRIENDS_LOG,
                 },
@@ -431,71 +432,79 @@ async def activate_friends_log(data: dict, db: Session = Depends(get_db)):
     user_id = stripe_session.metadata.get("user_id")
 
     already = db.execute(text("""
-        SELECT id FROM friends_log_purchases WHERE stripe_session_id = :sid
+        SELECT id, credits_remaining FROM friends_log_purchases
+        WHERE stripe_session_id = :sid
     """), {"sid": session_id}).fetchone()
 
     if already:
-        purchase = db.execute(text("""
-            SELECT expires_at,
-                   (expires_at::date - CURRENT_DATE) AS days_remaining
-            FROM friends_log_purchases
-            WHERE stripe_session_id = :sid
-        """), {"sid": session_id}).fetchone()
         return {
             "status": "already_activated",
-            "days_remaining": purchase.days_remaining,
-            "expires_at": purchase.expires_at.isoformat(),
+            "credits_remaining": already.credits_remaining,
         }
 
-    expires_at = datetime.now(timezone.utc) + timedelta(days=30)
     db.execute(text("""
         INSERT INTO friends_log_purchases
-            (buyer_user_id, stripe_session_id, purchased_at, expires_at, is_active)
-        VALUES (:uid, :sid, NOW(), :expires, true)
-    """), {"uid": int(user_id), "sid": session_id, "expires": expires_at})
+            (buyer_user_id, stripe_session_id, purchased_at, is_active, credits_remaining)
+        VALUES (:uid, :sid, NOW(), true, 30)
+    """), {"uid": int(user_id), "sid": session_id})
     db.commit()
 
     return {
         "status": "activated",
-        "days_remaining": 30,
-        "expires_at": expires_at.isoformat(),
+        "credits_remaining": 30,
     }
 
 
 # -------------------------------------------------------
 # 4. Friends' Feeling Log 購入状態チェック
 # -------------------------------------------------------
+FRIENDS_LOG_INTERVAL_HOURS = 4  # 次のDLまでの待機時間
+
 @router.get("/stripe/friends-log-status")
 async def get_friends_log_status(db: Session = Depends(get_db), user_id: int = None):
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id が必要です")
 
     purchase = db.execute(text("""
-        SELECT
-            expires_at,
-            (expires_at::date - CURRENT_DATE) AS days_remaining
+        SELECT id, credits_remaining
         FROM friends_log_purchases
         WHERE buyer_user_id = :uid
           AND is_active = true
-          AND expires_at > NOW()
-        ORDER BY expires_at DESC
+          AND credits_remaining > 0
+        ORDER BY purchased_at DESC
         LIMIT 1
     """), {"uid": user_id}).fetchone()
 
     if not purchase:
         return {"has_active_purchase": False}
 
-    already_downloaded_today = db.execute(text("""
-        SELECT id FROM friends_log_downloads
+    # 最後のDL時刻を確認（4時間インターバルチェック）
+    last_dl = db.execute(text("""
+        SELECT last_downloaded_at
+        FROM friends_log_downloads
         WHERE buyer_user_id = :uid
-          AND download_date = CURRENT_DATE
+        ORDER BY last_downloaded_at DESC
+        LIMIT 1
     """), {"uid": user_id}).fetchone()
+
+    now = datetime.now(timezone.utc)
+    can_download = True
+    next_available_at = None
+
+    if last_dl and last_dl.last_downloaded_at:
+        elapsed = now - last_dl.last_downloaded_at.replace(tzinfo=timezone.utc)
+        if elapsed < timedelta(hours=FRIENDS_LOG_INTERVAL_HOURS):
+            can_download = False
+            next_available_at = (
+                last_dl.last_downloaded_at.replace(tzinfo=timezone.utc)
+                + timedelta(hours=FRIENDS_LOG_INTERVAL_HOURS)
+            ).isoformat()
 
     return {
         "has_active_purchase": True,
-        "days_remaining": max(0, purchase.days_remaining),
-        "expires_at": purchase.expires_at.isoformat(),
-        "can_download_today": already_downloaded_today is None,
+        "credits_remaining": purchase.credits_remaining,
+        "can_download": can_download,
+        "next_available_at": next_available_at,  # can_download=False の時だけ値あり
     }
 
 
@@ -505,27 +514,37 @@ async def get_friends_log_status(db: Session = Depends(get_db), user_id: int = N
 @router.get("/download/friends-feeling-log")
 async def download_friends_feeling_log(user_id: int, db: Session = Depends(get_db)):
     purchase = db.execute(text("""
-        SELECT id FROM friends_log_purchases
+        SELECT id, credits_remaining
+        FROM friends_log_purchases
         WHERE buyer_user_id = :uid
           AND is_active = true
-          AND expires_at > NOW()
+          AND credits_remaining > 0
+        ORDER BY purchased_at DESC
         LIMIT 1
     """), {"uid": user_id}).fetchone()
 
     if not purchase:
         raise HTTPException(status_code=403, detail="有効な購入がありません")
 
-    already = db.execute(text("""
-        SELECT id FROM friends_log_downloads
+    # 4時間インターバルチェック
+    last_dl = db.execute(text("""
+        SELECT last_downloaded_at FROM friends_log_downloads
         WHERE buyer_user_id = :uid
-          AND download_date = CURRENT_DATE
+        ORDER BY last_downloaded_at DESC
+        LIMIT 1
     """), {"uid": user_id}).fetchone()
 
-    if already:
-        raise HTTPException(
-            status_code=429,
-            detail="本日のダウンロードは完了しています。明日また試してください。"
-        )
+    now = datetime.now(timezone.utc)
+    if last_dl and last_dl.last_downloaded_at:
+        elapsed = now - last_dl.last_downloaded_at.replace(tzinfo=timezone.utc)
+        if elapsed < timedelta(hours=FRIENDS_LOG_INTERVAL_HOURS):
+            remaining_minutes = int(
+                (timedelta(hours=FRIENDS_LOG_INTERVAL_HOURS) - elapsed).total_seconds() / 60
+            )
+            raise HTTPException(
+                status_code=429,
+                detail=f"次のダウンロードまであと{remaining_minutes}分お待ちください。"
+            )
 
     logs = db.execute(text("""
         SELECT
@@ -552,10 +571,19 @@ async def download_friends_feeling_log(user_id: int, db: Session = Depends(get_d
     """), {"uid": user_id}).fetchall()
 
     db.execute(text("""
-        INSERT INTO friends_log_downloads (buyer_user_id, download_date)
-        VALUES (:uid, CURRENT_DATE)
-        ON CONFLICT (buyer_user_id, download_date) DO NOTHING
+        INSERT INTO friends_log_downloads (buyer_user_id, last_downloaded_at)
+        VALUES (:uid, NOW())
+        ON CONFLICT (buyer_user_id)
+        DO UPDATE SET last_downloaded_at = NOW()
     """), {"uid": user_id})
+
+    # クレジットを1消費
+    db.execute(text("""
+        UPDATE friends_log_purchases
+        SET credits_remaining = credits_remaining - 1
+        WHERE id = :pid
+    """), {"pid": purchase.id})
+
     db.commit()
 
     output = io.StringIO()
@@ -853,3 +881,95 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 db.rollback()
 
     return {"status": "ok"}
+
+
+# -------------------------------------------------------
+# 11. 今月の課金サマリー（MyPage用）
+#     - アクティブなサブスク（FRIEND's manager / hide_affiliate）
+#     - 今月支払い済みの一時課金（feeling_log / meetup / ad / no_affiliate）
+# -------------------------------------------------------
+@router.get("/stripe/billing-summary")
+async def get_billing_summary(user_id: int, db: Session = Depends(get_db)):
+    """
+    MyPageの課金一覧セクション用。
+    今月1日以降に支払い済みの stripe_payments と
+    アクティブなサブスク情報を返す。
+
+    stripe_payments.user_id は VARCHAR で保存されているため
+    CAST して比較する。テーブル未作成の場合も安全にスキップ。
+    """
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # ── 今月の一時課金履歴 ──────────────────────────
+    # user_id は VARCHAR 型で保存されているので文字列として比較
+    one_time = []
+    try:
+        payments = db.execute(text("""
+            SELECT product, amount, paid_at
+            FROM stripe_payments
+            WHERE user_id = :uid
+              AND paid_at >= :month_start
+            ORDER BY paid_at DESC
+        """), {"uid": str(user_id), "month_start": month_start}).fetchall()
+
+        PRODUCT_LABEL = {
+            "feeling_log":  "Feeling Log DL",
+            "friends_log":  "Friends' Log DL",
+            "meetup":       "MEETUP 掲載",
+            "ad":           "AD 掲載",
+            "no_affiliate": "Hide affiliate ads",
+        }
+
+        one_time = [
+            {
+                "product": row.product,
+                "amount":  row.amount,
+                "paid_at": row.paid_at.isoformat(),
+                "label":   PRODUCT_LABEL.get(row.product, row.product),
+            }
+            for row in payments
+        ]
+    except Exception:
+        # stripe_payments テーブルが未作成の場合はスキップ
+        pass
+
+    # ── FRIEND's manager サブスク ────────────────────
+    friend_manager = None
+    try:
+        fm_row = db.execute(text("""
+            SELECT status, friend_count, charged_extra_count, current_amount
+            FROM friend_manager_subscriptions
+            WHERE user_id = :uid
+              AND status IN ('active', 'pending', 'cancel_at_period_end', 'past_due')
+            LIMIT 1
+        """), {"uid": user_id}).fetchone()
+
+        if fm_row:
+            friend_manager = {
+                "status":         fm_row.status,
+                "friend_count":   fm_row.friend_count,
+                "extra_count":    fm_row.charged_extra_count,
+                "monthly_amount": fm_row.current_amount,
+            }
+    except Exception:
+        # friend_manager_subscriptions テーブルが未作成の場合はスキップ
+        pass
+
+    # ── hide_affiliate サブスク ──────────────────────
+    hide_affiliate_active = False
+    try:
+        ha_row = db.execute(text("""
+            SELECT is_active FROM hide_affiliate_subscriptions
+            WHERE user_id = :uid AND is_active = true
+            LIMIT 1
+        """), {"uid": user_id}).fetchone()
+        hide_affiliate_active = ha_row is not None
+    except Exception:
+        pass  # テーブルが未作成でも無視
+
+    return {
+        "friend_manager":    friend_manager,
+        "hide_affiliate":    hide_affiliate_active,
+        "one_time_payments": one_time,
+    }
