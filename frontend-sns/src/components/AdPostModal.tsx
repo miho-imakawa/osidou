@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { authApi, fetchAdQuote } from '../api';
+import { authApi, fetchAdQuote, startAdCheckout } from '../api';
 import { X, CheckCircle2, Users, CreditCard, Send, Megaphone, Calendar } from 'lucide-react';
 
 interface RelatedCategory {
@@ -15,12 +15,30 @@ interface AdPostModalProps {
     onPosted: () => void;
 }
 
+interface AdPostModalProps {
+    profile: any; // ★ これを追加
+    currentCategoryId: number;
+    currentCategoryName: string;
+    onClose: () => void;
+    onPosted: () => void;
+}
+
+interface AdPostModalProps {
+    profile: any; // ★ 詳細に書かず、一旦 any に戻す
+    currentCategoryId: number;
+    currentCategoryName: string;
+    onClose: () => void;
+    onPosted: () => void;
+}
+
 const AdPostModal: React.FC<AdPostModalProps> = ({
+    profile, // ★ これが入っているか確認！
     currentCategoryId,
     currentCategoryName,
     onClose,
     onPosted,
 }) => {
+    // ...
     const [relatedCategories, setRelatedCategories] = useState<RelatedCategory[]>([]);
     const [selectedIds, setSelectedIds] = useState<number[]>([currentCategoryId]);
     const [quote, setQuote] = useState<{ unique_user_count: number; total_user_count: number; estimated_fee: number } | null>(null);
@@ -94,30 +112,29 @@ const AdPostModal: React.FC<AdPostModalProps> = ({
         );
     };
 
+// handlePost を以下のように修正
 const handlePost = async () => {
-        if (!adTitle.trim() || selectedIds.length === 0) return;
-        setPosting(true);
-        try {
-            // 選択した全Chatに同時投稿
-            await Promise.all(selectedIds.map(categoryId =>
-                authApi.post('/posts', {
-                    content: `${adTitle}\n${adContent}`,
-                    hobby_category_id: categoryId,
-                    is_ad: true,
-                    ad_color: selectedColor, // ★ 3. 選択した色を送信に追加
-                    is_meetup: false,
-                    ad_end_date: endDate || undefined,
-                    is_system: false,
-                })
-            ));
-            onPosted();
-            onClose();
-        } catch {
-            alert('投稿に失敗しました');
-        } finally {
-            setPosting(false);
-        }
-    };
+    if (!adTitle.trim() || !quote || posting) return;
+    setPosting(true);
+
+    try {
+        // 1. Stripe 決済を開始
+        // api.ts に定義した startAdCheckout を使用
+        await startAdCheckout(
+            profile.id, 
+            quote.estimated_fee, // Python側で計算された金額
+            adTitle
+        );
+        
+        // 注: 実際には決済完了後にWebhook等で投稿を有効化するのが安全ですが、
+        // まずはこのリダイレクトでStripe画面に飛ばすことができます。
+        
+    } catch (e) {
+        alert('決済の準備に失敗しました');
+    } finally {
+        setPosting(false);
+    }
+};
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
