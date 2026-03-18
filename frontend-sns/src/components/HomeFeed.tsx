@@ -8,7 +8,7 @@ import {
   activateFriendsLog,
   startFriendsLogCheckout,
 } from '../api';
-import { Clock, Download } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import MoodInput from './MoodInput';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -20,6 +20,12 @@ interface FriendsLogStatus {
   days_remaining?: number;
   expires_at?: string;
   can_download_today?: boolean;
+}
+
+interface FriendCount {
+  total: number;
+  over: number;
+  is_billing: boolean;
 }
 
 const MOOD_TYPES: Record<string, { label: string; emoji: string }> = {
@@ -52,6 +58,9 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [dlMessage, setDlMessage] = useState<string | null>(null);
 
+  // ✅ 友達数
+  const [friendCount, setFriendCount] = useState<FriendCount | null>(null);
+
   // -------------------------------------------------------
   // フレンドの気分ログ読み込み
   // -------------------------------------------------------
@@ -79,14 +88,26 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     }
   }, [profile.id]);
 
+  // -------------------------------------------------------
+  // ✅ 友達数取得（COUNT 1本・軽い）
+  // -------------------------------------------------------
+  const loadFriendCount = useCallback(async () => {
+    try {
+      const res = await authApi.get('/friends/me/friends/count');
+      setFriendCount(res.data);
+    } catch {
+      // 失敗しても表示しないだけ
+    }
+  }, []);
+
   useEffect(() => {
     loadMoods();
     loadFriendsLogStatus();
-  }, [loadFriendsLogStatus]);
+    loadFriendCount();
+  }, [loadFriendsLogStatus, loadFriendCount]);
 
   // -------------------------------------------------------
   // Stripe 成功後のアクティベート処理
-  // URLパラメータ ?friends_log_session=xxx があれば自動処理
   // -------------------------------------------------------
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -158,7 +179,6 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-
       setDlMessage('✅ ダウンロード完了！');
       setFriendsLogStatus(prev => (prev ? { ...prev, can_download_today: false } : prev));
     } catch (e: any) {
@@ -194,7 +214,10 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-purple-400 tabular-nums">残り{days_remaining}日</span>
         <div className="w-10 h-1 bg-purple-100 rounded-full overflow-hidden">
-          <div className="h-full bg-purple-400 rounded-full" style={{ width: `${(days_remaining / 30) * 100}%` }} />
+          <div
+            className="h-full bg-purple-400 rounded-full"
+            style={{ width: `${(days_remaining / 30) * 100}%` }}
+          />
         </div>
         {can_download_today ? (
           <button
@@ -208,6 +231,33 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
           <span className="text-[10px] text-gray-300">本日済</span>
         )}
       </div>
+    );
+  };
+
+  // -------------------------------------------------------
+  // ✅ 友達数バッジ
+  //    10人以下 → 「👥 5人」
+  //    10人超え → 「👥 15人 (5 x¥100 💳)」
+  // -------------------------------------------------------
+  const renderFriendCount = () => {
+    if (!friendCount) return null;
+    const { total, over, is_billing } = friendCount;
+
+    if (!is_billing) {
+      return (
+        <span className="text-[10px] font-bold text-gray-400 tabular-nums">
+          👥 {total}人
+        </span>
+      );
+    }
+
+    return (
+      <span className="text-[10px] font-bold tabular-nums">
+        <span className="text-gray-400">👥 {total}人</span>
+        <span className="ml-1 text-indigo-400">
+          ({over} x¥100 💳)
+        </span>
+      </span>
     );
   };
 
@@ -230,11 +280,14 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       <MoodInput onSuccess={loadMoods} />
 
       <div className="mt-12 space-y-6">
-        {/* Friends' Log ヘッダー */}
+        {/* ✅ Friends' Log ヘッダー：タイトル + 友達数 + DLバー */}
         <div className="flex items-center justify-between">
-          <h2 className="text-[14px] font-black text-gray-900 tracking-[0.2em] uppercase leading-none">
-            ともだちs' LOG
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-[14px] font-black text-gray-900 tracking-[0.2em] uppercase leading-none">
+              ともだちs' LOG
+            </h2>
+            {renderFriendCount()}
+          </div>
           {renderFriendsLogBar()}
         </div>
         {dlMessage && <p className="text-[10px] text-gray-400">{dlMessage}</p>}
