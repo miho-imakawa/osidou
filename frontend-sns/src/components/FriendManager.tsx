@@ -19,8 +19,8 @@ const UserSearch: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [results, setResults] = useState<UserProfileType[]>([]);
     const [loading, setLoading] = useState(false);
-    // ✅ 型を修正
     const [status, setStatus] = useState<Record<number, 'sent' | 'pending'>>({});
+
     const handleSearch = async () => {
         if (!searchQuery.trim()) return;
         setLoading(true);
@@ -71,7 +71,7 @@ const UserSearch: React.FC = () => {
                         </div>
                         <button
                             onClick={() => handleSend(u.id, u.nickname || u.username)}
-                            disabled={!!status[u.id]}  // <- u.id に修正
+                            disabled={!!status[u.id]}
                             className="bg-pink-100 px-3 py-1 rounded"
                         >
                             {status[u.id] === 'sent' ? '申請済み' : 'フレンド申請'}
@@ -84,7 +84,7 @@ const UserSearch: React.FC = () => {
 };
 
 /* ======================
-   承認待ち (修正版)
+   承認待ち
 ====================== */
 const RequestList: React.FC = () => {
     const [requests, setRequests] = useState<FriendRequest[]>([]);
@@ -94,21 +94,32 @@ const RequestList: React.FC = () => {
         setRequests(res);
     };
 
-    // 💡 承認処理をスマートに！
     const handleAccept = async (requestId: number) => {
         try {
             await acceptFriendRequest(requestId);
             alert("Success!");
             load();
         } catch (err: any) {
-            // 💡 バックエンドで設定した 402 (Payment Required) が返ってきたら...
             if (err.response?.status === 402) {
-                const upgradeMsg = err.response.data.detail.upgrade_msg;
-                // Mihoさん流の "27 + 1..." メッセージを表示
-                if (window.confirm(`${upgradeMsg}\n\nUpgrade to add more friends?`)) {
-                    // ここで Stripe の決済ページへ誘導
-                    // window.location.href = "/stripe-checkout"; 
-                    alert("Stripeへ誘導（準備中）");
+                const { upgrade_msg, current_count } = err.response.data.detail;
+
+                if (window.confirm(`${upgrade_msg}\n\nFRIEND's managerに登録して友達を追加しますか？`)) {
+                    try {
+                        // ✅ Stripe Checkout URLを取得してリダイレクト
+                        const res = await authApi.post('/stripe/friend-manager-checkout', {
+                            newFriendCount: current_count + 1,
+                        });
+                        if (res.data.checkout_url) {
+                            window.location.href = res.data.checkout_url;
+                        } else if (res.data.updated) {
+                            // 既存サブスクの金額更新で済んだ場合はそのまま承認
+                            await acceptFriendRequest(requestId);
+                            alert("Success!");
+                            load();
+                        }
+                    } catch {
+                        alert("エラーが発生しました。もう一度お試しください。");
+                    }
                 }
             } else {
                 alert("An error occurred.");
@@ -129,8 +140,7 @@ const RequestList: React.FC = () => {
                         さんからの申請
                     </p>
                     <div className="space-x-2">
-                        {/* 💡 関数を handleAccept に差し替え */}
-                        <button 
+                        <button
                             className="bg-pink-500 text-white px-3 py-1 rounded text-sm"
                             onClick={() => handleAccept(r.id)}
                         >
@@ -186,7 +196,7 @@ const FriendList: React.FC = () => {
                                 return fInfo.username;
                             })()}
                         </p>
-                        
+
                         <div className="flex gap-2 mt-2">
                             <input
                                 defaultValue={f.friend_note || ''}
@@ -197,7 +207,7 @@ const FriendList: React.FC = () => {
                                     [f.id]: e.target.value
                                 })}
                             />
-                            <button 
+                            <button
                                 onClick={() => handleSaveNote(f.id)}
                                 className="bg-blue-500 text-white text-xs px-2 py-1 rounded hover:bg-blue-600"
                             >
@@ -205,7 +215,7 @@ const FriendList: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                    
+
                     <button
                         onClick={() => authApi.put(`/friends/friendships/${f.id}`, {
                             is_muted: !f.is_muted
@@ -227,7 +237,7 @@ const FriendManager: React.FC = () => {
     const [tab, setTab] = useState<'search' | 'requests' | 'friends'>('search');
     const [pendingCount, setPendingCount] = useState(0);
 
-        useEffect(() => {
+    useEffect(() => {
         authApi.get('/friends/pending/count')
             .then(res => setPendingCount(res.data.pending_count))
             .catch(() => {});
@@ -238,11 +248,11 @@ const FriendManager: React.FC = () => {
             <h1 className="text-2xl font-bold mb-4">ともだち管理</h1>
             <div className="flex gap-4 mb-6">
                 <button onClick={() => setTab('search')}>検索</button>
-                <button 
+                <button
                     onClick={() => setTab('requests')}
                     className={`relative ${
-                        tab === 'requests' 
-                            ? 'font-bold border-b-2 border-pink-500' 
+                        tab === 'requests'
+                            ? 'font-bold border-b-2 border-pink-500'
                             : ''
                     } ${pendingCount > 0 ? 'text-amber-500 font-bold' : ''}`}
                 >
