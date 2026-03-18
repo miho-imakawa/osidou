@@ -7,6 +7,7 @@ import {
   fetchFriendsLogStatus,
   activateFriendsLog,
   startFriendsLogCheckout,
+  
 } from '../api';
 import { Clock } from 'lucide-react';
 import MoodInput from './MoodInput';
@@ -17,9 +18,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 // -------------------------------------------------------
 interface FriendsLogStatus {
   has_active_purchase: boolean;
-  days_remaining?: number;
-  expires_at?: string;
-  can_download_today?: boolean;
+  credits_remaining?: number;
+  can_download?: boolean;
+  next_available_at?: string;
 }
 
 interface FriendCount {
@@ -58,7 +59,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [dlMessage, setDlMessage] = useState<string | null>(null);
 
-  // ✅ 友達数
+  // 友達数
   const [friendCount, setFriendCount] = useState<FriendCount | null>(null);
 
   // -------------------------------------------------------
@@ -89,7 +90,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   }, [profile.id]);
 
   // -------------------------------------------------------
-  // ✅ 友達数取得（COUNT 1本・軽い）
+  // 友達数取得（COUNT 1本・軽い）
   // -------------------------------------------------------
   const loadFriendCount = useCallback(async () => {
     try {
@@ -120,11 +121,10 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
         const res = await activateFriendsLog(sessionId);
         setFriendsLogStatus({
           has_active_purchase: true,
-          days_remaining: res.days_remaining,
-          expires_at: res.expires_at,
-          can_download_today: true,
+          credits_remaining: res.credits_remaining,
+          can_download: true,
         });
-        setDlMessage('🎉 購入完了！30日間、毎日1回ダウンロードできます。');
+        setDlMessage('🎉 購入完了！30回分ダウンロードできます（4時間ごとに1回）。');
       } catch (e: any) {
         const msg = e?.response?.data?.detail || 'アクティベートに失敗しました';
         setDlMessage(`⚠️ ${msg}`);
@@ -157,8 +157,14 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   // ダウンロード実行
   // -------------------------------------------------------
   const handleDownload = async () => {
-    if (!friendsLogStatus?.can_download_today) {
-      setDlMessage('⏳ 本日のダウンロードは完了しています。明日また試してください。');
+    if (!friendsLogStatus?.can_download) {
+      const { next_available_at } = friendsLogStatus ?? {};
+      if (next_available_at) {
+        const minutes = Math.ceil(
+          (new Date(next_available_at).getTime() - Date.now()) / 60000
+        );
+        setDlMessage(`⏳ 次のダウンロードまであと${minutes}分です。`);
+      }
       return;
     }
     setIsDownloading(true);
@@ -180,7 +186,11 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       link.remove();
       window.URL.revokeObjectURL(url);
       setDlMessage('✅ ダウンロード完了！');
-      setFriendsLogStatus(prev => (prev ? { ...prev, can_download_today: false } : prev));
+      setFriendsLogStatus(prev => prev ? {
+        ...prev,
+        credits_remaining: (prev.credits_remaining ?? 1) - 1,
+        can_download: false,
+      } : prev);
     } catch (e: any) {
       const detail = e?.response?.data?.detail || 'ダウンロードに失敗しました';
       setDlMessage(`❌ ${detail}`);
@@ -203,23 +213,33 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
           onClick={handlePurchase}
           className="px-2.5 py-1 bg-purple-50 border border-purple-200 text-purple-600 rounded-lg text-[10px] font-bold hover:bg-purple-100 transition-all"
         >
-          とも' Log DL — ¥1,000/30日
+          とも' Log DL — ¥1,000/30回
         </button>
       );
     }
 
-    const { days_remaining = 0, can_download_today } = friendsLogStatus;
+    const { credits_remaining = 0, can_download, next_available_at } = friendsLogStatus;
+
+    const waitMinutes = next_available_at
+      ? Math.ceil((new Date(next_available_at).getTime() - Date.now()) / 60000)
+      : 0;
 
     return (
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-purple-400 tabular-nums">残り{days_remaining}日</span>
-        <div className="w-10 h-1 bg-purple-100 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-purple-400 rounded-full"
-            style={{ width: `${(days_remaining / 30) * 100}%` }}
-          />
+        {/* 残り回数：30本の縦棒、使うたびに1本消える */}
+        <div className="flex items-center gap-0.5">
+          {Array.from({ length: 30 }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-0.5 h-2.5 rounded-full ${
+                i < credits_remaining ? 'bg-purple-400' : 'bg-gray-100'
+              }`}
+            />
+          ))}
         </div>
-        {can_download_today ? (
+        <span className="text-[10px] text-purple-400 tabular-nums">{credits_remaining}</span>
+
+        {can_download ? (
           <button
             onClick={handleDownload}
             disabled={isDownloading}
@@ -228,16 +248,16 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
             {isDownloading ? '...' : 'DL'}
           </button>
         ) : (
-          <span className="text-[10px] text-gray-300">本日済</span>
+          <span className="text-[10px] text-gray-300">
+            {waitMinutes > 0 ? `あと${waitMinutes}分` : '待機中'}
+          </span>
         )}
       </div>
     );
   };
 
   // -------------------------------------------------------
-  // ✅ 友達数バッジ
-  //    10人以下 → 「👥 5人」
-  //    10人超え → 「👥 15人 (5 x¥100 💳)」
+  // 友達数バッジ
   // -------------------------------------------------------
   const renderFriendCount = () => {
     if (!friendCount) return null;
@@ -254,9 +274,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     return (
       <span className="text-[10px] font-bold tabular-nums">
         <span className="text-gray-400">👥 {total}人</span>
-        <span className="ml-1 text-indigo-400">
-          ({over} x¥100 💳)
-        </span>
+        <span className="ml-1 text-indigo-400">({over} x¥100 💳)</span>
       </span>
     );
   };
@@ -280,7 +298,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       <MoodInput onSuccess={loadMoods} />
 
       <div className="mt-12 space-y-6">
-        {/* ✅ Friends' Log ヘッダー：タイトル + 友達数 + DLバー */}
+        {/* Friends' Log ヘッダー：タイトル + 友達数 + DLバー */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-[14px] font-black text-gray-900 tracking-[0.2em] uppercase leading-none">
