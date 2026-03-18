@@ -437,9 +437,9 @@ export const fetchFriendsLogStatus = async (userId: number) => {
     const res = await authApi.get(`/api/stripe/friends-log-status?user_id=${userId}`);
     return res.data as {
         has_active_purchase: boolean;
-        days_remaining?: number;
-        expires_at?: string;
-        can_download_today?: boolean;
+        credits_remaining?: number;
+        can_download?: boolean;
+        next_available_at?: string;
     };
 };
 
@@ -447,8 +447,7 @@ export const activateFriendsLog = async (sessionId: string) => {
     const res = await authApi.post('/api/stripe/friends-log-activate', { sessionId });
     return res.data as {
         status: string;
-        days_remaining: number;
-        expires_at: string;
+        credits_remaining?: number;
     };
 };
 
