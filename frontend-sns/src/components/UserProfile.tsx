@@ -103,30 +103,32 @@ useEffect(() => {
   };
 
 // handleFeelingLogDownload の実装例
-const handleFeelingLogDownload = async (profileId: string | number) => {
+const executeDownload = async (sessionId: string) => {
   try {
     setIsDownloading(true);
+    const response = await fetch(
+      `${BACKEND_URL}/api/download/feeling-log?session_id=${sessionId}`
+    );
 
-    // 1. Stripe Checkout セッションを作成
-    const response = await fetch(`https://osidou-production.up.railway.app/api/stripe/feeling-log-checkout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        userId: profileId,
-        // 成功時の戻り先を「ダウンロード実行用URL」にする
-      successUrl: window.location.origin + window.location.pathname + '?session_id={CHECKOUT_SESSION_ID}',
-        cancelUrl: window.location.href 
-      })
-    });
-
-    const data = await response.json();
-    if (data.url) {
-      // 2. Stripeの決済ページへリダイレクト
-      window.location.href = data.url;
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'ダウンロードに失敗しました');
     }
-  } catch (error) {
-    console.error("Checkout error:", error);
-    alert("決済の準備に失敗しました。");
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `my_feeling_log_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    window.history.replaceState({}, '', window.location.pathname);
+    alert("ダウンロードが完了しました！");
+  } catch (error: any) {
+    console.error("Download error:", error);
+    alert(error.message || "ダウンロード中にエラーが発生しました。");
   } finally {
     setIsDownloading(false);
   }
