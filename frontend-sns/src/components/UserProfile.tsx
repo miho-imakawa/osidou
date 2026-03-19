@@ -35,57 +35,53 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   const [myAdsStats, setMyAdsStats] = useState<any[]>([]);
 
   const [friendsLogUnlocked, setFriendsLogUnlocked] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [friendsLogExpires, setFriendsLogExpires] = useState<string | null>(null);
 
   // 💡 State を追加
 const [pendingCount, setPendingCount] = useState(0);
 
-// useEffect(() => {
-//   if (!displayProfile?.id) return;
+// 1. まず executeDownload 関数をコンポーネント内に定義
+const executeDownload = async (sessionId: string) => {
+  try {
+    setIsDownloading(true);
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/download/feeling-log?session_id=${sessionId}`
+    );
 
-//   const loadData = async () => {
-//       try {
-//           const categories = await fetchMyCommunities();
-//           setMyCategories(categories);
+    if (!response.ok) throw new Error('ダウンロードに失敗しました');
 
-//           const [joinedRes, hostedRes] = await Promise.all([
-//               authApi.get('/posts/my-meetups'),
-//               authApi.get('/posts/my-hosted-meetups')
-//           ]);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `my_feeling_log_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    // URLからsession_idを消す（何度もDLされないようにするため）
+    window.history.replaceState({}, '', window.location.pathname);
+    alert("ダウンロードが完了しました！");
+  } catch (error) {
+    console.error("Download error:", error);
+    alert("ダウンロード中にエラーが発生しました。");
+  } finally {
+    setIsDownloading(false);
+  }
+};
 
-//           const joined = joinedRes.data || [];
-//           const hosted = hostedRes.data || [];
-          
-//           const allMeetups = [...hosted];
-//           joined.forEach((m: any) => {
-//               if (!allMeetups.find((existing: any) => existing.id === m.id)) {
-//                   allMeetups.push(m);
-//               }
-//           });
-//           const futureMeetups = allMeetups.filter((m: any) => 
-//               !m.meetup_date || new Date(m.meetup_date) > new Date()
-//           );
-//           setMyMeetups(futureMeetups);
+// 2. URLを監視して自動実行する useEffect
+useEffect(() => {
+  const query = new URLSearchParams(location.search);
+  const sessionId = query.get('session_id');
 
-//           const logs = await fetchMyMoodHistory();
-//           setMoodLogs(logs);
-
-//           if (isMe) {
-//               const res = await authApi.get('/friends/pending/count');
-//               setPendingCount(res.data.pending_count);
-//           }
-//           if (isMe) {
-//               const adsRes = await authApi.get('/posts/my-ads-stats');
-//               setMyAdsStats(adsRes.data);
-//           }
-//       } catch (err) {
-//           console.error("データ取得失敗:", err);
-//       }
-//   };
-
-//   loadData();
-// }, [displayProfile?.id, isMe, location.pathname]);
-
+  // URLに session_id が含まれていて、かつ現在ダウンロード中でなければ実行
+  if (sessionId && !isDownloading) {
+    executeDownload(sessionId);
+  }
+}, [location.search]);
 
   const getRankClasses = (count: number) => {
     if (count >= 10000) return "bg-yellow-50 text-yellow-700 border-yellow-300 shadow-sm";
@@ -104,11 +100,33 @@ const [pendingCount, setPendingCount] = useState(0);
     };
   };
 
-const handleFeelingLogDownload = async (userId: string | number) => {
+// handleFeelingLogDownload の実装例
+const handleFeelingLogDownload = async (profileId: string | number) => {
   try {
-    await startFeelingLogCheckout(userId);
-  } catch (e) {
-    alert('エラーが発生しました。もう一度お試しください。');
+    setIsDownloading(true);
+
+    // 1. Stripe Checkout セッションを作成
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stripe/feeling-log-checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        userId: profileId,
+        // 成功時の戻り先を「ダウンロード実行用URL」にする
+      successUrl: window.location.origin + window.location.pathname + '?session_id={CHECKOUT_SESSION_ID}',
+        cancelUrl: window.location.href 
+      })
+    });
+
+    const data = await response.json();
+    if (data.url) {
+      // 2. Stripeの決済ページへリダイレクト
+      window.location.href = data.url;
+    }
+  } catch (error) {
+    console.error("Checkout error:", error);
+    alert("決済の準備に失敗しました。");
+  } finally {
+    setIsDownloading(false);
   }
 };
 
@@ -445,10 +463,15 @@ const handleFeelingLogDownload = async (userId: string | number) => {
                   <Heart className="text-pink-600" size={14}/> Feeling Logs
                 </h2>
                 <button 
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm" 
+                  // 1. ダウンロード中はボタンを押せなくする
+                  disabled={isDownloading} 
+                  // 2. ダウンロード中のスタイル（半透明・禁止マーク）を適用
+                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm ${
+                    isDownloading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                   onClick={() => handleFeelingLogDownload(displayProfile.id)}
                 >
-                  <Download size={14} /> <span>DL-200JPY</span>
+                  <Download size={14} /> <span>🤝DL¥200</span>
                 </button>
               </div>
               <div className="space-y-10">
