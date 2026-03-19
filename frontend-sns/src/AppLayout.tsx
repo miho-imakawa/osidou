@@ -10,6 +10,7 @@ import CategoryDetailPage from './components/CategoryDetailPage';
 import { Menu, X } from 'lucide-react';
 import LoginPage from './components/LoginPage';
 import TokuteiPage from './components/TokuteiPage';
+import FeelingLogDownload from './components/FeelingLogDownload';
 
 // 💡 初期値の設定
 const initialProfile: UserProfileType = {
@@ -248,6 +249,7 @@ useEffect(() => {
                     <>
                         <Route path="/" element={<HomeFeed profile={profile} />} />
                         <Route path="/friends" element={<FriendManager />} />
+                        <Route path="/download/feeling-log" element={<FeelingLogDownload />} />
                         <Route path="/mypage" element={<UserProfile profile={profile} fetchProfile={fetchProfile} />} />
                         <Route path="/profile/:userId" element={<UserProfile profile={profile} fetchProfile={fetchProfile} />} />
                         <Route path="/community" element={<CommunityList />} />
