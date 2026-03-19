@@ -222,13 +222,13 @@ useEffect(() => {
                 <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
                     <h2 className="text-2xl font-bold text-gray-900">ようこそ、推し道へ！🌸</h2>
                     <p className="text-sm text-gray-500">はじめに使い方をご確認ください</p>
-                    <a
-                        href={`/community/1`} // ← ここを修正
+                    <Link
+                        to="/community/1"
                         onClick={() => localStorage.setItem('has_seen_guide', 'true')}
                         className="bg-pink-500 text-white px-8 py-3 rounded-full font-bold hover:bg-pink-600 transition-colors"
                     >
                         📖 SEE THE GUIDE
-                    </a>
+                    </Link>
                     <button
                         onClick={() => localStorage.setItem('has_seen_guide', 'true')}
                         className="text-gray-400 text-sm underline"
