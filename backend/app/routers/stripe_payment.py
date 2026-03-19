@@ -2,7 +2,6 @@ import csv
 import io
 import os
 from datetime import datetime, timedelta, date, timezone
-
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -471,6 +470,7 @@ async def get_friends_log_status(db: Session = Depends(get_db), user_id: int = N
         WHERE buyer_user_id = :uid
           AND is_active = true
           AND credits_remaining > 0
+          AND expires_at > NOW()
         ORDER BY purchased_at DESC
         LIMIT 1
     """), {"uid": user_id}).fetchone()
@@ -480,10 +480,9 @@ async def get_friends_log_status(db: Session = Depends(get_db), user_id: int = N
 
     # 最後のDL時刻を確認（4時間インターバルチェック）
     last_dl = db.execute(text("""
-        SELECT last_downloaded_at
-        FROM friends_log_downloads
+        SELECT downloaded_at FROM friends_log_downloads
         WHERE buyer_user_id = :uid
-        ORDER BY last_downloaded_at DESC
+        ORDER BY downloaded_at DESC
         LIMIT 1
     """), {"uid": user_id}).fetchone()
 
@@ -491,8 +490,8 @@ async def get_friends_log_status(db: Session = Depends(get_db), user_id: int = N
     can_download = True
     next_available_at = None
 
-    if last_dl and last_dl.last_downloaded_at:
-        elapsed = now - last_dl.last_downloaded_at.replace(tzinfo=timezone.utc)
+    if last_dl and last_dl.downloaded_at:
+        elapsed = now - last_dl.downloaded_at.replace(tzinfo=timezone.utc)
         if elapsed < timedelta(hours=FRIENDS_LOG_INTERVAL_HOURS):
             can_download = False
             next_available_at = (
@@ -571,10 +570,10 @@ async def download_friends_feeling_log(user_id: int, db: Session = Depends(get_d
     """), {"uid": user_id}).fetchall()
 
     db.execute(text("""
-        INSERT INTO friends_log_downloads (buyer_user_id, last_downloaded_at)
+        INSERT INTO friends_log_downloads (buyer_user_id, downloaded_at)
         VALUES (:uid, NOW())
         ON CONFLICT (buyer_user_id)
-        DO UPDATE SET last_downloaded_at = NOW()
+        DO UPDATE SET downloaded_at = NOW()
     """), {"uid": user_id})
 
     # クレジットを1消費
