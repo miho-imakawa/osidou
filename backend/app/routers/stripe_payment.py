@@ -561,7 +561,6 @@ async def download_friends_feeling_log(user_id: int, db: Session = Depends(get_d
             END
             FROM friendships f
             WHERE (f.user_id = :uid OR f.friend_id = :uid)
-            AND f.status = 'accepted'
         )
         AND ml.is_visible = true
         AND ml.created_at > NOW() - INTERVAL '30 days'
