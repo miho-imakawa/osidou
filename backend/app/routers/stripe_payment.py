@@ -395,7 +395,7 @@ async def create_friends_log_checkout(data: dict, db: Session = Depends(get_db))
                     "currency": "jpy",
                     "product_data": {
                         "name": "Friends' Feeling Log（30回分）",
-                        "description": "友達全員のFeeling Logを30回ダウンロードできます（4時間ごとに1回）"
+                        "description": "Down Load 30 times of Friends' Feeling Log（1/EVERY 4HRS）"
                     },
                     "unit_amount": PRICE_FRIENDS_LOG,
                 },
@@ -444,8 +444,8 @@ async def activate_friends_log(data: dict, db: Session = Depends(get_db)):
 
     db.execute(text("""
         INSERT INTO friends_log_purchases
-            (buyer_user_id, stripe_session_id, purchased_at, is_active, credits_remaining)
-        VALUES (:uid, :sid, NOW(), true, 30)
+            (buyer_user_id, stripe_session_id, purchased_at, expires_at, is_active, credits_remaining)
+        VALUES (:uid, :sid, NOW(), NOW() + INTERVAL '60 days', true, 30)
     """), {"uid": int(user_id), "sid": session_id})
     db.commit()
 
