@@ -19,6 +19,8 @@ interface UserProfileProps {
   fetchProfile: () => void;
 }
 
+const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProfile: fetchMyProfile }) => {
   const { userId } = useParams<{ userId: string }>();
   const location = useLocation();
@@ -46,7 +48,7 @@ const executeDownload = async (sessionId: string) => {
   try {
     setIsDownloading(true);
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/download/feeling-log?session_id=${sessionId}`
+      `https://osidou-production.up.railway.app/api/stripe/feeling-log-checkout`
     );
 
     if (!response.ok) throw new Error('ダウンロードに失敗しました');
@@ -106,7 +108,7 @@ const handleFeelingLogDownload = async (profileId: string | number) => {
     setIsDownloading(true);
 
     // 1. Stripe Checkout セッションを作成
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stripe/feeling-log-checkout`, {
+    const response = await fetch(`https://osidou-production.up.railway.app/api/stripe/feeling-log-checkout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
