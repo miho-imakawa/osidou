@@ -546,27 +546,26 @@ async def download_friends_feeling_log(user_id: int, db: Session = Depends(get_d
             )
 
     logs = db.execute(text("""
-        SELECT
-            u.nickname,
-            u.username,
-            ml.mood_type,
-            ml.comment,
-            ml.created_at
-        FROM mood_logs ml
-        JOIN users u ON u.id = ml.user_id
-        WHERE ml.user_id IN (
-            SELECT CASE
-                WHEN f.user_id = :uid THEN f.friend_id
-                ELSE f.user_id
-            END
-            FROM friendships f
-            WHERE (f.user_id = :uid OR f.friend_id = :uid)
-        )
-        AND ml.is_visible = true
-        AND ml.created_at > NOW() - INTERVAL '30 days'
-        ORDER BY ml.created_at DESC
-        LIMIT 3000
-    """), {"uid": user_id}).fetchall()
+    SELECT DISTINCT ON (ml.user_id)
+        u.nickname,
+        u.username,
+        ml.mood_type,
+        ml.comment,
+        ml.created_at
+    FROM mood_logs ml
+    JOIN users u ON u.id = ml.user_id
+    WHERE ml.user_id IN (
+        SELECT CASE
+            WHEN f.user_id = :uid THEN f.friend_id
+            ELSE f.user_id
+        END
+        FROM friendships f
+        WHERE (f.user_id = :uid OR f.friend_id = :uid)
+    )
+    AND ml.is_visible = true
+    AND ml.created_at > NOW() - INTERVAL '30 days'
+    ORDER BY ml.user_id, ml.created_at DESC
+"""), {"uid": user_id}).fetchall()
 
     db.execute(text("""
         INSERT INTO friends_log_downloads (buyer_user_id, downloaded_at)
