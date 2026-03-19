@@ -114,39 +114,39 @@ def get_my_mood_logs(
     
     return logs
 
-# ==========================================
-# 💡 他のユーザーの現在の気分を取得
-# ==========================================
+# # ==========================================
+# # 💡 他のユーザーの現在の気分を取得
+# # ==========================================
 
-@router.get("/moods/user/{user_id}", response_model=UserMoodResponse, tags=["moods"])
-def get_user_current_mood(
-    user_id: int,
-    db: Session = Depends(get_db)
-):
-    """他のユーザーの現在の気分を取得（プロフィール表示用）"""
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+# @router.get("/moods/user/{user_id}", response_model=UserMoodResponse, tags=["moods"])
+# def get_user_current_mood(
+#     user_id: int,
+#     db: Session = Depends(get_db)
+# ):
+#     """他のユーザーの現在の気分を取得（プロフィール表示用）"""
+#     user = db.query(models.User).filter(models.User.id == user_id).first()
+#     if not user:
+#         raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
     
-    # 非公開設定の場合は表示しない
-    if not user.is_mood_visible:
-        return UserMoodResponse(
-            user_id=user.id,
-            nickname=user.nickname,
-            current_mood="neutral",
-            current_mood_comment=None,
-            mood_updated_at=None,
-            is_mood_visible=False
-        )
+#     # 非公開設定の場合は表示しない
+#     if not user.is_mood_visible:
+#         return UserMoodResponse(
+#             user_id=user.id,
+#             nickname=user.nickname,
+#             current_mood="neutral",
+#             current_mood_comment=None,
+#             mood_updated_at=None,
+#             is_mood_visible=False
+#         )
     
-    return UserMoodResponse(
-        user_id=user.id,
-        nickname=user.nickname,
-        current_mood=user.current_mood,
-        current_mood_comment=user.current_mood_comment,
-        mood_updated_at=user.mood_updated_at,
-        is_mood_visible=user.is_mood_visible
-    )
+#     return UserMoodResponse(
+#         user_id=user.id,
+#         nickname=user.nickname,
+#         current_mood=user.current_mood,
+#         current_mood_comment=user.current_mood_comment,
+#         mood_updated_at=user.mood_updated_at,
+#         is_mood_visible=user.is_mood_visible
+#     )
 
 # ==========================================
 # 💡 他のユーザーの気分ログ履歴（公開のみ）

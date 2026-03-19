@@ -181,6 +181,34 @@ def search_users(
 
     return users
 
+# 💡 response_model から "schemas." を消して直接指定します
+@router.get("/following/moods", response_model=List[UserMoodResponse])
+def get_following_moods(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    results = db.query(
+        models.User,
+        models.Friendship.friend_note 
+    ).join(
+        models.Friendship, models.Friendship.friend_id == models.User.id
+    ).filter(
+        models.Friendship.user_id == current_user.id
+    ).all()
+
+    moods = []
+    for user, note in results:
+        moods.append({
+            "user_id": user.id,
+            "nickname": user.nickname,
+            "email": user.email,
+            "current_mood": user.current_mood,
+            "current_mood_comment": user.current_mood_comment,
+            "mood_updated_at": user.mood_updated_at,
+            "friend_note": note 
+        })
+    return moods
+
 # ==========================================
 # 💡 4. (元) 気分履歴の取得 (安全キャップ付き) - GET /users/{user_id}/mood-history
 # ==========================================
@@ -360,30 +388,3 @@ class UserMoodResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-# 💡 response_model から "schemas." を消して直接指定します
-@router.get("/following/moods", response_model=List[UserMoodResponse])
-def get_following_moods(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    results = db.query(
-        models.User,
-        models.Friendship.friend_note 
-    ).join(
-        models.Friendship, models.Friendship.friend_id == models.User.id
-    ).filter(
-        models.Friendship.user_id == current_user.id
-    ).all()
-
-    moods = []
-    for user, note in results:
-        moods.append({
-            "user_id": user.id,
-            "nickname": user.nickname,
-            "email": user.email,
-            "current_mood": user.current_mood,
-            "current_mood_comment": user.current_mood_comment,
-            "mood_updated_at": user.mood_updated_at,
-            "friend_note": note 
-        })
-    return moods
