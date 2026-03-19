@@ -105,8 +105,7 @@ def search_users(query: str = Query(..., min_length=1), db: Session = Depends(ge
 
 @router.get("/following/moods", response_model=List[UserMoodResponse])
 def get_following_moods(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # 💡 models.py の定義通り、user_id と friend_id を使用
-    # status カラムは存在しないので条件から外します
+    # --- (前段の friendships 取得ロジックはそのまま) ---
     friendships = db.query(models.Friendship).filter(
         or_(
             models.Friendship.user_id == current_user.id,
@@ -114,18 +113,11 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
         )
     ).all()
 
-    friend_ids = []
-    friend_notes = {}
-    for f in friendships:
-        # 自分が user_id なら相手は friend_id、その逆も同様
-        fid = f.friend_id if f.user_id == current_user.id else f.user_id
-        friend_ids.append(fid)
-        friend_notes[fid] = f.friend_note
-
-    if not friend_ids:
+    if not friendships:
         return []
 
-    # 友達のユーザー情報を取得
+    friend_ids = [f.friend_id if f.user_id == current_user.id else f.user_id for f in friendships]
+
     users = db.query(models.User).filter(
         models.User.id.in_(friend_ids),
         models.User.is_mood_visible == True
@@ -140,8 +132,9 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
             "current_mood": user.current_mood,
             "current_mood_comment": user.current_mood_comment,
             "mood_updated_at": user.mood_updated_at,
-            "friend_note": friend_notes.get(user.id),
-            "is_mood_comment_visible": user.is_mood_comment_visible,
+            # 💡 ここを修正！ is_mood_comment_visible は存在しないので、is_mood_visible を使います
+            "is_mood_comment_visible": user.is_mood_visible, 
+            "friend_note": None 
         })
     return moods
 
