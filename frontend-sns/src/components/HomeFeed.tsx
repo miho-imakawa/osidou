@@ -213,7 +213,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
           onClick={handlePurchase}
           className="px-2.5 py-1 bg-purple-50 border border-purple-200 text-purple-600 rounded-lg text-[10px] font-bold hover:bg-purple-100 transition-all"
         >
-          とも' Log DL — ¥1,000/30回
+          👥'🤝Log DL 30回/¥1,000
         </button>
       );
     }
