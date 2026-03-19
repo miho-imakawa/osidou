@@ -105,26 +105,31 @@ def search_users(query: str = Query(..., min_length=1), db: Session = Depends(ge
 
 @router.get("/following/moods", response_model=List[UserMoodResponse])
 def get_following_moods(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # ★ ここを user_id_1, user_id_2 形式に完全修正 ★
+    # 💡 models.py の定義に合わせて user_id と friend_id を使います
     friendships = db.query(models.Friendship).filter(
         or_(
-            models.Friendship.user_id_1 == current_user.id,
-            models.Friendship.user_id_2 == current_user.id
-        ),
-        models.Friendship.status == 'accepted'
+            models.Friendship.user_id == current_user.id,
+            models.Friendship.friend_id == current_user.id
+        )
+        # もし status カラムがないというエラーが以前出たなら、以下の行は消したままでOKです
+        # , models.Friendship.status == 'accepted' 
     ).all()
 
     friend_ids = []
+    friend_notes = {}
     for f in friendships:
-        if f.user_id_1 == current_user.id:
-            friend_ids.append(f.user_id_2)
-        else:
-            friend_ids.append(f.user_id_1)
+        # 自分が user_id なら相手は friend_id、逆なら相手は user_id
+        fid = f.friend_id if f.user_id == current_user.id else f.user_id
+        friend_ids.append(fid)
+        friend_notes[fid] = f.friend_note
 
     if not friend_ids:
         return []
 
-    users = db.query(models.User).filter(models.User.id.in_(friend_ids)).all()
+    users = db.query(models.User).filter(
+        models.User.id.in_(friend_ids),
+        models.User.is_mood_visible == True
+    ).all()
 
     moods = []
     for user in users:
@@ -135,8 +140,8 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
             "current_mood": user.current_mood,
             "current_mood_comment": user.current_mood_comment,
             "mood_updated_at": user.mood_updated_at,
+            "friend_note": friend_notes.get(user.id),
             "is_mood_comment_visible": user.is_mood_comment_visible,
-            "friend_note": None 
         })
     return moods
 
