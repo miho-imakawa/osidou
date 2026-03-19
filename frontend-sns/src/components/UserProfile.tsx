@@ -43,49 +43,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   // 💡 State を追加
 const [pendingCount, setPendingCount] = useState(0);
 
-// 1. まず executeDownload 関数をコンポーネント内に定義
-const executeDownload = async (sessionId: string) => {
-  try {
-    setIsDownloading(true);
-    const response = await fetch(
-      `https://osidou-production.up.railway.app/api/stripe/feeling-log-checkout`
-    );
-
-    if (!response.ok) throw new Error('ダウンロードに失敗しました');
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `my_feeling_log_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    
-    // URLからsession_idを消す（何度もDLされないようにするため）
-    window.history.replaceState({}, '', window.location.pathname);
-    alert("ダウンロードが完了しました！");
-  } catch (error) {
-    console.error("Download error:", error);
-    alert("ダウンロード中にエラーが発生しました。");
-  } finally {
-    setIsDownloading(false);
-  }
-};
-
-// 2. URLを監視して自動実行する useEffect
-useEffect(() => {
-  const query = new URLSearchParams(location.search);
-  const sessionId = query.get('session_id');
-
-  // URLに session_id が含まれていて、かつ現在ダウンロード中でなければ実行
-  if (sessionId && !isDownloading) {
-    executeDownload(sessionId);
-  }
-}, [location.search]);
-
-  const getRankClasses = (count: number) => {
+const getRankClasses = (count: number) => {
     if (count >= 10000) return "bg-yellow-50 text-yellow-700 border-yellow-300 shadow-sm";
     if (count >= 500) return "bg-pink-50 text-pink-700 border-pink-200";
     return "bg-gray-50 text-gray-500 border-gray-100";
@@ -133,6 +91,44 @@ const executeDownload = async (sessionId: string) => {
     setIsDownloading(false);
   }
 };
+
+const handleFeelingLogDownload = async (profileId: string | number) => {
+  try {
+    setIsDownloading(true);
+    const successUrl = `${window.location.origin}${window.location.pathname}?session_id={CHECKOUT_SESSION_ID}`;
+
+    const response = await fetch(`${BACKEND_URL}/api/stripe/feeling-log-checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        userId: profileId,
+        successUrl: successUrl,
+        cancelUrl: window.location.href,
+      })
+    });
+
+    const data = await response.json();
+    if (data.url) {
+      window.location.href = data.url;
+    }
+  } catch (error) {
+    console.error("Checkout error:", error);
+    alert("決済の準備に失敗しました。");
+  } finally {
+    setIsDownloading(false);
+  }
+};
+
+  // 2. URLを監視して自動実行する useEffect
+  useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    const sessionId = query.get('session_id');
+
+    // URLに session_id が含まれていて、かつ現在ダウンロード中でなければ実行
+    if (sessionId && !isDownloading) {
+      executeDownload(sessionId);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (userId) {
