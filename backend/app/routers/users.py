@@ -105,14 +105,12 @@ def search_users(query: str = Query(..., min_length=1), db: Session = Depends(ge
 
 @router.get("/following/moods", response_model=List[UserMoodResponse])
 def get_following_moods(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # 💡 models.py の定義に合わせて user_id と friend_id を使います
+    # 💡 models.py の定義通り user_id と friend_id を使います
     friendships = db.query(models.Friendship).filter(
         or_(
             models.Friendship.user_id == current_user.id,
             models.Friendship.friend_id == current_user.id
         )
-        # もし status カラムがないというエラーが以前出たなら、以下の行は消したままでOKです
-        # , models.Friendship.status == 'accepted' 
     ).all()
 
     friend_ids = []
@@ -126,6 +124,7 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
     if not friend_ids:
         return []
 
+    # 友達の情報を取得
     users = db.query(models.User).filter(
         models.User.id.in_(friend_ids),
         models.User.is_mood_visible == True
