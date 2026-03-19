@@ -105,7 +105,8 @@ def search_users(query: str = Query(..., min_length=1), db: Session = Depends(ge
 
 @router.get("/following/moods", response_model=List[UserMoodResponse])
 def get_following_moods(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # 💡 models.py の定義通り user_id と friend_id を使います
+    # 💡 models.py の定義通り、user_id と friend_id を使用
+    # status カラムは存在しないので条件から外します
     friendships = db.query(models.Friendship).filter(
         or_(
             models.Friendship.user_id == current_user.id,
@@ -116,7 +117,7 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
     friend_ids = []
     friend_notes = {}
     for f in friendships:
-        # 自分が user_id なら相手は friend_id、逆なら相手は user_id
+        # 自分が user_id なら相手は friend_id、その逆も同様
         fid = f.friend_id if f.user_id == current_user.id else f.user_id
         friend_ids.append(fid)
         friend_notes[fid] = f.friend_note
@@ -124,7 +125,7 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
     if not friend_ids:
         return []
 
-    # 友達の情報を取得
+    # 友達のユーザー情報を取得
     users = db.query(models.User).filter(
         models.User.id.in_(friend_ids),
         models.User.is_mood_visible == True
