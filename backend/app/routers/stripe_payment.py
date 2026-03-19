@@ -68,7 +68,7 @@ def _get_friend_count(user_id: int, db: Session) -> int:
     """現在の友達数を取得する。"""
     result = db.execute(text("""
         SELECT COUNT(*) AS cnt FROM friendships
-        WHERE (user_id_1 = :uid OR user_id_2 = :uid)
+        WHERE (user_id = :uid OR friend_id = :uid)
           AND status = 'accepted'
     """), {"uid": user_id}).fetchone()
     return result.cnt if result else 0
@@ -556,12 +556,12 @@ async def download_friends_feeling_log(user_id: int, db: Session = Depends(get_d
         JOIN users u ON u.id = ml.user_id
         WHERE ml.user_id IN (
             SELECT CASE
-                WHEN f.user_id_1 = :uid THEN f.user_id_2
-                ELSE f.user_id_1
+                WHEN f.user_id = :uid THEN f.friend_id
+                ELSE f.user_id
             END
             FROM friendships f
-            WHERE (f.user_id_1 = :uid OR f.user_id_2 = :uid)
-              AND f.status = 'accepted'
+            WHERE (f.user_id = :uid OR f.friend_id = :uid)
+            AND f.status = 'accepted'
         )
         AND ml.is_visible = true
         AND ml.created_at > NOW() - INTERVAL '30 days'
