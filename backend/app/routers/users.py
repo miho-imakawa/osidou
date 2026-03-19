@@ -98,20 +98,36 @@ def toggle_mood_visibility(is_visible: bool, db: Session = Depends(get_db), curr
 def read_my_notifications(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user), limit: int = 20, offset: int = 0):
     return db.query(models.Notification).filter(models.Notification.recipient_id == current_user.id).order_by(desc(models.Notification.created_at)).offset(offset).limit(limit).all()
 
-# ==========================================
-# 💡 特殊なエンドポイント (重要：/{user_id} より前に置く)
-# ==========================================
-
 @router.get("/search", response_model=List[schemas.UserPublic])
-def search_users(query: str = Query(..., min_length=1), limit: int = 20, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def search_users(query: str = Query(..., min_length=1), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     search_pattern = f"%{query}%"
-    return db.query(models.User).filter(models.User.id != current_user.id, or_(models.User.nickname.ilike(search_pattern), models.User.username.ilike(search_pattern))).limit(limit).all()
+    return db.query(models.User).filter(models.User.id != current_user.id, or_(models.User.nickname.ilike(search_pattern), models.User.username.ilike(search_pattern))).limit(20).all()
 
 @router.get("/following/moods", response_model=List[UserMoodResponse])
 def get_following_moods(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    results = db.query(models.User, models.Friendship.friend_note).join(models.Friendship, models.Friendship.friend_id == models.User.id).filter(models.Friendship.user_id == current_user.id).all()
+    # ★ ここを user_id_1, user_id_2 形式に完全修正 ★
+    friendships = db.query(models.Friendship).filter(
+        or_(
+            models.Friendship.user_id_1 == current_user.id,
+            models.Friendship.user_id_2 == current_user.id
+        ),
+        models.Friendship.status == 'accepted'
+    ).all()
+
+    friend_ids = []
+    for f in friendships:
+        if f.user_id_1 == current_user.id:
+            friend_ids.append(f.user_id_2)
+        else:
+            friend_ids.append(f.user_id_1)
+
+    if not friend_ids:
+        return []
+
+    users = db.query(models.User).filter(models.User.id.in_(friend_ids)).all()
+
     moods = []
-    for user, note in results:
+    for user in users:
         moods.append({
             "user_id": user.id,
             "nickname": user.nickname,
@@ -119,8 +135,8 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
             "current_mood": user.current_mood,
             "current_mood_comment": user.current_mood_comment,
             "mood_updated_at": user.mood_updated_at,
-            "friend_note": note,
             "is_mood_comment_visible": user.is_mood_comment_visible,
+            "friend_note": None 
         })
     return moods
 
@@ -169,3 +185,4 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: model
     db.delete(user)
     db.commit()
     return
+
