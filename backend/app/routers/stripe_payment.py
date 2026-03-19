@@ -495,7 +495,7 @@ async def get_friends_log_status(db: Session = Depends(get_db), user_id: int = N
         if elapsed < timedelta(hours=FRIENDS_LOG_INTERVAL_HOURS):
             can_download = False
             next_available_at = (
-                last_dl.last_downloaded_at.replace(tzinfo=timezone.utc)
+                last_dl.downloaded_at.replace(tzinfo=timezone.utc)
                 + timedelta(hours=FRIENDS_LOG_INTERVAL_HOURS)
             ).isoformat()
 
@@ -527,15 +527,15 @@ async def download_friends_feeling_log(user_id: int, db: Session = Depends(get_d
 
     # 4時間インターバルチェック
     last_dl = db.execute(text("""
-        SELECT last_downloaded_at FROM friends_log_downloads
+        SELECT downloaded_at FROM friends_log_downloads
         WHERE buyer_user_id = :uid
-        ORDER BY last_downloaded_at DESC
+        ORDER BY downloaded_at DESC
         LIMIT 1
     """), {"uid": user_id}).fetchone()
 
     now = datetime.now(timezone.utc)
-    if last_dl and last_dl.last_downloaded_at:
-        elapsed = now - last_dl.last_downloaded_at.replace(tzinfo=timezone.utc)
+    if last_dl and last_dl.downloaded_at:
+        elapsed = now - last_dl.downloaded_at.replace(tzinfo=timezone.utc)
         if elapsed < timedelta(hours=FRIENDS_LOG_INTERVAL_HOURS):
             remaining_minutes = int(
                 (timedelta(hours=FRIENDS_LOG_INTERVAL_HOURS) - elapsed).total_seconds() / 60
