@@ -718,8 +718,8 @@ async def create_meetup_checkout(data: dict, db: Session = Depends(get_db)):
                 "quantity": 1,
             }],
             mode="payment",
-            success_url=f"{FRONTEND_URL}/community?meetup_session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{FRONTEND_URL}/community?meetup_cancelled=true",
+            success_url=f"{FRONTEND_URL}/community/{post_data.get('hobby_category_id')}?meetup_session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{FRONTEND_URL}/community/{post_data.get('hobby_category_id')}?meetup_cancelled=true",
             metadata={
                 "user_id": str(user_id),
                 "product": "meetup",
