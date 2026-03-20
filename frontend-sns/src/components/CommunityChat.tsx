@@ -146,31 +146,53 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
     }
 }, [posts, adInteractions]);
 
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const meetupSessionId = params.get('meetup_session_id');
-        const meetupCancelled = params.get('meetup_cancelled');
+useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const meetupSessionId = params.get('meetup_session_id');
+    const meetupCancelled = params.get('meetup_cancelled');
+    const adSessionId = params.get('ad_session_id');
+    const adCancelled = params.get('ad_cancelled');
 
-        if (meetupSessionId) {
-            fetch(`${BACKEND_URL}/api/stripe/meetup-activate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId: meetupSessionId }),
-            })
-            .then(res => res.json())
-            .then(() => {
-                alert('🎉 お支払い完了！MEET UPを楽しんで！');
-                window.history.replaceState({}, '', '/community');
-                fetchPosts();
-            })
-            .catch(() => alert('アクティベートに失敗しました'));
-        }
+    if (meetupSessionId) {
+        fetch(`${BACKEND_URL}/api/stripe/meetup-activate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: meetupSessionId }),
+        })
+        .then(res => res.json())
+        .then(() => {
+            alert('🎉 お支払い完了！MEET UPを楽しんで！');
+            window.history.replaceState({}, '', window.location.pathname);
+            fetchPosts();
+        })
+        .catch(() => alert('アクティベートに失敗しました'));
+    }
 
-        if (meetupCancelled) {
-            alert('決済がキャンセルされました。投稿は保存されていません。');
-            window.history.replaceState({}, '', '/community');
-        }
-    }, []);
+    if (meetupCancelled) {
+        alert('決済がキャンセルされました。投稿は保存されていません。');
+        window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    if (adSessionId) {
+        fetch(`${BACKEND_URL}/api/stripe/ad-activate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: adSessionId }),
+        })
+        .then(res => res.json())
+        .then(() => {
+            alert('🎉 AD掲載完了！');
+            window.history.replaceState({}, '', window.location.pathname);
+            fetchPosts();
+        })
+        .catch(() => alert('ADのアクティベートに失敗しました'));
+    }
+
+    if (adCancelled) {
+        alert('決済がキャンセルされました。');
+        window.history.replaceState({}, '', window.location.pathname);
+    }
+}, []);
 
     const handleAdAction = async (postId: number, action: 'like' | 'pin' | 'close') => {
         try {

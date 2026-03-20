@@ -118,17 +118,16 @@ const handlePost = async () => {
     setPosting(true);
 
     try {
-        // 1. Stripe 決済を開始
-        // api.ts に定義した startAdCheckout を使用
         await startAdCheckout(
-            profile.id, 
-            quote.estimated_fee, // Python側で計算された金額
-            adTitle
+            profile.id,
+            quote.estimated_fee,
+            adTitle,
+            adContent,
+            startDate,
+            endDate,
+            selectedIds,
+            selectedColor,
         );
-        
-        // 注: 実際には決済完了後にWebhook等で投稿を有効化するのが安全ですが、
-        // まずはこのリダイレクトでStripe画面に飛ばすことができます。
-        
     } catch (e) {
         alert('決済の準備に失敗しました');
     } finally {
@@ -147,7 +146,7 @@ const handlePost = async () => {
                             <Megaphone size={18} className="text-green-600" />
                         </div>
                         <div>
-                            <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Create Ad</p>
+                            <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Create AD</p>
                             <h2 className="text-sm font-black text-gray-900">広告を投稿する</h2>
                         </div>
                     </div>
@@ -167,7 +166,7 @@ const handlePost = async () => {
                             <input
                                 value={adTitle}
                                 onChange={e => setAdTitle(e.target.value)}
-                                placeholder="例: 佐藤健 誕生日お祝いイベント開催！"
+                                placeholder="例: 〇〇で蚤の市開催！"
                                 className="w-full px-3 py-2.5 rounded-xl border-2 border-green-200 bg-white text-[13px] outline-none focus:border-green-400 font-bold"
                             />
                         </div>
