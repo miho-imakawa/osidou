@@ -167,6 +167,9 @@ useEffect(() => {
           // ここを先ほどバックエンドで確認したパスに合わせて修正します
           const adsRes = await authApi.get('/posts/my-ads-stats'); 
           setMyAdsStats(adsRes.data || []);
+
+          const pendingRes = await authApi.get('/friends/pending/count');
+          setPendingCount(pendingRes.data.pending_count || 0);
         }
 
         const joined = joinedRes.data || [];
@@ -378,6 +381,16 @@ useEffect(() => {
           </div>
           {/* 🔔 自分の時だけ表示される申請バナー */}
           {isMe && <PendingFriendBanner count={pendingCount} />}
+
+          {isMe && pendingCount > 0 && (
+            <Link
+              to="/friends"
+              state={{ tab: 'requests' }}
+              className="block text-xs font-bold text-amber-500 hover:text-amber-600"
+            >
+              🔔 ともだち申請が{pendingCount}件あります
+            </Link>
+          )}
 
           {/* Communities */}
           <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">

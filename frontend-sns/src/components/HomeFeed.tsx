@@ -11,7 +11,7 @@ import {
 } from '../api';
 import { Clock } from 'lucide-react';
 import MoodInput from './MoodInput';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 
 // -------------------------------------------------------
 // 型定義
@@ -60,8 +60,16 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   const [dlMessage, setDlMessage] = useState<string | null>(null);
 
   // 友達数
+  const [pendingCount, setPendingCount] = useState(0);
   const [friendCount, setFriendCount] = useState<FriendCount | null>(null);
 
+  //友達申請
+  const loadPendingCount = useCallback(async () => {
+    try {
+      const res = await authApi.get('/friends/pending/count');
+      setPendingCount(res.data.pending_count || 0);
+    } catch {}
+  }, []);
   // -------------------------------------------------------
   // フレンドの気分ログ読み込み
   // -------------------------------------------------------
@@ -105,7 +113,8 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     loadMoods();
     loadFriendsLogStatus();
     loadFriendCount();
-  }, [loadFriendsLogStatus, loadFriendCount]);
+    loadPendingCount(); // ✅ 追加
+}, [loadFriendsLogStatus, loadFriendCount, loadPendingCount]);
 
   // -------------------------------------------------------
   // Stripe 成功後のアクティベート処理
@@ -293,6 +302,16 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
           Welcome back
         </p>
       </div>
+
+        {pendingCount > 0 && (
+        <Link
+            to="/friends"
+            state={{ tab: 'requests' }}
+            className="block text-xs font-bold text-amber-500 hover:text-amber-600 mb-4"
+        >
+            🔔 ともだち申請が{pendingCount}件あります
+        </Link>
+        )}
 
       {/* 気分入力 */}
       <MoodInput onSuccess={loadMoods} />

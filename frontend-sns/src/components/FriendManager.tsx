@@ -9,7 +9,7 @@ import {
     UserProfileType,
     FriendRequest
 } from '../api';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { authApi } from '../api';
 
 /* ======================
@@ -233,9 +233,15 @@ const FriendList: React.FC = () => {
    メイン
 ====================== */
 const FriendManager: React.FC = () => {
-    const [tab, setTab] = useState<'search' | 'requests' | 'friends'>('search');
+    const location = useLocation(); // ✅ 追加：URLの情報を取得
+
+    // ✅ tabの初期値を location.state?.tab から受け取るように変更
+    const [tab, setTab] = useState<'search' | 'requests' | 'friends'>(
+        location.state?.tab || 'search'
+    );
+    
     const [pendingCount, setPendingCount] = useState(0);
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);  // ← 追加
+    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
     useEffect(() => {
         authApi.get('/friends/pending/count')
