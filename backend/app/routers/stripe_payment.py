@@ -830,11 +830,13 @@ async def create_ad_checkout(data: dict, db: Session = Depends(get_db)):
             INSERT INTO hobby_posts (
                 content, user_id, hobby_category_id, is_system,
                 is_meetup, is_ad, is_hidden,
-                ad_color, ad_start_date, ad_end_date, ad_status
+                ad_color, ad_start_date, ad_end_date, ad_status,
+                meetup_status
             ) VALUES (
                 :content, :user_id, :category_id, false,
                 false, true, true,
-                :ad_color, :start_date, :end_date, 'pending'
+                :ad_color, :start_date, :end_date, 'pending',
+                'open'
             ) RETURNING id
         """), {
             "content": f"{ad_title}\n{ad_content}",
