@@ -21,7 +21,7 @@ PRICE_FRIENDS_LOG    = 1000
 PRICE_MEETUP         = 500
 PRICE_AFFILIATE_NONE = 200
 PRICE_PER_FRIEND     = 100   # 11人目以降1人あたり月100円
-FRIEND_FREE_LIMIT    = 10    # 無料枠
+FRIEND_FREE_LIMIT    = 1   # 無料枠 ※一旦変更中
 
 
 # ===============================================================
@@ -116,20 +116,9 @@ async def get_friend_manager_status(user_id: int, db: Session = Depends(get_db))
 # FM-2. サブスクリプション作成 or 金額更新 チェックアウト
 #        （11人目以降を友達追加するたびに呼び出す）
 # -------------------------------------------------------
+
 @router.post("/stripe/friend-manager-checkout")
 async def create_friend_manager_checkout(data: dict, db: Session = Depends(get_db)):
-    """
-    友達数が FRIEND_FREE_LIMIT を超えている場合にサブスクを作成 or 更新する。
-
-    フロントから渡すデータ:
-        { "userId": 123, "newFriendCount": 11 }
-
-    処理フロー:
-    1. newFriendCount から月額を計算
-    2. Stripe Customer を取得 or 作成
-    3. 既存サブスクがあれば Stripe の Price を更新（proration なし）
-    4. なければ新規サブスク作成のための Checkout Session を発行
-    """
     user_id = data.get("userId")
     new_friend_count = data.get("newFriendCount")
     if not user_id or new_friend_count is None:
@@ -138,7 +127,6 @@ async def create_friend_manager_checkout(data: dict, db: Session = Depends(get_d
     new_friend_count = int(new_friend_count)
     extra = max(0, new_friend_count - FRIEND_FREE_LIMIT)
     if extra <= 0:
-        # 10人以下なら課金不要
         return {"requires_payment": False, "monthly_amount": 0}
 
     amount = extra * PRICE_PER_FRIEND
@@ -152,12 +140,11 @@ async def create_friend_manager_checkout(data: dict, db: Session = Depends(get_d
     try:
         customer_id = _get_or_create_stripe_customer(int(user_id), db)
 
-        # ---- サブスクが既にアクティブ → 金額を更新して完了 ----
+        # ---- 1. サブスクが既にアクティブ（金額更新のみ） ----
         if sub and sub.stripe_subscription_id and sub.status == "active":
             subscription = stripe.Subscription.retrieve(sub.stripe_subscription_id)
             item_id = subscription["items"]["data"][0]["id"]
 
-            # 新しい Price を都度作成（メタデータで管理）
             new_price = stripe.Price.create(
                 unit_amount=amount,
                 currency="jpy",
@@ -172,7 +159,6 @@ async def create_friend_manager_checkout(data: dict, db: Session = Depends(get_d
                 proration_behavior="none",
             )
 
-            # DBを更新
             db.execute(text("""
                 UPDATE friend_manager_subscriptions
                 SET friend_count = :fc,
@@ -190,7 +176,26 @@ async def create_friend_manager_checkout(data: dict, db: Session = Depends(get_d
                 "extra_count": extra,
             }
 
-        # ---- サブスク未作成 or キャンセル済み → Checkout Session を発行 ----
+        # ---- 2. サブスク未作成 or キャンセル済み（新規発行・トライアル判定あり） ----
+        
+        # 月末7日ルールで課金開始日を決定
+        today = datetime.now(timezone.utc).date()
+        _, last_day = monthrange(today.year, today.month)
+        days_until_end = last_day - today.day
+
+        if days_until_end < 7:
+            # 翌月1日から課金開始
+            if today.month == 12:
+                billing_start = date(today.year + 1, 1, 1)
+            else:
+                billing_start = date(today.year, today.month + 1, 1)
+            # トライアル終了時刻（翌月1日 00:00:00 UTC）
+            trial_end = int(datetime(billing_start.year, billing_start.month, 1, tzinfo=timezone.utc).timestamp())
+        else:
+            # 当日から課金開始
+            billing_start = today
+            trial_end = None
+
         # Stripe Price を作成
         price = stripe.Price.create(
             unit_amount=amount,
@@ -200,39 +205,56 @@ async def create_friend_manager_checkout(data: dict, db: Session = Depends(get_d
             metadata={"user_id": str(user_id), "extra_count": str(extra)},
         )
 
-        session = stripe.checkout.Session.create(
-            customer=customer_id,
-            payment_method_types=["card"],
-            line_items=[{"price": price.id, "quantity": 1}],
-            mode="subscription",
-            success_url=f"{FRONTEND_URL}/friends?fm_session={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{FRONTEND_URL}/friends",
-            metadata={
+        # Checkout Session パラメータ
+        session_params = {
+            "customer": customer_id,
+            "payment_method_types": ["card"],
+            "line_items": [{"price": price.id, "quantity": 1}],
+            "mode": "subscription",
+            "success_url": f"{FRONTEND_URL}/friends?fm_session={{CHECKOUT_SESSION_ID}}",
+            "cancel_url": f"{FRONTEND_URL}/friends",
+            "metadata": {
                 "user_id": str(user_id),
                 "product": "friend_manager",
                 "extra_count": str(extra),
                 "friend_count": str(new_friend_count),
+                "billing_start": billing_start.isoformat(),
             },
-        )
+        }
 
-        # customer_id を DB に保存（サブスクはWebhook完了後に保存）
+        # 翌月課金の場合はトライアル設定を追加
+        if trial_end:
+            session_params["subscription_data"] = {"trial_end": trial_end}
+
+        session = stripe.checkout.Session.create(**session_params)
+
+        # DB保存（billing_start_date を含む）
         existing = db.execute(
             text("SELECT id FROM friend_manager_subscriptions WHERE user_id = :uid"),
             {"uid": int(user_id)}
         ).fetchone()
+
+        query_params = {
+            "uid": int(user_id), "cid": customer_id, "fc": new_friend_count,
+            "ec": extra, "amt": amount, "bsd": billing_start
+        }
+
         if not existing:
             db.execute(text("""
                 INSERT INTO friend_manager_subscriptions
-                    (user_id, stripe_customer_id, status, friend_count, charged_extra_count, current_amount)
-                VALUES (:uid, :cid, 'pending', :fc, :ec, :amt)
-            """), {"uid": int(user_id), "cid": customer_id, "fc": new_friend_count, "ec": extra, "amt": amount})
+                    (user_id, stripe_customer_id, status, friend_count, 
+                     charged_extra_count, current_amount, billing_start_date)
+                VALUES (:uid, :cid, 'pending', :fc, :ec, :amt, :bsd)
+            """), query_params)
         else:
             db.execute(text("""
                 UPDATE friend_manager_subscriptions
                 SET stripe_customer_id = :cid, status = 'pending',
-                    friend_count = :fc, charged_extra_count = :ec, current_amount = :amt
+                    friend_count = :fc, charged_extra_count = :ec, 
+                    current_amount = :amt, billing_start_date = :bsd
                 WHERE user_id = :uid
-            """), {"cid": customer_id, "fc": new_friend_count, "ec": extra, "amt": amount, "uid": int(user_id)})
+            """), query_params)
+        
         db.commit()
 
         return {
@@ -244,8 +266,7 @@ async def create_friend_manager_checkout(data: dict, db: Session = Depends(get_d
 
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
+    
 # -------------------------------------------------------
 # FM-3. サブスクリプション有効化（Checkout成功後）
 # -------------------------------------------------------
