@@ -714,7 +714,17 @@ const submitPost = async () => {
                             </div>
                             <div className="grid grid-cols-2 gap-2 pb-2 border-b border-orange-200/30">
                                 <div className="flex flex-col"><label className="text-[9px] font-bold text-orange-800">MAX定員</label><input type="number" value={meetupDetails.capacity} onChange={e => setMeetupDetails({...meetupDetails, capacity: parseInt(e.target.value) || 0})} className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" /></div>
-                                <div className="flex flex-col"><label className="text-[9px] font-bold text-orange-800 flex items-center gap-1">費用{meetupDetails.fee && <span className="bg-blue-500 text-white px-1 rounded-[4px] text-[7px] italic font-black">STRIPE</span>}</label><input value={meetupDetails.fee} onChange={e => setMeetupDetails({...meetupDetails, fee: e.target.value})} className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" /></div>
+                                <div className="flex flex-col">
+        <label className="text-[9px] font-bold text-orange-800 flex items-center gap-1">
+            参加費用（アプリ決済）{meetupDetails.fee && <span className="bg-blue-500 text-white px-1 rounded-[4px] text-[7px] italic font-black">STRIPE</span>}
+        </label>
+        <input 
+            value={meetupDetails.fee} 
+            onChange={e => setMeetupDetails({...meetupDetails, fee: e.target.value})} 
+            placeholder="💰記入（当日💰は空欄）" 
+            className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" 
+        />
+    </div>
                             </div>
                             <div className="flex flex-col gap-1">
                                 <label className="text-[9px] font-bold text-orange-800">詳細</label>
