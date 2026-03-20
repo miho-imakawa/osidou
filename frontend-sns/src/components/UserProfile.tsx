@@ -149,22 +149,29 @@ const handleFeelingLogDownload = async (profileId: string | number) => {
     }
   }, [userId, myProfile]);
 
-  useEffect(() => {
-    if (!displayProfile?.id) return;
-
+useEffect(() => {
     const loadData = async () => {
       try {
+        // 1. カテゴリ取得
         const categories = await fetchMyCommunities();
-        setMyCategories(categories); 
+        setMyCategories(categories);
 
+        // 2. ミートアップ取得（並列実行）
         const [joinedRes, hostedRes] = await Promise.all([
           authApi.get('/posts/my-meetups'),
           authApi.get('/posts/my-hosted-meetups')
         ]);
 
+        // 3. 自分の広告統計を取得（isMeの場合のみ）
+        if (isMe) {
+          // ここを先ほどバックエンドで確認したパスに合わせて修正します
+          const adsRes = await authApi.get('/posts/my-ads-stats'); 
+          setMyAdsStats(adsRes.data || []);
+        }
+
         const joined = joinedRes.data || [];
         const hosted = hostedRes.data || [];
-        
+
         const allMeetups = [...hosted];
         joined.forEach((m: any) => {
           if (!allMeetups.find((existing: any) => existing.id === m.id)) {
@@ -173,13 +180,16 @@ const handleFeelingLogDownload = async (profileId: string | number) => {
         });
 
         console.log("主催:", hosted.length, "参加:", joined.length, "合計:", allMeetups.length);
-        const futureMeetups = allMeetups.filter((m: any) => 
+        
+        const futureMeetups = allMeetups.filter((m: any) =>
           !m.meetup_date || new Date(m.meetup_date) > new Date()
         );
         setMyMeetups(futureMeetups);
 
+        // 4. 気分ログ取得
         const logs = await fetchMyMoodHistory();
         setMoodLogs(logs);
+
       } catch (err) {
         console.error("データ取得失敗:", err);
       }
