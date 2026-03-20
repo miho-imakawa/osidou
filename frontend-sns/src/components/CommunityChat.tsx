@@ -15,6 +15,8 @@ interface CommunityChatProps {
     isPublic?: boolean;
 }
 
+const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 const CommunityChat: React.FC<CommunityChatProps> = ({
     categoryId: propCategoryId, masterId, currentUserId, currentCategoryName, isPublic }) => {
     const chatTargetId = masterId ? String(masterId) : propCategoryId;
@@ -275,7 +277,7 @@ const submitPost = async () => {
     if (isMeetup) {
         // MEETUPはStripe経由
         try {
-            const res = await fetch('/api/stripe/meetup-checkout', {
+            const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-checkout`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
