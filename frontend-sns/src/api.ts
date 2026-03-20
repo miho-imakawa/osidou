@@ -423,12 +423,26 @@ export const startNoAffiliateCheckout = async (userId: string | number) => {
     });
 };
 
-export const startAdCheckout = async (userId: string | number, amount: number, adTitle: string) => {
+export const startAdCheckout = async (
+    userId: string | number,
+    amount: number,
+    adTitle: string,
+    adContent: string,
+    startDate: string,
+    endDate: string,
+    categoryIds: number[],
+    adColor: string,
+) => {
     await redirectToStripe("/api/stripe/ad-checkout", {
         userId: String(userId),
         amount,
         adTitle,
-        successUrl: `${window.location.origin}/community?ad_paid=true`,
+        adContent,
+        startDate,
+        endDate,
+        categoryIds,
+        adColor,
+        successUrl: `${window.location.origin}${window.location.pathname}?ad_session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: window.location.href,
     });
 };
