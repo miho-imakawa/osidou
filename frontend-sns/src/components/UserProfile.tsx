@@ -12,7 +12,6 @@ import {
   MoodLog,
   startFeelingLogCheckout, startFriendsLogCheckout, verifyFriendsLogSession, 
 } from '../api';
-import PendingFriendBanner from './PendingFriendBanner'; // 💡 パスは環境に合わせて調整してください
 
 interface UserProfileProps {
   profile: any; 
@@ -379,9 +378,6 @@ useEffect(() => {
               )}
             </div>
           </div>
-          {/* 🔔 自分の時だけ表示される申請バナー */}
-          {isMe && <PendingFriendBanner count={pendingCount} />}
-
           {isMe && pendingCount > 0 && (
             <Link
               to="/friends"
