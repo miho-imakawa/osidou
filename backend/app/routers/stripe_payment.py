@@ -673,10 +673,39 @@ async def download_feeling_log(session_id: str, db: Session = Depends(get_db)):
 # 7. MEETUP 掲載料（500円）
 # -------------------------------------------------------
 @router.post("/stripe/meetup-checkout")
-async def create_meetup_checkout(data: dict):
+async def create_meetup_checkout(data: dict, db: Session = Depends(get_db)):
     user_id = data.get("userId")
-    if not user_id:
-        raise HTTPException(status_code=400, detail="userId が必要です")
+    post_data = data.get("postData")  # フロントから投稿データを受け取る
+
+    if not user_id or not post_data:
+        raise HTTPException(status_code=400, detail="userId と postData が必要です")
+
+    # ① 投稿を pending 状態で先に保存
+    result = db.execute(text("""
+        INSERT INTO hobby_posts (
+            content, user_id, hobby_category_id, is_system,
+            is_meetup, is_ad, is_hidden,
+            meetup_date, meetup_location, meetup_capacity,
+            meetup_fee_info, meetup_status
+        ) VALUES (
+            :content, :user_id, :hobby_category_id, false,
+            true, false, true,
+            :meetup_date, :meetup_location, :meetup_capacity,
+            :meetup_fee_info, 'pending'
+        ) RETURNING id
+    """), {
+        "content": post_data.get("content", ""),
+        "user_id": int(user_id),
+        "hobby_category_id": int(post_data.get("hobby_category_id", 1)),
+        "meetup_date": post_data.get("meetup_date"),
+        "meetup_location": post_data.get("meetup_location", ""),
+        "meetup_capacity": post_data.get("meetup_capacity", 0),
+        "meetup_fee_info": post_data.get("meetup_fee_info", ""),
+    })
+    db.commit()
+    post_id = result.fetchone().id
+
+    # ② Stripe Checkout Session を作成（post_id を紐づけ）
     try:
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
@@ -689,14 +718,62 @@ async def create_meetup_checkout(data: dict):
                 "quantity": 1,
             }],
             mode="payment",
-            success_url=data.get("successUrl", f"{FRONTEND_URL}/community?meetup_paid=true"),
-            cancel_url=data.get("cancelUrl", f"{FRONTEND_URL}/community"),
-            metadata={"user_id": str(user_id), "product": "meetup"},
+            success_url=f"{FRONTEND_URL}/community?meetup_session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{FRONTEND_URL}/community?meetup_cancelled=true",
+            metadata={
+                "user_id": str(user_id),
+                "product": "meetup",
+                "post_id": str(post_id),
+            },
         )
-        return {"url": session.url}
+
+        # ③ stripe_session_id を投稿に紐づけ
+        db.execute(text("""
+            UPDATE hobby_posts
+            SET stripe_session_id = :session_id
+            WHERE id = :post_id
+        """), {"session_id": session.id, "post_id": post_id})
+        db.commit()
+
+        return {"url": session.url, "post_id": post_id}
+
     except stripe.error.StripeError as e:
+        # Stripe エラー時は pending 投稿を削除
+        db.execute(text("DELETE FROM hobby_posts WHERE id = :post_id"), {"post_id": post_id})
+        db.commit()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# -------------------------------------------------------
+# 7-2. MEETUP アクティベート（支払い完了後）
+# -------------------------------------------------------
+@router.post("/stripe/meetup-activate")
+async def activate_meetup(data: dict, db: Session = Depends(get_db)):
+    session_id = data.get("sessionId")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="sessionId が必要です")
+
+    try:
+        stripe_session = stripe.checkout.Session.retrieve(session_id)
+        if stripe_session.payment_status != "paid":
+            raise HTTPException(status_code=403, detail="決済が完了していません")
+        if stripe_session.metadata.get("product") != "meetup":
+            raise HTTPException(status_code=400, detail="商品が一致しません")
+    except stripe.error.StripeError:
+        raise HTTPException(status_code=400, detail="無効なセッションです")
+
+    post_id = stripe_session.metadata.get("post_id")
+
+    # 投稿を公開状態に更新
+    db.execute(text("""
+        UPDATE hobby_posts
+        SET meetup_status = 'open',
+            is_hidden = false
+        WHERE id = :post_id
+    """), {"post_id": int(post_id)})
+    db.commit()
+
+    return {"status": "activated", "post_id": post_id}
 
 # -------------------------------------------------------
 # 8. アフェリエイトなし掲載（200円）
