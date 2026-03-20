@@ -808,14 +808,46 @@ async def create_no_affiliate_checkout(data: dict):
 # 9. AD 掲載（変動制）
 # -------------------------------------------------------
 @router.post("/stripe/ad-checkout")
-async def create_ad_checkout(data: dict):
+async def create_ad_checkout(data: dict, db: Session = Depends(get_db)):
     user_id = data.get("userId")
     amount = data.get("amount")
     ad_title = data.get("adTitle", "広告掲載")
+    ad_content = data.get("adContent", "")
+    start_date = data.get("startDate")
+    end_date = data.get("endDate")
+    category_ids = data.get("categoryIds", [])
+    ad_color = data.get("adColor", "green")
+
     if not user_id or not amount:
         raise HTTPException(status_code=400, detail="userId と amount が必要です")
     if int(amount) < 100:
         raise HTTPException(status_code=400, detail="最低金額は100円です")
+
+    # ① 投稿を pending 状態で先に保存（複数カテゴリ対応）
+    post_ids = []
+    for category_id in category_ids:
+        result = db.execute(text("""
+            INSERT INTO hobby_posts (
+                content, user_id, hobby_category_id, is_system,
+                is_meetup, is_ad, is_hidden,
+                ad_color, ad_start_date, ad_end_date, ad_status
+            ) VALUES (
+                :content, :user_id, :category_id, false,
+                false, true, true,
+                :ad_color, :start_date, :end_date, 'pending'
+            ) RETURNING id
+        """), {
+            "content": f"{ad_title}\n{ad_content}",
+            "user_id": int(user_id),
+            "category_id": int(category_id),
+            "ad_color": ad_color,
+            "start_date": start_date or None,
+            "end_date": end_date or None,
+        })
+        db.commit()
+        post_ids.append(result.fetchone().id)
+
+    # ② Stripe Checkout Session を作成
     try:
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
@@ -828,14 +860,67 @@ async def create_ad_checkout(data: dict):
                 "quantity": 1,
             }],
             mode="payment",
-            success_url=data.get("successUrl", f"{FRONTEND_URL}/community?ad_paid=true"),
+            success_url=data.get("successUrl", f"{FRONTEND_URL}/community?ad_session_id={{CHECKOUT_SESSION_ID}}"),
             cancel_url=data.get("cancelUrl", f"{FRONTEND_URL}/community"),
-            metadata={"user_id": str(user_id), "product": "ad", "ad_title": ad_title},
+            metadata={
+                "user_id": str(user_id),
+                "product": "ad",
+                "ad_title": ad_title,
+                "post_ids": ",".join(str(i) for i in post_ids),
+                "category_ids": ",".join(str(i) for i in category_ids),
+            },
         )
-        return {"url": session.url}
+
+        # ③ stripe_session_id を全投稿に紐づけ
+        for post_id in post_ids:
+            db.execute(text("""
+                UPDATE hobby_posts
+                SET stripe_session_id = :session_id
+                WHERE id = :post_id
+            """), {"session_id": session.id, "post_id": post_id})
+        db.commit()
+
+        return {"url": session.url, "post_ids": post_ids}
+
     except stripe.error.StripeError as e:
+        # エラー時は pending 投稿を削除
+        for post_id in post_ids:
+            db.execute(text("DELETE FROM hobby_posts WHERE id = :post_id"), {"post_id": post_id})
+        db.commit()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# -------------------------------------------------------
+# 9-2. AD アクティベート（支払い完了後）
+# -------------------------------------------------------
+@router.post("/stripe/ad-activate")
+async def activate_ad(data: dict, db: Session = Depends(get_db)):
+    session_id = data.get("sessionId")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="sessionId が必要です")
+
+    try:
+        stripe_session = stripe.checkout.Session.retrieve(session_id)
+        if stripe_session.payment_status != "paid":
+            raise HTTPException(status_code=403, detail="決済が完了していません")
+        if stripe_session.metadata.get("product") != "ad":
+            raise HTTPException(status_code=400, detail="商品が一致しません")
+    except stripe.error.StripeError:
+        raise HTTPException(status_code=400, detail="無効なセッションです")
+
+    post_ids_str = stripe_session.metadata.get("post_ids", "")
+    post_ids = [int(i) for i in post_ids_str.split(",") if i]
+
+    for post_id in post_ids:
+        db.execute(text("""
+            UPDATE hobby_posts
+            SET ad_status = 'open',
+                is_hidden = false
+            WHERE id = :post_id
+        """), {"post_id": post_id})
+    db.commit()
+
+    return {"status": "activated", "post_ids": post_ids}
 
 # -------------------------------------------------------
 # 10. Stripe Webhook（本番用）
