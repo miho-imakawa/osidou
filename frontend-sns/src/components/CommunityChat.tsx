@@ -152,7 +152,7 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
         const meetupCancelled = params.get('meetup_cancelled');
 
         if (meetupSessionId) {
-            fetch('/api/stripe/meetup-activate', {
+            fetch(`${BACKEND_URL}/api/stripe/meetup-activate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sessionId: meetupSessionId }),
