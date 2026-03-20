@@ -86,7 +86,7 @@ const UserSearch: React.FC = () => {
 /* ======================
    承認待ち
 ====================== */
-const RequestList: React.FC = () => {
+const RequestList: React.FC<{ currentUserId: number | null }> = ({ currentUserId }) => {
     const [requests, setRequests] = useState<FriendRequest[]>([]);
 
     const load = async () => {
@@ -105,14 +105,13 @@ const RequestList: React.FC = () => {
 
                 if (window.confirm(`${upgrade_msg}\n\nFRIEND's managerに登録して友達を追加しますか？`)) {
                     try {
-                        // ✅ Stripe Checkout URLを取得してリダイレクト
                         const res = await authApi.post('/stripe/friend-manager-checkout', {
+                            userId: currentUserId,  // ← 追加
                             newFriendCount: current_count + 1,
                         });
                         if (res.data.checkout_url) {
                             window.location.href = res.data.checkout_url;
                         } else if (res.data.updated) {
-                            // 既存サブスクの金額更新で済んだ場合はそのまま承認
                             await acceptFriendRequest(requestId);
                             alert("Success!");
                             load();
@@ -236,10 +235,16 @@ const FriendList: React.FC = () => {
 const FriendManager: React.FC = () => {
     const [tab, setTab] = useState<'search' | 'requests' | 'friends'>('search');
     const [pendingCount, setPendingCount] = useState(0);
+    const [currentUserId, setCurrentUserId] = useState<number | null>(null);  // ← 追加
 
     useEffect(() => {
         authApi.get('/friends/pending/count')
             .then(res => setPendingCount(res.data.pending_count))
+            .catch(() => {});
+        
+        // ← 追加
+        authApi.get('/users/me')
+            .then(res => setCurrentUserId(res.data.id))
             .catch(() => {});
     }, []);
 
@@ -267,7 +272,7 @@ const FriendManager: React.FC = () => {
             </div>
 
             {tab === 'search' && <UserSearch />}
-            {tab === 'requests' && <RequestList />}
+            {tab === 'requests' && <RequestList currentUserId={currentUserId} />}  {/* ← userId渡す */}
             {tab === 'friends' && <FriendList />}
         </div>
     );
