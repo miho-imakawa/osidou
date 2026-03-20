@@ -335,6 +335,28 @@ def cancel_meetup_participation(
 # 💡 広告インタラクション（いいね・PIN・閉じる）
 # ==========================================
 
+@router.get("/posts/my-ads")
+def get_my_ads(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    posts = db.query(models.HobbyPost).filter(
+        models.HobbyPost.user_id == current_user.id,
+        models.HobbyPost.is_ad == True,
+        models.HobbyPost.ad_status.in_(['open', 'pending'])
+    ).all()
+    
+    return [
+        {
+            "id": p.id,
+            "title": p.content.split('\n')[0],
+            "like_count": 0,
+            "pin_count": 0,
+            "ad_end_date": p.ad_end_date.isoformat() if p.ad_end_date else None,
+        }
+        for p in posts
+    ]
+
 class AdInteractionRequest(BaseModel):
     action: str  # "like", "pin", "close"
 
