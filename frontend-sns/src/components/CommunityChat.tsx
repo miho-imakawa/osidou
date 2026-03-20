@@ -137,6 +137,39 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
         }
     }, [posts, adInteractions]); // posts か adInteractions が変わるたびに実行
    
+    useEffect(() => {
+    if (posts.length > 0) {
+        const pinned = posts.filter(post => adInteractions[post.id]?.is_pinned);
+        setPinnedAds(pinned);
+    }
+}, [posts, adInteractions]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const meetupSessionId = params.get('meetup_session_id');
+        const meetupCancelled = params.get('meetup_cancelled');
+
+        if (meetupSessionId) {
+            fetch('/api/stripe/meetup-activate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: meetupSessionId }),
+            })
+            .then(res => res.json())
+            .then(() => {
+                alert('🎉 お支払い完了！MEET UPを楽しんで！');
+                window.history.replaceState({}, '', '/community');
+                fetchPosts();
+            })
+            .catch(() => alert('アクティベートに失敗しました'));
+        }
+
+        if (meetupCancelled) {
+            alert('決済がキャンセルされました。投稿は保存されていません。');
+            window.history.replaceState({}, '', '/community');
+        }
+    }, []);
+
     const handleAdAction = async (postId: number, action: 'like' | 'pin' | 'close') => {
         try {
             const result = await adInteraction(postId, action);
@@ -238,22 +271,45 @@ const handleSend = async (e: React.FormEvent) => {
 
 const submitPost = async () => {
     const isMeetup = postType === 'meetup';
+
+    if (isMeetup) {
+        // MEETUPはStripe経由
+        try {
+            const res = await fetch('/api/stripe/meetup-checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: currentUserId,
+                    postData: {
+                        content: `${meetupDetails.title}\n${newPost}`,
+                        hobby_category_id: parseInt(chatTargetId),
+                        meetup_date: meetupDetails.date || null,
+                        meetup_location: `${meetupDetails.pref || ''} ${meetupDetails.city_town || ''}`.trim(),
+                        meetup_capacity: meetupDetails.capacity || 0,
+                        meetup_fee_info: meetupDetails.fee || null,
+                    }
+                }),
+            });
+            const { url } = await res.json();
+            window.location.href = url; // Stripeへリダイレクト
+        } catch (err) {
+            console.error('Stripe エラー:', err);
+            alert("決済の開始に失敗しました");
+        }
+        return;
+    }
+
+    // 通常投稿・AD投稿はそのまま
     try {
         await createPost({
-            content: isMeetup ? `${meetupDetails.title}\n${newPost}` : newPost,
+            content: newPost,
             hobby_category_id: parseInt(chatTargetId),
-            is_meetup: isMeetup,
-            is_ad: false,
+            is_meetup: false,
+            is_ad: postType === ('ad' as string),
             is_system: false,
-            meetup_date: meetupDetails.date || undefined,
-            meetup_location: `${meetupDetails.pref || ''} ${meetupDetails.city_town || ''}`.trim(),
-            meetup_capacity: meetupDetails.capacity || 0,
-            meetup_fee_info: meetupDetails.fee || undefined,
         });
         setNewPost('');
-        setMeetupDetails({ title: '', date: '', pref: '', city_town: '', capacity: 5, fee: '' });
         setPostType('normal');
-        setShowPaymentConfirm(false);
         fetchPosts();
     } catch (err) {
         console.error('送信エラー:', err);
@@ -421,7 +477,7 @@ const submitPost = async () => {
                                         <div className={`p-4 rounded-[28px] border-2 shadow-sm ${adBg} ${adBorder}`}>
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[9px] font-black bg-gray-900 text-white px-2 py-0.5 rounded-full uppercase">Sponsored AD</span>
+                                                    <span className="text-[9px] font-black bg-gray-900 text-white px-2 py-0.5 rounded-full uppercase">AD</span>
                                                     <h3 className="font-black text-sm leading-tight">
                                                         {post.content.split('\n')[0]}
                                                     </h3>
@@ -669,13 +725,14 @@ const submitPost = async () => {
                 <MeetupChatModal postId={activeChat.id} meetupTitle={activeChat.title} onClose={() => setActiveChat(null)} />
             )}
             {showAdModal && (
-                <AdPostModal
-                    currentCategoryId={parseInt(chatTargetId)}
-                    currentCategoryName={currentCategoryName || ''}
-                    onClose={() => setShowAdModal(false)}
-                    onPosted={fetchPosts}
-                />
-            )}
+            <AdPostModal
+                profile={{ id: currentUserId }}  // ← これを追加
+                currentCategoryId={parseInt(chatTargetId)}
+                currentCategoryName={currentCategoryName || ''}
+                onClose={() => setShowAdModal(false)}
+                onPosted={fetchPosts}
+            />
+        )}
 {showSubChatModal && (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-[32px] shadow-2xl p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto">
