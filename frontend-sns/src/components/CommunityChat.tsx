@@ -771,7 +771,7 @@ const submitPost = async () => {
                                                                         }
                                                                     }
                                                                 }}
-                                                                className="w-full py-2 bg-blue-50 text-blue-600 rounded-xl text-[11px] font-black hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+                                                                className="text-[8px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1"
                                                             >
                                                                 <CheckSquare size={12} /> 文言を追記する
                                                             </button>
