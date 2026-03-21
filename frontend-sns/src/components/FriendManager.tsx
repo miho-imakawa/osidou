@@ -47,7 +47,7 @@ const UserSearch: React.FC<{ currentUserId: number | null }> = ({ currentUserId 
 
                 if (window.confirm(`${msg}\n\nカード登録画面に移動しますか？`)) {
                     try {
-                        const res = await authApi.post('/stripe/friend-manager-setup-intent', {
+                        const res = await authApi.post('/api/stripe/friend-manager-setup-intent', {
                             requesterId: currentUserId,
                             receiverId:  receiverId,
                         });
