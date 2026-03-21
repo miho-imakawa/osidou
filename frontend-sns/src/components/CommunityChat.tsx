@@ -82,10 +82,10 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
 
 🗺️ 開催場所 MapURL 又はURL：
 
-💰【支払い方法】： 当日現金 / Stripe決済 / お茶代のみ各自
+💰【支払い方法】： 当日現金 / アプリ（Stripe）決済 / お茶代のみ各自
 ※カフェ開催のためお茶代が必要です。
 
-❌【キャンセルポリシー】： Stripe決済の場合
+❌【キャンセルポリシー】： アプリ（Stripe）決済の場合
     当日0時以降のキャンセル50%、NoShow100%`;
 
     const toggleAdCollapse = (postId: number) => {
@@ -721,7 +721,7 @@ const submitPost = async () => {
         <input 
             value={meetupDetails.fee} 
             onChange={e => setMeetupDetails({...meetupDetails, fee: e.target.value})} 
-            placeholder="💰記入（当日💰は空欄）" 
+            placeholder="金額入力でアプリ決済 / 空欄で詳細に記載"
             className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" 
         />
     </div>
