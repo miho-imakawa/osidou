@@ -62,7 +62,7 @@ def send_friend_request(
         .count()
     )
 
-    if friend_count >= FRIEND_FREE_LIMIT:
+    if friend_count + 1 > FRIEND_FREE_LIMIT:
         # アクティブなサブスクがすでにあれば追加課金は承認後に自動処理 → 申請OK
         sub_row = db.execute(
             text("""
