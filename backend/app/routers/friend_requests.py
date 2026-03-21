@@ -20,9 +20,6 @@ class FriendshipUpdate(BaseModel):
 
 router = APIRouter(tags=["Friend Requests"])
 
-# 同じ相手への申請回数上限（後で変更しやすいよう定数化）
-FRIEND_REQUEST_LIMIT = 10  # 確認中につき10回。本番は3回に変更予定
-
 
 # -----------------------------------------------------
 # 1. フレンド申請の送信
@@ -58,29 +55,17 @@ def send_friend_request(
     if existing_request:
         raise HTTPException(status_code=400, detail="既に申請済みです。")
 
-    # 過去の申請回数チェック（PENDING/ACCEPTED/REJECTED 全て含む）
-    request_count = (
-        db.query(models.FriendRequest)
-        .filter(
-            models.FriendRequest.requester_id == current_user.id,
-            models.FriendRequest.receiver_id == receiver_id,
-        )
-        .count()
-    )
-    if request_count >= FRIEND_REQUEST_LIMIT:
-        raise HTTPException(
-            status_code=400,
-            detail=f"同じ相手への申請は{FRIEND_REQUEST_LIMIT}回までです。"
-        )
-
     # ── 申請者の友達数チェック ──
     friend_count = (
         db.query(models.Friendship)
         .filter(models.Friendship.user_id == current_user.id)
         .count()
     )
+    # Railwayのログで確認するためのデバッグ行
+    print(f"DEBUG: user={current_user.id} friend_count={friend_count} limit={FRIEND_FREE_LIMIT}")
 
-    if friend_count + 1 > FRIEND_FREE_LIMIT:
+    # 友達数がリミット以上の場合のみ、サブスク（カード登録）チェックを行う
+    if friend_count >= FRIEND_FREE_LIMIT:
         # アクティブなサブスクがすでにあれば追加課金は承認後に自動処理 → 申請OK
         sub_row = db.execute(
             text("""
@@ -107,6 +92,7 @@ def send_friend_request(
                 }
             )
 
+    # 上記のチェック（402）を通過した場合、または友達数がリミット未満の場合に実行
     new_request = models.FriendRequest(
         requester_id=current_user.id,
         receiver_id=receiver_id,
@@ -116,7 +102,6 @@ def send_friend_request(
     db.commit()
     db.refresh(new_request)
     return new_request
-
 
 # -----------------------------------------------------
 # 2. 受信したフレンド申請
