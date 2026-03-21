@@ -182,6 +182,8 @@ export interface Post {
     meetup_location?: string;
     meetup_fee_info?: string;
     meetup_status?: string;
+    meetup_confirmed_at?: string | null;
+    meetup_organizer_showed?: boolean | null;
     meetup_capacity?: number;
     ad_end_date?: string;
     ad_start_date?: string;

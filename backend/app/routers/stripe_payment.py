@@ -1090,6 +1090,462 @@ async def activate_ad(data: dict, db: Session = Depends(get_db)):
 
     return {"status": "activated", "post_ids": post_ids}
 
+
+# ===============================================================
+# MEETUP 参加・決済フロー
+# ===============================================================
+
+MEETUP_CANCEL_FREE_HOUR = 0   # 当日0時以降はキャンセル料発生
+MEETUP_COMMISSION_RATE  = 0.05  # 運営取り分 5%
+
+
+def _get_or_create_stripe_customer_for_user(user_id: int, db: Session) -> str:
+    """users テーブルから Stripe Customer を作成 or 取得（meetup用）"""
+    row = db.execute(
+        text("SELECT id, email, nickname FROM users WHERE id = :uid"),
+        {"uid": user_id}
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+
+    # post_responses に stripe_customer_id があればそれを使う
+    existing = db.execute(
+        text("""
+            SELECT stripe_customer_id FROM post_responses
+            WHERE user_id = :uid AND stripe_customer_id IS NOT NULL
+            LIMIT 1
+        """),
+        {"uid": user_id}
+    ).fetchone()
+
+    if existing and existing.stripe_customer_id:
+        return existing.stripe_customer_id
+
+    # friend_manager_subscriptions にもあれば流用
+    fm = db.execute(
+        text("SELECT stripe_customer_id FROM friend_manager_subscriptions WHERE user_id = :uid"),
+        {"uid": user_id}
+    ).fetchone()
+    if fm and fm.stripe_customer_id:
+        return fm.stripe_customer_id
+
+    # 新規作成
+    customer = stripe.Customer.create(
+        email=row.email,
+        name=row.nickname or f"user_{user_id}",
+        metadata={"user_id": str(user_id)},
+    )
+    return customer.id
+
+
+# -------------------------------------------------------
+# M-1. JOIN時 SetupIntent（カード登録のみ・参加費ありの場合）
+# -------------------------------------------------------
+@router.post("/stripe/meetup-join-setup")
+async def meetup_join_setup(data: dict, db: Session = Depends(get_db)):
+    """
+    参加費ありのMEETUPにJOINするとき、カードを登録させる。
+    まだ課金しない。主催者が「開催決定」を押したときに課金する。
+    """
+    user_id  = data.get("userId")
+    post_id  = data.get("postId")
+    if not user_id or not post_id:
+        raise HTTPException(status_code=400, detail="userId と postId が必要です")
+
+    user_id = int(user_id)
+    post_id = int(post_id)
+
+    # 投稿情報を取得
+    post = db.execute(
+        text("SELECT id, meetup_fee_info, content FROM hobby_posts WHERE id = :pid"),
+        {"pid": post_id}
+    ).fetchone()
+    if not post:
+        raise HTTPException(status_code=404, detail="投稿が見つかりません")
+
+    # Stripe Customer を作成 or 取得
+    customer_id = _get_or_create_stripe_customer_for_user(user_id, db)
+
+    # post_responses の stripe_customer_id を更新
+    db.execute(text("""
+        UPDATE post_responses
+        SET stripe_customer_id = :cid
+        WHERE user_id = :uid AND post_id = :pid
+    """), {"cid": customer_id, "uid": user_id, "pid": post_id})
+    db.commit()
+
+    try:
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            mode="setup",
+            success_url=(
+                f"{FRONTEND_URL}/community/{data.get('categoryId', '')}"
+                f"?meetup_join_done=true&post_id={post_id}"
+                f"&setup_session_id={{CHECKOUT_SESSION_ID}}"
+            ),
+            cancel_url=f"{FRONTEND_URL}/community/{data.get('categoryId', '')}",
+            metadata={
+                "user_id":  str(user_id),
+                "post_id":  str(post_id),
+                "product":  "meetup_join",
+            },
+        )
+        return {"checkout_url": session.url}
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------------
+# M-2. 主催者「開催決定」→ 参加者全員に課金
+# -------------------------------------------------------
+@router.post("/stripe/meetup-confirm")
+async def meetup_confirm(data: dict, db: Session = Depends(get_db)):
+    """
+    主催者が「開催決定」を押したとき。
+    参加費ありの参加者全員のカードに一斉課金する。
+    95%→主催者ConnectアカウントへTransfer / 5%→運営
+    """
+    post_id      = data.get("postId")
+    organizer_id = data.get("organizerId")
+    if not post_id or not organizer_id:
+        raise HTTPException(status_code=400, detail="postId と organizerId が必要です")
+
+    post_id      = int(post_id)
+    organizer_id = int(organizer_id)
+
+    # 投稿情報
+    post = db.execute(
+        text("SELECT id, meetup_fee_info, user_id FROM hobby_posts WHERE id = :pid"),
+        {"pid": post_id}
+    ).fetchone()
+    if not post:
+        raise HTTPException(status_code=404, detail="投稿が見つかりません")
+    if post.user_id != organizer_id:
+        raise HTTPException(status_code=403, detail="主催者のみ操作できます")
+
+    # 参加費を数値で取得
+    try:
+        fee = int(post.meetup_fee_info)
+    except (TypeError, ValueError):
+        # 参加費が数値でない（「お茶代各自」など）→ 課金スキップ
+        db.execute(text("""
+            UPDATE hobby_posts
+            SET meetup_confirmed_at = NOW()
+            WHERE id = :pid
+        """), {"pid": post_id})
+        db.commit()
+        return {"status": "confirmed_no_charge", "message": "参加費なしのため課金スキップ"}
+
+    if fee <= 0:
+        db.execute(text("""
+            UPDATE hobby_posts SET meetup_confirmed_at = NOW() WHERE id = :pid
+        """), {"pid": post_id})
+        db.commit()
+        return {"status": "confirmed_no_charge"}
+
+    # カード登録済みの参加者を取得
+    participants = db.execute(text("""
+        SELECT pr.user_id, pr.stripe_customer_id
+        FROM post_responses pr
+        WHERE pr.post_id = :pid
+          AND pr.is_participation = true
+          AND pr.stripe_customer_id IS NOT NULL
+          AND pr.cancel_charged_at IS NULL
+    """), {"pid": post_id}).fetchall()
+
+    charged = []
+    failed  = []
+
+    for p in participants:
+        try:
+            # カードのPaymentMethodを取得
+            pms = stripe.PaymentMethod.list(
+                customer=p.stripe_customer_id, type="card"
+            )
+            if not pms.data:
+                failed.append({"user_id": p.user_id, "reason": "no_card"})
+                continue
+
+            pm_id = pms.data[0].id
+
+            # PaymentIntent で即時課金
+            pi = stripe.PaymentIntent.create(
+                amount=fee,
+                currency="jpy",
+                customer=p.stripe_customer_id,
+                payment_method=pm_id,
+                confirm=True,
+                off_session=True,
+                metadata={
+                    "user_id":      str(p.user_id),
+                    "post_id":      str(post_id),
+                    "product":      "meetup_fee",
+                    "organizer_id": str(organizer_id),
+                },
+            )
+            charged.append({"user_id": p.user_id, "payment_intent_id": pi.id})
+
+        except stripe.error.StripeError as e:
+            failed.append({"user_id": p.user_id, "reason": str(e)})
+
+    # 開催確定フラグを更新
+    db.execute(text("""
+        UPDATE hobby_posts
+        SET meetup_confirmed_at = NOW()
+        WHERE id = :pid
+    """), {"pid": post_id})
+    db.commit()
+
+    # TODO: 主催者へのTransfer（Stripe Connect設定後に実装）
+    # 現時点では課金だけ行い、主催者への送金は手動 or 後日実装
+
+    return {
+        "status":  "confirmed",
+        "charged": len(charged),
+        "failed":  len(failed),
+        "details": {"charged": charged, "failed": failed},
+    }
+
+
+# -------------------------------------------------------
+# M-3. 参加者キャンセル
+# -------------------------------------------------------
+@router.post("/stripe/meetup-cancel")
+async def meetup_cancel(data: dict, db: Session = Depends(get_db)):
+    """
+    参加者がキャンセルするとき。
+    前日23:59まで → 無料（post_responsesを削除）
+    当日0時以降   → 50%徴収（カード登録済みの場合のみ）
+                  → キャンセル待ちの最初の人に通知
+    """
+    user_id = data.get("userId")
+    post_id = data.get("postId")
+    if not user_id or not post_id:
+        raise HTTPException(status_code=400, detail="userId と postId が必要です")
+
+    user_id = int(user_id)
+    post_id = int(post_id)
+
+    # 投稿情報（meetup_date と fee を確認）
+    post = db.execute(
+        text("SELECT meetup_date, meetup_fee_info FROM hobby_posts WHERE id = :pid"),
+        {"pid": post_id}
+    ).fetchone()
+    if not post:
+        raise HTTPException(status_code=404, detail="投稿が見つかりません")
+
+    # 参加レコード取得
+    response = db.execute(text("""
+        SELECT id, stripe_customer_id, content
+        FROM post_responses
+        WHERE user_id = :uid AND post_id = :pid AND is_participation = true
+    """), {"uid": user_id, "pid": post_id}).fetchone()
+    if not response:
+        raise HTTPException(status_code=404, detail="参加レコードが見つかりません")
+
+    now = datetime.now(timezone.utc)
+    cancel_fee = 0
+    is_same_day = False
+
+    # 当日0時判定
+    if post.meetup_date:
+        meetup_day_start = post.meetup_date.replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+        )
+        if now >= meetup_day_start:
+            is_same_day = True
+
+    # 当日キャンセル → 50%徴収
+    if is_same_day and response.stripe_customer_id:
+        try:
+            fee = int(post.meetup_fee_info or 0)
+        except (TypeError, ValueError):
+            fee = 0
+
+        if fee > 0:
+            cancel_fee = fee // 2  # 50%
+            try:
+                pms = stripe.PaymentMethod.list(
+                    customer=response.stripe_customer_id, type="card"
+                )
+                if pms.data:
+                    stripe.PaymentIntent.create(
+                        amount=cancel_fee,
+                        currency="jpy",
+                        customer=response.stripe_customer_id,
+                        payment_method=pms.data[0].id,
+                        confirm=True,
+                        off_session=True,
+                        metadata={
+                            "user_id": str(user_id),
+                            "post_id": str(post_id),
+                            "product": "meetup_cancel_fee",
+                        },
+                    )
+                    db.execute(text("""
+                        UPDATE post_responses
+                        SET cancel_charged_at = NOW()
+                        WHERE id = :rid
+                    """), {"rid": response.id})
+            except stripe.error.StripeError:
+                pass  # 課金失敗してもキャンセルは通す
+
+    # post_responsesから削除（キャンセル待ちの人は残す）
+    db.execute(text("""
+        DELETE FROM post_responses
+        WHERE id = :rid
+    """), {"rid": response.id})
+
+    # キャンセル待ち（content = 'Waitlist'）の最初の人を繰り上げ通知
+    waitlist = db.execute(text("""
+        SELECT pr.user_id, u.nickname
+        FROM post_responses pr
+        JOIN users u ON u.id = pr.user_id
+        WHERE pr.post_id = :pid
+          AND pr.content = 'Waitlist'
+        ORDER BY pr.created_at ASC
+        LIMIT 1
+    """), {"pid": post_id}).fetchone()
+
+    db.commit()
+
+    return {
+        "status":       "cancelled",
+        "cancel_fee":   cancel_fee,
+        "is_same_day":  is_same_day,
+        "waitlist_user": {
+            "user_id":  waitlist.user_id,
+            "nickname": waitlist.nickname,
+        } if waitlist else None,
+    }
+
+
+# -------------------------------------------------------
+# M-4. 主催者 No Show マーク → 参加者全員100%徴収
+#      または 参加者が「主催者来ない」を報告 → 返金
+# -------------------------------------------------------
+@router.post("/stripe/meetup-noshow")
+async def meetup_noshow(data: dict, db: Session = Depends(get_db)):
+    """
+    type = 'organizer'  → 主催者が参加者のNo Showをマーク（100%課金）
+    type = 'participant' → 参加者が主催者のNo Showを報告（全員返金 / 未課金なら何もしない）
+    """
+    post_id   = data.get("postId")
+    user_id   = data.get("userId")    # 操作するユーザー
+    target_id = data.get("targetId")  # No Showの対象（organizerの場合）
+    ntype     = data.get("type", "organizer")  # 'organizer' or 'participant'
+
+    if not post_id or not user_id:
+        raise HTTPException(status_code=400, detail="postId と userId が必要です")
+
+    post_id = int(post_id)
+    user_id = int(user_id)
+
+    post = db.execute(
+        text("SELECT user_id, meetup_fee_info, meetup_organizer_showed FROM hobby_posts WHERE id = :pid"),
+        {"pid": post_id}
+    ).fetchone()
+    if not post:
+        raise HTTPException(status_code=404, detail="投稿が見つかりません")
+
+    # ── 主催者が参加者のNo Showをマーク ──
+    if ntype == "organizer":
+        if post.user_id != user_id:
+            raise HTTPException(status_code=403, detail="主催者のみ操作できます")
+        if not target_id:
+            raise HTTPException(status_code=400, detail="targetId が必要です")
+
+        target_id = int(target_id)
+
+        response = db.execute(text("""
+            SELECT id, stripe_customer_id
+            FROM post_responses
+            WHERE user_id = :uid AND post_id = :pid AND is_participation = true
+        """), {"uid": target_id, "pid": post_id}).fetchone()
+
+        if not response or not response.stripe_customer_id:
+            return {"status": "no_card_registered"}
+
+        try:
+            fee = int(post.meetup_fee_info or 0)
+        except (TypeError, ValueError):
+            fee = 0
+
+        if fee > 0:
+            pms = stripe.PaymentMethod.list(
+                customer=response.stripe_customer_id, type="card"
+            )
+            if pms.data:
+                try:
+                    stripe.PaymentIntent.create(
+                        amount=fee,
+                        currency="jpy",
+                        customer=response.stripe_customer_id,
+                        payment_method=pms.data[0].id,
+                        confirm=True,
+                        off_session=True,
+                        metadata={
+                            "user_id": str(target_id),
+                            "post_id": str(post_id),
+                            "product": "meetup_noshow_fee",
+                        },
+                    )
+                except stripe.error.StripeError as e:
+                    raise HTTPException(status_code=500, detail=str(e))
+
+        db.execute(text("""
+            UPDATE post_responses
+            SET is_attended = false, cancel_charged_at = NOW()
+            WHERE id = :rid
+        """), {"rid": response.id})
+        db.commit()
+        return {"status": "noshow_charged", "amount": fee}
+
+    # ── 参加者が主催者のNo Showを報告 ──
+    elif ntype == "participant":
+        # 開催確定済みで課金されていたら返金
+        charged = db.execute(text("""
+            SELECT pr.user_id, pr.stripe_customer_id
+            FROM post_responses pr
+            WHERE pr.post_id = :pid
+              AND pr.is_participation = true
+              AND pr.cancel_charged_at IS NOT NULL
+        """), {"pid": post_id}).fetchall()
+
+        refunded = []
+        for p in charged:
+            try:
+                # 最新のPaymentIntentを取得して返金
+                pis = stripe.PaymentIntent.list(
+                    customer=p.stripe_customer_id, limit=5
+                )
+                for pi in pis.data:
+                    if (pi.metadata.get("post_id") == str(post_id)
+                            and pi.metadata.get("product") == "meetup_fee"
+                            and pi.status == "succeeded"):
+                        stripe.Refund.create(payment_intent=pi.id)
+                        refunded.append(p.user_id)
+                        break
+            except stripe.error.StripeError:
+                pass
+
+        # 主催者No Showフラグ
+        db.execute(text("""
+            UPDATE hobby_posts
+            SET meetup_organizer_showed = false
+            WHERE id = :pid
+        """), {"pid": post_id})
+        db.commit()
+
+        return {
+            "status":   "organizer_noshow_reported",
+            "refunded": len(refunded),
+            "user_ids": refunded,
+        }
+
+    raise HTTPException(status_code=400, detail="type は 'organizer' か 'participant' を指定してください")
+
 # -------------------------------------------------------
 # 10. Stripe Webhook（本番用）
 # -------------------------------------------------------
@@ -1208,7 +1664,6 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 db.rollback()
 
     return {"status": "ok"}
-
 
 # -------------------------------------------------------
 # 11. 今月の課金サマリー（MyPage用）

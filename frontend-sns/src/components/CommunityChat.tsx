@@ -688,27 +688,157 @@ const submitPost = async () => {
                                                 </div>
 
                                                 {/* 参加・キャンセル待ちボタン */}
-                            {/* ✅ 参加者リストのすぐ下に続くロジック */}
+                                                {/* ✅ 参加者リストのすぐ下に続くロジック */}
                                                 {!isJoined && !isOwner && (
                                                     dbParticipants.length < (post.meetup_capacity || 0) ? (
-                                                        <button onClick={() => authApi.post(`/posts/${post.id}/responses`, { content: "Join!", is_participation: true }).then(fetchPosts)} 
-                                                            className="w-full py-2.5 bg-orange-600 text-white rounded-xl text-[11px] font-black hover:bg-orange-700 shadow-md">
+                                                        <button
+                                                            onClick={async () => {
+                                                                // まずpost_responsesにレコード作成
+                                                                await authApi.post(`/posts/${post.id}/responses`, {
+                                                                    content: "Join!", is_participation: true
+                                                                });
+                                                                // 参加費が数値でありかつ0より大きい場合→カード登録へ
+                                                                const fee = Number(post.meetup_fee_info);
+                                                                if (post.meetup_fee_info && !isNaN(fee) && fee > 0) {
+                                                                    const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-join-setup`, {
+                                                                        method: 'POST',
+                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                        body: JSON.stringify({
+                                                                            userId: currentUserId,
+                                                                            postId: post.id,
+                                                                            categoryId: chatTargetId,
+                                                                        }),
+                                                                    });
+                                                                    const { checkout_url } = await res.json();
+                                                                    window.location.href = checkout_url;
+                                                                } else {
+                                                                    // 参加費なし → そのまま参加完了
+                                                                    fetchPosts();
+                                                                }
+                                                            }}
+                                                            className="w-full py-2.5 bg-orange-600 text-white rounded-xl text-[11px] font-black hover:bg-orange-700 shadow-md"
+                                                        >
                                                             JOIN THIS MEETUP / 参加を希望する
                                                         </button>
                                                     ) : (
-                                                        <button onClick={() => authApi.post(`/posts/${post.id}/responses`, { content: "Waitlist", is_participation: true }).then(fetchPosts)} 
-                                                            className="w-full py-2.5 bg-gray-800 text-white rounded-xl text-[11px] font-black hover:bg-gray-900 shadow-md">
+                                                        <button
+                                                            onClick={() => authApi.post(`/posts/${post.id}/responses`, {
+                                                                content: "Waitlist", is_participation: true
+                                                            }).then(fetchPosts)}
+                                                            className="w-full py-2.5 bg-gray-800 text-white rounded-xl text-[11px] font-black hover:bg-gray-900 shadow-md"
+                                                        >
                                                             JOIN WAITLIST / キャンセル待ち
                                                         </button>
                                                     )
                                                 )}
                                                 
                                                 {(isJoined || isOwner) && (
-                                                    <div className="w-full py-2 bg-orange-100 text-orange-600 rounded-xl text-[11px] font-black text-center">
-                                                        {isOwner ? "YOU ARE HOSTING THIS EVENT" : 
-                                                        allParticipants.find(p => p.user_id === currentUserId)?.content === "Waitlist" ? "ON WAITLIST (キャンセル待ち中)" : "YOU ARE JOINED!"}
+                                                <div className="space-y-2">
+                                                    {/* 参加者向け：キャンセルボタン */}
+                                                    {isJoined && !isOwner && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (!window.confirm("キャンセルしますか？\n当日0時以降は参加費の50%が発生します。")) return;
+                                                                try {
+                                                                    const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-cancel`, {
+                                                                        method: 'POST',
+                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                        body: JSON.stringify({
+                                                                            userId: currentUserId,
+                                                                            postId: post.id,
+                                                                        }),
+                                                                    });
+                                                                    const result = await res.json();
+                                                                    if (result.cancel_fee > 0) {
+                                                                        alert(`キャンセル料 ¥${result.cancel_fee} が発生しました。`);
+                                                                    } else {
+                                                                        alert("キャンセルしました。");
+                                                                    }
+                                                                    if (result.waitlist_user) {
+                                                                        alert(`キャンセル待ち中の ${result.waitlist_user.nickname} さんに通知しました。`);
+                                                                    }
+                                                                    fetchPosts();
+                                                                } catch {
+                                                                    alert("キャンセルに失敗しました。");
+                                                                }
+                                                            }}
+                                                            className="w-full py-2 bg-gray-100 text-gray-500 rounded-xl text-[11px] font-black hover:bg-red-50 hover:text-red-400 transition-colors"
+                                                        >
+                                                            キャンセルする
+                                                        </button>
+                                                    )}
+
+                                                    {/* ステータス表示 */}
+                                                    <div className={`w-full py-2 rounded-xl text-[11px] font-black text-center ${
+                                                        isOwner ? 'bg-orange-100 text-orange-600' : 'bg-green-50 text-green-600'
+                                                    }`}>
+                                                        {isOwner ? "YOU ARE HOSTING THIS EVENT" :
+                                                        allParticipants.find(p => p.user_id === currentUserId)?.content === "Waitlist"
+                                                            ? "ON WAITLIST (キャンセル待ち中)" : "YOU ARE JOINED! ✅"}
                                                     </div>
-                                                )}
+
+                                                    {/* 主催者向けボタン群 */}
+                                                    {isOwner && (
+                                                        <div className="space-y-2 pt-2 border-t border-orange-100">
+                                                            {/* 文言追記 */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    const addText = window.prompt("追記する内容を入力してください：");
+                                                                    if (addText && addText.trim()) {
+                                                                        try {
+                                                                            const updatedContent = `${post.content}\n\n📌 追記：${addText.trim()}`;
+                                                                            await authApi.patch(`/posts/${post.id}`, { content: updatedContent });
+                                                                            fetchPosts();
+                                                                        } catch {
+                                                                            alert("追記に失敗しました。");
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                className="w-full py-2 bg-blue-50 text-blue-600 rounded-xl text-[11px] font-black hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+                                                            >
+                                                                <CheckSquare size={12} /> 文言を追記する
+                                                            </button>
+
+                                                            {/* 開催決定 */}
+                                                            {!post.meetup_confirmed_at && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!window.confirm("開催を決定しますか？\n参加費ありの参加者に課金が発生します。")) return;
+                                                                        try {
+                                                                            const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-confirm`, {
+                                                                                method: 'POST',
+                                                                                headers: { 'Content-Type': 'application/json' },
+                                                                                body: JSON.stringify({
+                                                                                    postId: post.id,
+                                                                                    organizerId: currentUserId,
+                                                                                }),
+                                                                            });
+                                                                            const result = await res.json();
+                                                                            alert(`✅ 開催決定！${result.charged > 0 ? ` ${result.charged}名に課金しました。` : ' 参加費なし。'}`);
+                                                                            fetchPosts();
+                                                                        } catch {
+                                                                            alert("開催決定に失敗しました。");
+                                                                        }
+                                                                    }}
+                                                                    className="w-full py-2 bg-orange-500 text-white rounded-xl text-[11px] font-black hover:bg-orange-600 transition-colors"
+                                                                >
+                                                                    🎉 開催決定する
+                                                                </button>
+                                                            )}
+
+                                                            {/* 開催済み表示 */}
+                                                            {post.meetup_confirmed_at && (
+                                                                <div className="w-full py-2 bg-green-500 text-white rounded-xl text-[11px] font-black text-center">
+                                                                    ✅ 開催決定済み
+                                                                </div>
+                                                            )}
+
+                                                            {/* No Show報告（参加者個別）は MeetupChatModal側で対応 */}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                             </div>
                                         </div>
                                     )}
@@ -819,7 +949,13 @@ const submitPost = async () => {
             </div>
 
             {activeChat && (
-                <MeetupChatModal postId={activeChat.id} meetupTitle={activeChat.title} onClose={() => setActiveChat(null)} />
+                <MeetupChatModal
+                    postId={activeChat.id}
+                    meetupTitle={activeChat.title}
+                    onClose={() => setActiveChat(null)}
+                    currentUserId={currentUserId}
+                    isOrganizer={posts.find(p => p.id === activeChat.id)?.user_id === currentUserId}
+                />
             )}
             {showAdModal && (
             <AdPostModal
