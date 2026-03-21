@@ -75,7 +75,7 @@ def send_friend_request(
             {"uid": current_user.id}
         ).fetchone()
 
-        already_subscribed = sub_row and sub_row.status == "active"
+        already_subscribed = sub_row and sub_row.status in ("active", "pending")
 
         if not already_subscribed:
             # カード未登録 → フロントに SetupIntent へ誘導させる
