@@ -127,9 +127,9 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
     friendship_map = {}
     for f in friendships:
         if f.user_id == current_user.id:
+            # 自分がuser_id側 → is_mutedは自分の設定
             friendship_map[f.friend_id] = f
-        else:
-            friendship_map[f.user_id] = f
+        # friend_id側のレコードはis_mutedを使わない
 
     moods = []
     for user in users:
@@ -144,7 +144,7 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
             "mood_updated_at": user.mood_updated_at,
             "is_mood_comment_visible": user.is_mood_visible,
             "friend_note": fs.friend_note if fs else None,
-            "is_muted": fs.is_muted if fs else False,  # ← 追加
+            "is_muted": fs.is_muted if (fs and fs.user_id == current_user.id) else False,
         })
     return moods
 
