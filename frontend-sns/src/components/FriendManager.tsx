@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     searchUsers,
     sendFriendRequest,
@@ -9,13 +9,13 @@ import {
     UserProfileType,
     FriendRequest
 } from '../api';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../api';
 
 /* ======================
    ユーザー検索
 ====================== */
-const UserSearch: React.FC = () => {
+const UserSearch: React.FC<{ currentUserId: number | null }> = ({ currentUserId }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [results, setResults] = useState<UserProfileType[]>([]);
     const [loading, setLoading] = useState(false);
@@ -32,18 +32,47 @@ const UserSearch: React.FC = () => {
         }
     };
 
-    const handleSend = async (id: number, name: string) => {
-        if (status[id]) return;
-        setStatus({ ...status, [id]: 'pending' });
+    const handleSend = async (receiverId: number, name: string) => {
+        if (status[receiverId]) return;
+        setStatus(prev => ({ ...prev, [receiverId]: 'pending' }));
+
         try {
-            await sendFriendRequest(id);
-            setStatus({ ...status, [id]: 'sent' });
+            await sendFriendRequest(receiverId);
+            setStatus(prev => ({ ...prev, [receiverId]: 'sent' }));
             alert(`${name} に申請しました`);
-        } catch {
-            const newStatus = { ...status };
-            delete newStatus[id];
-            setStatus(newStatus);
-            alert('送信に失敗しました');
+        } catch (err: any) {
+            if (err.response?.status === 402 && err.response.data.detail?.requires_setup) {
+                // 人数超過 → SetupIntent（カード登録）へ誘導
+                const { msg } = err.response.data.detail;
+
+                if (window.confirm(`${msg}\n\nカード登録画面に移動しますか？`)) {
+                    try {
+                        const res = await authApi.post('/stripe/friend-manager-setup-intent', {
+                            requesterId: currentUserId,
+                            receiverId:  receiverId,
+                        });
+                        if (res.data.checkout_url) {
+                            window.location.href = res.data.checkout_url;
+                        }
+                    } catch {
+                        alert('エラーが発生しました。もう一度お試しください。');
+                    }
+                } else {
+                    // キャンセル時はボタンをリセット
+                    setStatus(prev => {
+                        const next = { ...prev };
+                        delete next[receiverId];
+                        return next;
+                    });
+                }
+            } else {
+                setStatus(prev => {
+                    const next = { ...prev };
+                    delete next[receiverId];
+                    return next;
+                });
+                alert('送信に失敗しました');
+            }
         }
     };
 
@@ -72,9 +101,10 @@ const UserSearch: React.FC = () => {
                         <button
                             onClick={() => handleSend(u.id, u.nickname || u.username)}
                             disabled={!!status[u.id]}
-                            className="bg-pink-100 px-3 py-1 rounded"
+                            className="bg-pink-100 px-3 py-1 rounded disabled:opacity-50"
                         >
-                            {status[u.id] === 'sent' ? '申請済み' : 'フレンド申請'}
+                            {status[u.id] === 'sent'    ? '申請済み'  :
+                             status[u.id] === 'pending' ? '送信中...' : 'フレンド申請'}
                         </button>
                     </li>
                 ))}
@@ -86,52 +116,54 @@ const UserSearch: React.FC = () => {
 /* ======================
    承認待ち
 ====================== */
-const RequestList: React.FC<{ currentUserId: number | null }> = ({ currentUserId }) => {
+const RequestList: React.FC = () => {
     const [requests, setRequests] = useState<FriendRequest[]>([]);
+    const [processing, setProcessing] = useState<Record<number, boolean>>({});
 
     const load = async () => {
         const res = await fetchFriendRequests();
         setRequests(res);
     };
 
+    useEffect(() => { load(); }, []);
+
     const handleAccept = async (requestId: number) => {
+        if (processing[requestId]) return;
+        setProcessing(prev => ({ ...prev, [requestId]: true }));
         try {
+            // 承認する → バックエンドが申請者のサブスクを自動開始
             await acceptFriendRequest(requestId);
-            alert("Success!");
+            alert('承認しました！');
             load();
         } catch (err: any) {
-            if (err.response?.status === 402) {
-                const { upgrade_msg, current_count } = err.response.data.detail;
-
-                if (window.confirm(`${upgrade_msg}\n\nFRIEND's managerに登録して友達を追加しますか？`)) {
-                    try {
-                        const res = await authApi.post('/stripe/friend-manager-checkout', {
-                            userId: currentUserId,  // ← 追加
-                            newFriendCount: current_count + 1,
-                        });
-                        if (res.data.checkout_url) {
-                            window.location.href = res.data.checkout_url;
-                        } else if (res.data.updated) {
-                            await acceptFriendRequest(requestId);
-                            alert("Success!");
-                            load();
-                        }
-                    } catch {
-                        alert("エラーが発生しました。もう一度お試しください。");
-                    }
-                }
-            } else {
-                alert("An error occurred.");
-            }
+            alert('エラーが発生しました。');
+        } finally {
+            setProcessing(prev => ({ ...prev, [requestId]: false }));
         }
     };
 
-    useEffect(() => { load(); }, []);
+    const handleReject = async (requestId: number) => {
+        if (processing[requestId]) return;
+        setProcessing(prev => ({ ...prev, [requestId]: true }));
+        try {
+            // 拒否する → 課金なし。SetupIntentはStripe側で自然失効。
+            await rejectFriendRequest(requestId);
+            load();
+        } catch {
+            alert('エラーが発生しました。');
+        } finally {
+            setProcessing(prev => ({ ...prev, [requestId]: false }));
+        }
+    };
+
+    if (requests.length === 0) {
+        return <p className="text-gray-500 text-sm p-4">承認待ちの申請はありません。</p>;
+    }
 
     return (
         <ul className="divide-y bg-white rounded shadow">
             {requests.map(r => (
-                <li key={r.id} className="p-4 flex justify-between">
+                <li key={r.id} className="p-4 flex justify-between items-center">
                     <p>
                         <Link to={`/profile/${r.requester.id}`} className="text-pink-500">
                             {r.requester.nickname || r.requester.username}
@@ -140,12 +172,19 @@ const RequestList: React.FC<{ currentUserId: number | null }> = ({ currentUserId
                     </p>
                     <div className="space-x-2">
                         <button
-                            className="bg-pink-500 text-white px-3 py-1 rounded text-sm"
+                            className="bg-pink-500 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
                             onClick={() => handleAccept(r.id)}
+                            disabled={!!processing[r.id]}
                         >
-                            承認
+                            {processing[r.id] ? '処理中...' : '承認'}
                         </button>
-                        <button onClick={() => rejectFriendRequest(r.id).then(load)}>拒否</button>
+                        <button
+                            className="px-3 py-1 rounded text-sm border disabled:opacity-50"
+                            onClick={() => handleReject(r.id)}
+                            disabled={!!processing[r.id]}
+                        >
+                            拒否
+                        </button>
                     </div>
                 </li>
             ))}
@@ -171,13 +210,11 @@ const FriendList: React.FC = () => {
         const note = editingNotes[friendshipId];
         if (note === undefined) return;
         try {
-            await authApi.put(`/friends/friendships/${friendshipId}`, {
-                friend_note: note
-            });
-            alert("メモを保存しました");
+            await authApi.put(`/friends/friendships/${friendshipId}`, { friend_note: note });
+            alert('メモを保存しました');
             load();
-        } catch (err) {
-            alert("保存に失敗しました");
+        } catch {
+            alert('保存に失敗しました');
         }
     };
 
@@ -189,7 +226,7 @@ const FriendList: React.FC = () => {
                         <p className="font-bold text-gray-900">
                             {(() => {
                                 const fInfo = f.friend;
-                                if (!fInfo) return "読み込み中...";
+                                if (!fInfo) return '読み込み中...';
                                 if (fInfo.nickname) return fInfo.nickname;
                                 if (fInfo.email) return fInfo.email.split('@')[0];
                                 return fInfo.username;
@@ -201,10 +238,10 @@ const FriendList: React.FC = () => {
                                 defaultValue={f.friend_note || ''}
                                 className="border text-xs p-1 flex-grow rounded"
                                 placeholder="メモを追加..."
-                                onChange={e => setEditingNotes({
-                                    ...editingNotes,
+                                onChange={e => setEditingNotes(prev => ({
+                                    ...prev,
                                     [f.id]: e.target.value
-                                })}
+                                }))}
                             />
                             <button
                                 onClick={() => handleSaveNote(f.id)}
@@ -216,9 +253,11 @@ const FriendList: React.FC = () => {
                     </div>
 
                     <button
-                        onClick={() => authApi.put(`/friends/friendships/${f.id}`, {
-                            is_muted: !f.is_muted
-                        }).then(load)}
+                        onClick={() =>
+                            authApi.put(`/friends/friendships/${f.id}`, {
+                                is_muted: !f.is_muted
+                            }).then(load)
+                        }
                         className={`p-2 rounded-full ${f.is_muted ? 'bg-gray-200' : 'bg-pink-100'}`}
                     >
                         {f.is_muted ? '🔇' : '📣'}
@@ -233,38 +272,88 @@ const FriendList: React.FC = () => {
    メイン
 ====================== */
 const FriendManager: React.FC = () => {
-    const location = useLocation(); // ✅ 追加：URLの情報を取得
+    const location = useLocation();
+    const navigate = useNavigate();
 
-    // ✅ tabの初期値を location.state?.tab から受け取るように変更
     const [tab, setTab] = useState<'search' | 'requests' | 'friends'>(
         location.state?.tab || 'search'
     );
-    
-    const [pendingCount, setPendingCount] = useState(0);
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const [pendingCount, setPendingCount]       = useState(0);
+    const [currentUserId, setCurrentUserId]     = useState<number | null>(null);
+    const [isProcessingSetup, setIsProcessingSetup] = useState(false);
+    const [setupMessage, setSetupMessage]       = useState<string | null>(null);
+
+    // ── SetupIntent 完了後のリダイレクト処理（HomeFeed と同パターン）──
+    useEffect(() => {
+        const params        = new URLSearchParams(location.search);
+        const setupDone     = params.get('fm_setup_done');
+        const receiverIdStr = params.get('receiver_id');
+
+        // パラメータがない or すでに処理中なら何もしない
+        if (!setupDone || !receiverIdStr || isProcessingSetup) return;
+
+        const processSetup = async () => {
+            setIsProcessingSetup(true);
+            try {
+                const receiverId = Number(receiverIdStr);
+                await sendFriendRequest(receiverId);
+                setSetupMessage('カード登録が完了しました。申請を送りました。相手の承認をお待ちください。');
+            } catch (err: any) {
+                if (err.response?.status === 400 && err.response.data.detail === '既に申請済みです。') {
+                    setSetupMessage('カード登録が完了しました。申請は送信済みです。');
+                } else {
+                    setSetupMessage('カード登録は完了しましたが、申請の送信に失敗しました。再度お試しください。');
+                }
+            } finally {
+                setIsProcessingSetup(false);
+                // URLパラメータをクリア（HomeFeed 同様 replace: true）
+                navigate('/friends', { replace: true });
+            }
+        };
+
+        processSetup();
+    }, [location.search, isProcessingSetup, navigate]);
+
+    // ── 承認待ち件数・ユーザーID取得 ──
+    const loadPendingCount = useCallback(async () => {
+        try {
+            const res = await authApi.get('/friends/pending/count');
+            setPendingCount(res.data.pending_count || 0);
+        } catch {}
+    }, []);
 
     useEffect(() => {
-        authApi.get('/friends/pending/count')
-            .then(res => setPendingCount(res.data.pending_count))
-            .catch(() => {});
-        
-        // ← 追加
+        loadPendingCount();
         authApi.get('/users/me')
             .then(res => setCurrentUserId(res.data.id))
             .catch(() => {});
-    }, []);
+    }, [loadPendingCount]);
 
     return (
         <div className="p-6">
             <h1 className="text-2xl font-bold mb-4">ともだち管理</h1>
+
+            {/* SetupIntent 完了後メッセージ */}
+            {isProcessingSetup && (
+                <p className="text-xs text-purple-400 animate-pulse mb-4">カード登録を確認中...</p>
+            )}
+            {setupMessage && (
+                <p className="text-xs text-green-600 bg-green-50 border border-green-200 rounded p-3 mb-4">
+                    {setupMessage}
+                </p>
+            )}
+
             <div className="flex gap-4 mb-6">
-                <button onClick={() => setTab('search')}>検索</button>
+                <button
+                    onClick={() => setTab('search')}
+                    className={tab === 'search' ? 'font-bold border-b-2 border-pink-500' : ''}
+                >
+                    検索
+                </button>
                 <button
                     onClick={() => setTab('requests')}
                     className={`relative ${
-                        tab === 'requests'
-                            ? 'font-bold border-b-2 border-pink-500'
-                            : ''
+                        tab === 'requests' ? 'font-bold border-b-2 border-pink-500' : ''
                     } ${pendingCount > 0 ? 'text-amber-500 font-bold' : ''}`}
                 >
                     承認待ち
@@ -274,12 +363,17 @@ const FriendManager: React.FC = () => {
                         </span>
                     )}
                 </button>
-                <button onClick={() => setTab('friends')}>一覧</button>
+                <button
+                    onClick={() => setTab('friends')}
+                    className={tab === 'friends' ? 'font-bold border-b-2 border-pink-500' : ''}
+                >
+                    一覧
+                </button>
             </div>
 
-            {tab === 'search' && <UserSearch />}
-            {tab === 'requests' && <RequestList currentUserId={currentUserId} />}  {/* ← userId渡す */}
-            {tab === 'friends' && <FriendList />}
+            {tab === 'search'   && <UserSearch currentUserId={currentUserId} />}
+            {tab === 'requests' && <RequestList />}
+            {tab === 'friends'  && <FriendList />}
         </div>
     );
 };
