@@ -60,19 +60,147 @@ def _get_or_create_stripe_customer(user_id: int, db: Session) -> str:
 
 
 def _calc_amount(friend_count: int) -> int:
-    """友達数から月額を計算する。10人以下は0円。"""
+    """友達数から月額を計算する。無料枠以下は0円。"""
     extra = max(0, friend_count - FRIEND_FREE_LIMIT)
     return extra * PRICE_PER_FRIEND
 
 
 def _get_friend_count(user_id: int, db: Session) -> int:
-    """現在の友達数を取得する。"""
+    """現在の友達数を取得する。Friendshipモデルに status カラムはないので user_id のみで集計。"""
     result = db.execute(text("""
         SELECT COUNT(*) AS cnt FROM friendships
-        WHERE (user_id = :uid OR friend_id = :uid)
-          AND status = 'accepted'
+        WHERE user_id = :uid
     """), {"uid": user_id}).fetchone()
     return result.cnt if result else 0
+
+
+def _create_subscription_for_requester(requester_id: int, db: Session) -> dict:
+    """
+    承認時に呼び出す共通関数。
+    申請者のカード（Setup済み）でサブスクを作成、または既存サブスクの金額を更新する。
+    カード未登録の場合は何もしない（無料枠内とみなす）。
+    """
+    friend_count = _get_friend_count(requester_id, db)
+    # 承認後の人数（+1）で計算
+    new_count = friend_count + 1
+    extra = max(0, new_count - FRIEND_FREE_LIMIT)
+
+    if extra <= 0:
+        return {"requires_payment": False}
+
+    amount = extra * PRICE_PER_FRIEND
+
+    sub_row = db.execute(
+        text("""
+            SELECT stripe_customer_id, stripe_subscription_id, status
+            FROM friend_manager_subscriptions
+            WHERE user_id = :uid
+        """),
+        {"uid": requester_id}
+    ).fetchone()
+
+    # カード未登録（SetupIntentをスキップした場合）→ 何もしない
+    if not sub_row or not sub_row.stripe_customer_id:
+        return {"requires_payment": False, "skipped": True}
+
+    customer_id = sub_row.stripe_customer_id
+
+    # ── 既存アクティブサブスクがある → 金額更新のみ ──
+    if sub_row.stripe_subscription_id and sub_row.status == "active":
+        subscription = stripe.Subscription.retrieve(sub_row.stripe_subscription_id)
+        item_id = subscription["items"]["data"][0]["id"]
+        new_price = stripe.Price.create(
+            unit_amount=amount,
+            currency="jpy",
+            recurring={"interval": "month"},
+            product_data={"name": "FRIEND's manager"},
+            metadata={"user_id": str(requester_id), "extra_count": str(extra)},
+        )
+        stripe.Subscription.modify(
+            sub_row.stripe_subscription_id,
+            items=[{"id": item_id, "price": new_price.id}],
+            proration_behavior="none",
+        )
+        db.execute(text("""
+            UPDATE friend_manager_subscriptions
+            SET friend_count = :fc,
+                charged_extra_count = :ec,
+                current_amount = :amt,
+                updated_at = NOW()
+            WHERE user_id = :uid
+        """), {"fc": new_count, "ec": extra, "amt": amount, "uid": requester_id})
+        db.commit()
+        return {"updated": True, "monthly_amount": amount}
+
+    # ── 新規サブスク作成 ──
+    # Setup済みのカードを取得（最新のもの）
+    payment_methods = stripe.PaymentMethod.list(customer=customer_id, type="card")
+    if not payment_methods.data:
+        # カードが見つからない（SetupIntentが未完了など）→ スキップ
+        return {"requires_payment": False, "skipped": True, "reason": "no_payment_method"}
+
+    pm_id = payment_methods.data[0].id
+
+    # デフォルトPMを設定
+    stripe.Customer.modify(customer_id, invoice_settings={"default_payment_method": pm_id})
+
+    # 月末7日ルールで課金開始日を決定
+    today = datetime.now(timezone.utc).date()
+    _, last_day = monthrange(today.year, today.month)
+    days_until_end = last_day - today.day
+
+    price = stripe.Price.create(
+        unit_amount=amount,
+        currency="jpy",
+        recurring={"interval": "month"},
+        product_data={"name": "FRIEND's manager"},
+        metadata={"user_id": str(requester_id), "extra_count": str(extra)},
+    )
+
+    sub_params: dict = {
+        "customer": customer_id,
+        "items": [{"price": price.id}],
+        "default_payment_method": pm_id,
+        "metadata": {
+            "user_id": str(requester_id),
+            "product": "friend_manager",
+            "extra_count": str(extra),
+            "friend_count": str(new_count),
+        },
+    }
+
+    if days_until_end < 7:
+        # 翌月1日から課金開始（trial期間を設定）
+        if today.month == 12:
+            billing_start = date(today.year + 1, 1, 1)
+        else:
+            billing_start = date(today.year, today.month + 1, 1)
+        trial_end = int(
+            datetime(billing_start.year, billing_start.month, 1, tzinfo=timezone.utc).timestamp()
+        )
+        sub_params["trial_end"] = trial_end
+
+    subscription = stripe.Subscription.create(**sub_params)
+
+    db.execute(text("""
+        UPDATE friend_manager_subscriptions
+        SET stripe_subscription_id = :sid,
+            status = 'active',
+            friend_count = :fc,
+            charged_extra_count = :ec,
+            current_amount = :amt,
+            updated_at = NOW()
+        WHERE user_id = :uid
+    """), {
+        "sid": subscription.id,
+        "fc": new_count,
+        "ec": extra,
+        "amt": amount,
+        "uid": requester_id,
+    })
+    db.commit()
+
+    return {"subscribed": True, "monthly_amount": amount, "extra_count": extra}
 
 
 # ===============================================================
@@ -80,13 +208,76 @@ def _get_friend_count(user_id: int, db: Session) -> int:
 # ===============================================================
 
 # -------------------------------------------------------
+# FM-0. SetupIntent 作成（申請者が人数超過時）
+#        カード登録のみ。まだ課金しない。
+# -------------------------------------------------------
+@router.post("/stripe/friend-manager-setup-intent")
+async def create_friend_manager_setup_intent(data: dict, db: Session = Depends(get_db)):
+    """
+    申請者が FRIEND_FREE_LIMIT 人以上のフレンドを持つ場合に呼び出す。
+    Stripe Checkout（mode=setup）でカードを登録させる。
+    課金は承認者が承認したタイミングで開始する。
+    """
+    requester_id = data.get("requesterId")
+    receiver_id  = data.get("receiverId")
+    if not requester_id or not receiver_id:
+        raise HTTPException(status_code=400, detail="requesterId と receiverId が必要です")
+
+    requester_id = int(requester_id)
+    receiver_id  = int(receiver_id)
+
+    # Stripe Customer を作成 or 取得
+    customer_id = _get_or_create_stripe_customer(requester_id, db)
+
+    # customer_id を friend_manager_subscriptions に保存（初回のみ INSERT）
+    existing = db.execute(
+        text("SELECT id FROM friend_manager_subscriptions WHERE user_id = :uid"),
+        {"uid": requester_id}
+    ).fetchone()
+
+    if not existing:
+        db.execute(text("""
+            INSERT INTO friend_manager_subscriptions
+                (user_id, stripe_customer_id, status, friend_count, charged_extra_count, current_amount)
+            VALUES (:uid, :cid, 'pending', 0, 0, 0)
+        """), {"uid": requester_id, "cid": customer_id})
+    else:
+        db.execute(text("""
+            UPDATE friend_manager_subscriptions
+            SET stripe_customer_id = :cid
+            WHERE user_id = :uid
+        """), {"uid": requester_id, "cid": customer_id})
+    db.commit()
+
+    try:
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            mode="setup",
+            success_url=(
+                f"{FRONTEND_URL}/friends"
+                f"?fm_setup_done=true"
+                f"&receiver_id={receiver_id}"
+                f"&setup_session_id={{CHECKOUT_SESSION_ID}}"
+            ),
+            cancel_url=f"{FRONTEND_URL}/friends",
+            metadata={
+                "user_id":     str(requester_id),
+                "receiver_id": str(receiver_id),
+                "product":     "friend_manager_setup",
+            },
+        )
+        return {"checkout_url": session.url}
+
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------------
 # FM-1. サブスクリプション状態チェック
 # -------------------------------------------------------
 @router.get("/stripe/friend-manager-status")
 async def get_friend_manager_status(user_id: int, db: Session = Depends(get_db)):
-    """
-    フロントエンドが友達追加前後に呼び出し、課金状態を確認する。
-    """
     friend_count = _get_friend_count(user_id, db)
     amount = _calc_amount(friend_count)
 
@@ -100,27 +291,26 @@ async def get_friend_manager_status(user_id: int, db: Session = Depends(get_db))
     ).fetchone()
 
     return {
-        "friend_count": friend_count,
-        "free_limit": FRIEND_FREE_LIMIT,
-        "extra_count": max(0, friend_count - FRIEND_FREE_LIMIT),
+        "friend_count":   friend_count,
+        "free_limit":     FRIEND_FREE_LIMIT,
+        "extra_count":    max(0, friend_count - FRIEND_FREE_LIMIT),
         "monthly_amount": amount,
         "subscription": {
-            "exists": sub is not None,
-            "status": sub.status if sub else "none",
+            "exists":          sub is not None,
+            "status":          sub.status if sub else "none",
             "subscription_id": sub.stripe_subscription_id if sub else None,
-            "current_amount": sub.current_amount if sub else 0,
+            "current_amount":  sub.current_amount if sub else 0,
         } if sub else {"exists": False, "status": "none"},
     }
 
 
 # -------------------------------------------------------
-# FM-2. サブスクリプション作成 or 金額更新 チェックアウト
-#        （11人目以降を友達追加するたびに呼び出す）
+# FM-2. （旧 checkout フロー・後方互換で残す）
 # -------------------------------------------------------
-
 @router.post("/stripe/friend-manager-checkout")
 async def create_friend_manager_checkout(data: dict, db: Session = Depends(get_db)):
-    user_id = data.get("userId")
+    """後方互換。新規フローは FM-0 (setup-intent) を使うこと。"""
+    user_id          = data.get("userId")
     new_friend_count = data.get("newFriendCount")
     if not user_id or new_friend_count is None:
         raise HTTPException(status_code=400, detail="userId と newFriendCount が必要です")
@@ -132,7 +322,6 @@ async def create_friend_manager_checkout(data: dict, db: Session = Depends(get_d
 
     amount = extra * PRICE_PER_FRIEND
 
-    # 既存サブスクを確認
     sub = db.execute(
         text("SELECT stripe_subscription_id, status, stripe_customer_id FROM friend_manager_subscriptions WHERE user_id = :uid"),
         {"uid": user_id}
@@ -141,141 +330,104 @@ async def create_friend_manager_checkout(data: dict, db: Session = Depends(get_d
     try:
         customer_id = _get_or_create_stripe_customer(int(user_id), db)
 
-        # ---- 1. サブスクが既にアクティブ（金額更新のみ） ----
         if sub and sub.stripe_subscription_id and sub.status == "active":
             subscription = stripe.Subscription.retrieve(sub.stripe_subscription_id)
             item_id = subscription["items"]["data"][0]["id"]
-
             new_price = stripe.Price.create(
-                unit_amount=amount,
-                currency="jpy",
+                unit_amount=amount, currency="jpy",
                 recurring={"interval": "month"},
                 product_data={"name": "FRIEND's manager"},
                 metadata={"user_id": str(user_id), "extra_count": str(extra)},
             )
-
             stripe.Subscription.modify(
                 sub.stripe_subscription_id,
                 items=[{"id": item_id, "price": new_price.id}],
                 proration_behavior="none",
             )
-
             db.execute(text("""
                 UPDATE friend_manager_subscriptions
-                SET friend_count = :fc,
-                    charged_extra_count = :ec,
-                    current_amount = :amt,
-                    updated_at = NOW()
+                SET friend_count = :fc, charged_extra_count = :ec,
+                    current_amount = :amt, updated_at = NOW()
                 WHERE user_id = :uid
             """), {"fc": new_friend_count, "ec": extra, "amt": amount, "uid": int(user_id)})
             db.commit()
+            return {"requires_payment": False, "updated": True, "monthly_amount": amount}
 
-            return {
-                "requires_payment": False,
-                "updated": True,
-                "monthly_amount": amount,
-                "extra_count": extra,
-            }
-
-        # ---- 2. サブスク未作成 or キャンセル済み（新規発行・トライアル判定あり） ----
-        
-        # 月末7日ルールで課金開始日を決定
         today = datetime.now(timezone.utc).date()
         _, last_day = monthrange(today.year, today.month)
         days_until_end = last_day - today.day
 
         if days_until_end < 7:
-            # 翌月1日から課金開始
             if today.month == 12:
                 billing_start = date(today.year + 1, 1, 1)
             else:
                 billing_start = date(today.year, today.month + 1, 1)
-            # トライアル終了時刻（翌月1日 00:00:00 UTC）
             trial_end = int(datetime(billing_start.year, billing_start.month, 1, tzinfo=timezone.utc).timestamp())
         else:
-            # 当日から課金開始
             billing_start = today
             trial_end = None
 
-        # Stripe Price を作成
         price = stripe.Price.create(
-            unit_amount=amount,
-            currency="jpy",
+            unit_amount=amount, currency="jpy",
             recurring={"interval": "month"},
             product_data={"name": "FRIEND's manager"},
             metadata={"user_id": str(user_id), "extra_count": str(extra)},
         )
 
-        # Checkout Session パラメータ
-        session_params = {
+        session_params: dict = {
             "customer": customer_id,
             "payment_method_types": ["card"],
             "line_items": [{"price": price.id, "quantity": 1}],
             "mode": "subscription",
             "success_url": f"{FRONTEND_URL}/friends?fm_session={{CHECKOUT_SESSION_ID}}",
-            "cancel_url": f"{FRONTEND_URL}/friends",
+            "cancel_url":  f"{FRONTEND_URL}/friends",
             "metadata": {
-                "user_id": str(user_id),
-                "product": "friend_manager",
-                "extra_count": str(extra),
-                "friend_count": str(new_friend_count),
+                "user_id": str(user_id), "product": "friend_manager",
+                "extra_count": str(extra), "friend_count": str(new_friend_count),
                 "billing_start": billing_start.isoformat(),
             },
         }
-
-        # 翌月課金の場合はトライアル設定を追加
         if trial_end:
             session_params["subscription_data"] = {"trial_end": trial_end}
 
         session = stripe.checkout.Session.create(**session_params)
 
-        # DB保存（billing_start_date を含む）
         existing = db.execute(
             text("SELECT id FROM friend_manager_subscriptions WHERE user_id = :uid"),
             {"uid": int(user_id)}
         ).fetchone()
 
-        query_params = {
-            "uid": int(user_id), "cid": customer_id, "fc": new_friend_count,
-            "ec": extra, "amt": amount, "bsd": billing_start
-        }
-
+        qp = {"uid": int(user_id), "cid": customer_id, "fc": new_friend_count,
+              "ec": extra, "amt": amount, "bsd": billing_start}
         if not existing:
             db.execute(text("""
                 INSERT INTO friend_manager_subscriptions
-                    (user_id, stripe_customer_id, status, friend_count, 
+                    (user_id, stripe_customer_id, status, friend_count,
                      charged_extra_count, current_amount, billing_start_date)
                 VALUES (:uid, :cid, 'pending', :fc, :ec, :amt, :bsd)
-            """), query_params)
+            """), qp)
         else:
             db.execute(text("""
                 UPDATE friend_manager_subscriptions
                 SET stripe_customer_id = :cid, status = 'pending',
-                    friend_count = :fc, charged_extra_count = :ec, 
+                    friend_count = :fc, charged_extra_count = :ec,
                     current_amount = :amt, billing_start_date = :bsd
                 WHERE user_id = :uid
-            """), query_params)
-        
+            """), qp)
         db.commit()
 
-        return {
-            "requires_payment": True,
-            "checkout_url": session.url,
-            "monthly_amount": amount,
-            "extra_count": extra,
-        }
+        return {"requires_payment": True, "checkout_url": session.url,
+                "monthly_amount": amount, "extra_count": extra}
 
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
 # -------------------------------------------------------
-# FM-3. サブスクリプション有効化（Checkout成功後）
+# FM-3. サブスクリプション有効化（旧 Checkout 成功後）
 # -------------------------------------------------------
 @router.post("/stripe/friend-manager-activate")
 async def activate_friend_manager(data: dict, db: Session = Depends(get_db)):
-    """
-    フロントエンドが success_url から session_id を受け取り呼び出す。
-    """
     session_id = data.get("sessionId")
     if not session_id:
         raise HTTPException(status_code=400, detail="sessionId が必要です")
@@ -289,11 +441,11 @@ async def activate_friend_manager(data: dict, db: Session = Depends(get_db)):
     except stripe.error.StripeError:
         raise HTTPException(status_code=400, detail="無効なセッションです")
 
-    user_id = stripe_session.metadata.get("user_id")
+    user_id       = stripe_session.metadata.get("user_id")
     subscription_id = stripe_session.subscription
-    extra_count = int(stripe_session.metadata.get("extra_count", 0))
-    friend_count = int(stripe_session.metadata.get("friend_count", 0))
-    amount = extra_count * PRICE_PER_FRIEND
+    extra_count   = int(stripe_session.metadata.get("extra_count", 0))
+    friend_count  = int(stripe_session.metadata.get("friend_count", 0))
+    amount        = extra_count * PRICE_PER_FRIEND
 
     db.execute(text("""
         UPDATE friend_manager_subscriptions
@@ -304,21 +456,18 @@ async def activate_friend_manager(data: dict, db: Session = Depends(get_db)):
             current_amount = :amt,
             updated_at = NOW()
         WHERE user_id = :uid
-    """), {"sid": subscription_id, "fc": friend_count, "ec": extra_count, "amt": amount, "uid": int(user_id)})
+    """), {"sid": subscription_id, "fc": friend_count, "ec": extra_count,
+           "amt": amount, "uid": int(user_id)})
     db.commit()
 
     return {"status": "activated", "monthly_amount": amount, "extra_count": extra_count}
 
 
 # -------------------------------------------------------
-# FM-4. サブスクリプションキャンセル（友達を10人以下に減らした場合）
+# FM-4. サブスクリプションキャンセル
 # -------------------------------------------------------
 @router.post("/stripe/friend-manager-cancel")
 async def cancel_friend_manager(data: dict, db: Session = Depends(get_db)):
-    """
-    友達が10人以下になったらサブスクをキャンセルする。
-    フロントから: { "userId": 123 }
-    """
     user_id = data.get("userId")
     if not user_id:
         raise HTTPException(status_code=400, detail="userId が必要です")
@@ -332,11 +481,7 @@ async def cancel_friend_manager(data: dict, db: Session = Depends(get_db)):
         return {"status": "no_active_subscription"}
 
     try:
-        # 期末キャンセル（月末まで有効）
-        stripe.Subscription.modify(
-            sub.stripe_subscription_id,
-            cancel_at_period_end=True,
-        )
+        stripe.Subscription.modify(sub.stripe_subscription_id, cancel_at_period_end=True)
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -348,7 +493,6 @@ async def cancel_friend_manager(data: dict, db: Session = Depends(get_db)):
     db.commit()
 
     return {"status": "cancel_scheduled"}
-
 
 # ===============================================================
 # 既存エンドポイント（変更なし）

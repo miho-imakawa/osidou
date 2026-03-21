@@ -1,11 +1,18 @@
 from pydantic import BaseModel, ConfigDict
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import text
 from typing import List, Optional
 
 from .. import models, schemas
 from ..utils.security import get_current_user
 from ..database import get_db
+
+# stripe_payment から定数と共通関数をインポート
+from ..routers.stripe_payment import (
+    FRIEND_FREE_LIMIT,
+    _create_subscription_for_requester,
+)
 
 class FriendshipUpdate(BaseModel):
     friend_note: Optional[str] = None
@@ -13,8 +20,11 @@ class FriendshipUpdate(BaseModel):
 
 router = APIRouter(tags=["Friend Requests"])
 
+
 # -----------------------------------------------------
 # 1. フレンド申請の送信
+#    申請者が FRIEND_FREE_LIMIT 人以上 → 402 を返す
+#    フロントは 402 を受け取ったら setup-intent エンドポイントへ
 # -----------------------------------------------------
 @router.post(
     "/{receiver_id}/friend_request",
@@ -42,9 +52,42 @@ def send_friend_request(
         )
         .first()
     )
-
     if existing_request:
         raise HTTPException(status_code=400, detail="既に申請済みです。")
+
+    # ── 申請者の友達数チェック ──
+    friend_count = (
+        db.query(models.Friendship)
+        .filter(models.Friendship.user_id == current_user.id)
+        .count()
+    )
+
+    if friend_count >= FRIEND_FREE_LIMIT:
+        # アクティブなサブスクがすでにあれば追加課金は承認後に自動処理 → 申請OK
+        sub_row = db.execute(
+            text("""
+                SELECT status FROM friend_manager_subscriptions
+                WHERE user_id = :uid
+            """),
+            {"uid": current_user.id}
+        ).fetchone()
+
+        already_subscribed = sub_row and sub_row.status == "active"
+
+        if not already_subscribed:
+            # カード未登録 → フロントに SetupIntent へ誘導させる
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "requires_setup": True,
+                    "current_count":  friend_count,
+                    "receiver_id":    receiver_id,
+                    "msg": (
+                        f"友達が{FRIEND_FREE_LIMIT}人以上のため、"
+                        f"カード登録が必要です（¥100/月）"
+                    ),
+                }
+            )
 
     new_request = models.FriendRequest(
         requester_id=current_user.id,
@@ -78,6 +121,8 @@ def get_friend_requests(
 
 # -----------------------------------------------------
 # 3. フレンド申請の承認 / 拒否
+#    承認時：Friendship 作成 → 申請者のサブスク開始（カード登録済みの場合）
+#    拒否時：ステータス更新のみ。課金なし。
 # -----------------------------------------------------
 @router.put("/friend_requests/{request_id}/status")
 def update_friend_request_status(
@@ -102,23 +147,7 @@ def update_friend_request_status(
         raise HTTPException(status_code=400, detail="既に処理済みです。")
 
     if payload.status == models.FriendRequestStatus.ACCEPTED:
-        friend_count = db.query(models.Friendship).filter(
-            models.Friendship.user_id == current_user.id
-        ).count()
-
-        allowed_limit = 10 + (current_user.paid_friend_slots or 0)
-
-        if friend_count >= allowed_limit:
-            upgrade_msg = f"{friend_count} + 1 x Cost ¥100 /Month"
-            raise HTTPException(
-                status_code=402,
-                detail={
-                    "upgrade_msg": upgrade_msg,
-                    "current_count": friend_count,
-                    "allowed_limit": allowed_limit,
-                }
-            )
-
+        # Friendship を双方向で作成
         request_obj.status = models.FriendRequestStatus.ACCEPTED
         friendships = [
             models.Friendship(
@@ -137,7 +166,16 @@ def update_friend_request_status(
         db.add_all(friendships)
         db.commit()
 
+        # 申請者のサブスクを開始（カード登録済みの場合のみ）
+        # エラーが起きてもフレンド追加自体はロールバックしない
+        try:
+            _create_subscription_for_requester(request_obj.requester_id, db)
+        except Exception as e:
+            # サブスク作成失敗はログに残すが承認は成立させる
+            print(f"[WARN] subscribe failed for user {request_obj.requester_id}: {e}")
+
     elif payload.status == models.FriendRequestStatus.REJECTED:
+        # 拒否：ステータス更新のみ。課金なし。SetupIntentはStripe側で自然失効。
         request_obj.status = models.FriendRequestStatus.REJECTED
         db.commit()
 
@@ -169,13 +207,12 @@ def get_my_friends(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    friends = (
+    return (
         db.query(models.Friendship)
         .options(joinedload(models.Friendship.friend))
         .filter(models.Friendship.user_id == current_user.id)
         .all()
     )
-    return friends
 
 
 # -----------------------------------------------------
@@ -235,6 +272,9 @@ def update_friendship(
     if payload.friend_note is not None:
         friendship.friend_note = payload.friend_note
 
+    if payload.is_muted is not None:
+        friendship.is_muted = payload.is_muted
+
     db.commit()
     return {"message": "保存しました"}
 
@@ -255,28 +295,22 @@ def get_pending_friend_requests_count(
 
 
 # -----------------------------------------------------
-# 9. ✅ 友達数カウント（HomeFeed用）
-#    COUNT(*) 1本だけなので非常に軽い
+# 9. 友達数カウント（HomeFeed用）
 # -----------------------------------------------------
 @router.get("/me/friends/count", summary="自分の友達数を取得")
 def get_friend_count(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """
-    友達の総数と、無料枠（10人）を超えた人数を返す。
-    HomeFeed の「ともだちs' LOG」ヘッダー表示用。
-    """
     total = db.query(models.Friendship).filter(
         models.Friendship.user_id == current_user.id
     ).count()
 
-    free_limit = 10
-    over = max(0, total - free_limit)
+    over = max(0, total - FRIEND_FREE_LIMIT)
 
     return {
-        "total": total,
-        "over": over,          # 10人超えの人数（課金対象）
+        "total":      total,
+        "over":       over,
         "is_billing": over > 0,
     }
 
@@ -287,7 +321,7 @@ def get_friend_count(
 class FriendLimitResponse(BaseModel):
     current_count: int
     allowed_limit: int
-    upgrade_msg: str
+    upgrade_msg:   str
     stripe_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
