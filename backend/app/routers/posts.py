@@ -523,7 +523,7 @@ def update_post_content(
         raise HTTPException(status_code=403, detail="投稿者本人のみ編集できます")
 
     if not post.is_ad:
-        raise HTTPException(status_code=403, detail="AD投稿のみ編集できます")
+        if not post.is_ad and not post.is_meetup:raise HTTPException(status_code=403, detail="AD・MEETUP投稿のみ編集できます")
 
     post.content = data.content
     db.commit()

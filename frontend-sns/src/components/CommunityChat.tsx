@@ -645,30 +645,6 @@ const submitPost = async () => {
                                             {post.content}
                                         </p>
 
-                                        {/* 💡 主催者専用：文言追記ボタン */}
-                                        {isOwner && (
-                                            <div className="mb-3 pb-3 border-b border-dashed border-orange-200">
-                                                <button
-                                                    type="button"
-                                                    onClick={async () => {
-                                                        const addText = window.prompt("追記する内容を入力してください：");
-                                                        if (addText && addText.trim()) {
-                                                            try {
-                                                                const updatedContent = `${post.content}\n\n📌 追記：${addText.trim()}`;
-                                                                await authApi.patch(`/posts/${post.id}`, { content: updatedContent });
-                                                                fetchPosts();
-                                                            } catch (err) {
-                                                                alert("追記に失敗しました。");
-                                                            }
-                                                        }
-                                                    }}
-                                                    className="text-[9px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                                >
-                                                    <CheckSquare size={12} /> 文言を追記する
-                                                </button>
-                                            </div>
-                                        )}
-
                                         <div className="border-t border-orange-50 pt-3">
                                                 <p className="text-[9px] font-black text-orange-400 mb-2 uppercase tracking-widest">Participants</p>
                                                 <div className="flex flex-wrap gap-2 mb-4">
