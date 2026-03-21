@@ -28,7 +28,7 @@ class UserMoodResponse(BaseModel):
     mood_updated_at: Optional[datetime] = None
     friend_note: Optional[str] = None
     is_mood_comment_visible: Optional[bool] = None
-
+    is_muted: Optional[bool] = None 
     model_config = ConfigDict(from_attributes=True)
 
 # ==========================================
