@@ -502,13 +502,13 @@ const submitPost = async () => {
 
                                         {/* ★ 投稿者名（上部：アイコン＋名義＋ADラベル） */}
                                         <div className="flex items-center gap-1.5 mb-2">
+                                            <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded-full uppercase shrink-0">AD</span>
                                             <div className="w-5 h-5 rounded-full bg-black/10 flex items-center justify-center text-[9px] font-black shrink-0">
                                                 {(post.author_nickname || '?').charAt(0).toUpperCase()}
                                             </div>
                                             <span className="text-[10px] font-bold opacity-60 truncate">
                                                 {post.author_nickname || 'Unknown'}
                                             </span>
-                                            <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded-full uppercase ml-1 shrink-0">AD</span>
                                         </div>
 
                                         {/* タイトル */}
@@ -527,18 +527,18 @@ const submitPost = async () => {
                                                 <button 
                                                     type="button"
                                                     onClick={async () => {
-                                                        const newContent = window.prompt("広告の文言を編集・追記しますか？", post.content);
-                                                        if (newContent !== null && newContent !== post.content) {
+                                                        const addText = window.prompt("追記する内容を入力してください：");
+                                                        if (addText && addText.trim()) {
                                                             try {
-                                                                // ※ authApi.patch を呼び出す（バックエンド未実装の場合はエラーになりますが、コードはこれで正解です）
-                                                                await authApi.patch(`/posts/${post.id}`, { content: newContent });
+                                                                const updatedContent = `${post.content}\n\n📌 追記：${addText.trim()}`;
+                                                                await authApi.patch(`/posts/${post.id}`, { content: updatedContent });
                                                                 fetchPosts();
                                                             } catch (err) {
-                                                                alert("更新に失敗しました。サーバー側の設定を確認してください。");
+                                                                alert("追記に失敗しました。");
                                                             }
                                                         }
                                                     }}
-                                                    className="text-[10px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                                    className="text-[8px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1"
                                                 >
                                                     <CheckSquare size={12} /> 文言を編集・追記する
                                                 </button>

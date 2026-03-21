@@ -297,7 +297,7 @@ const FriendManager: React.FC = () => {
             try {
                 const receiverId = Number(receiverIdStr);
                 await sendFriendRequest(receiverId);
-                setSetupMessage('カード登録が完了しました。申請を送りました。相手の承認をお待ちください。');
+                setSetupMessage('カード登録が完了しました。承認後に課金が開始されます。');
             } catch (err: any) {
                 if (err.response?.status === 400 && err.response.data.detail === '既に申請済みです。') {
                     setSetupMessage('カード登録が完了しました。申請は送信済みです。');

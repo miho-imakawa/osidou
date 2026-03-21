@@ -449,31 +449,26 @@ useEffect(() => {
           )}
 
           {/* MY ADS STATS */}
-          {isMe && myAdsStats.length > 0 && (
-              <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
-                  <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
-                      <span className="text-green-500">📢</span> My AD Stats
-                  </h2>
-                  <div className="flex flex-wrap gap-2">
-                      {myAdsStats.map(ad => (
-                      <div key={ad.id} className="flex items-center gap-3 px-4 py-1.5 bg-green-50 border border-green-200 rounded-full hover:bg-green-100 transition-all">
-                          <span className="text-[11px] font-bold text-green-800 truncate max-w-[120px]">
-                              {ad.title}
+          {myAdsStats.map(ad => (
+              <Link
+                  key={ad.id}
+                  to={`/community/${ad.hobby_category_id}`}
+                  className="flex items-center gap-3 px-4 py-1.5 bg-green-50 border border-green-200 rounded-full hover:bg-green-100 transition-all"
+              >
+                  <span className="text-[11px] font-bold text-green-800 truncate max-w-[120px]">
+                      {ad.title}
+                  </span>
+                  <div className="flex items-center gap-2 shrink-0 border-l border-green-200 pl-2">
+                      <span className="text-[11px] font-black text-pink-500">👍 {ad.like_count}</span>
+                      <span className="text-[11px] font-black text-yellow-500">📌 {ad.pin_count}</span>
+                      {ad.ad_end_date && (
+                          <span className="text-[9px] text-green-400">
+                              〜{ad.ad_end_date.slice(0, 10)}
                           </span>
-                          <div className="flex items-center gap-2 shrink-0 border-l border-green-200 pl-2">
-                              <span className="text-[11px] font-black text-pink-500">👍 {ad.like_count}</span>
-                              <span className="text-[11px] font-black text-yellow-500">📌 {ad.pin_count}</span>
-                              {ad.ad_end_date && (
-                                  <span className="text-[9px] text-green-400">
-                                      〜{ad.ad_end_date.slice(0, 10)}
-                                  </span>
-                              )}
-                          </div>
-                      </div>
-                      ))}
+                      )}
                   </div>
-              </div>
-          )}
+              </Link>
+          ))}
           {/* Feeling Logs */}
           {displayProfile.is_mood_visible && (
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-2">
