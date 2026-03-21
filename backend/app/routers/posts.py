@@ -445,6 +445,7 @@ def get_my_ads_stats(
             "ad_end_date": ad.ad_end_date.isoformat() if ad.ad_end_date else None,
             "like_count": like_count,
             "pin_count": pin_count,
+            "hobby_category_id": ad.hobby_category_id, 
         })
     
     return result
