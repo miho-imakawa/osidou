@@ -20,6 +20,9 @@ class FriendshipUpdate(BaseModel):
 
 router = APIRouter(tags=["Friend Requests"])
 
+# 同じ相手への申請回数上限（後で変更しやすいよう定数化）
+FRIEND_REQUEST_LIMIT = 10  # 確認中につき10回。本番は3回に変更予定
+
 
 # -----------------------------------------------------
 # 1. フレンド申請の送信
@@ -54,6 +57,21 @@ def send_friend_request(
     )
     if existing_request:
         raise HTTPException(status_code=400, detail="既に申請済みです。")
+
+    # 過去の申請回数チェック（PENDING/ACCEPTED/REJECTED 全て含む）
+    request_count = (
+        db.query(models.FriendRequest)
+        .filter(
+            models.FriendRequest.requester_id == current_user.id,
+            models.FriendRequest.receiver_id == receiver_id,
+        )
+        .count()
+    )
+    if request_count >= FRIEND_REQUEST_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"同じ相手への申請は{FRIEND_REQUEST_LIMIT}回までです。"
+        )
 
     # ── 申請者の友達数チェック ──
     friend_count = (
