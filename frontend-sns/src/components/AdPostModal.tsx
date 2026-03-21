@@ -9,22 +9,7 @@ interface RelatedCategory {
 }
 
 interface AdPostModalProps {
-    currentCategoryId: number;
-    currentCategoryName: string;
-    onClose: () => void;
-    onPosted: () => void;
-}
-
-interface AdPostModalProps {
-    profile: any; // ★ これを追加
-    currentCategoryId: number;
-    currentCategoryName: string;
-    onClose: () => void;
-    onPosted: () => void;
-}
-
-interface AdPostModalProps {
-    profile: any; // ★ 詳細に書かず、一旦 any に戻す
+    profile: any;
     currentCategoryId: number;
     currentCategoryName: string;
     onClose: () => void;
@@ -32,13 +17,12 @@ interface AdPostModalProps {
 }
 
 const AdPostModal: React.FC<AdPostModalProps> = ({
-    profile, // ★ これが入っているか確認！
+    profile,
     currentCategoryId,
     currentCategoryName,
     onClose,
     onPosted,
 }) => {
-    // ...
     const [relatedCategories, setRelatedCategories] = useState<RelatedCategory[]>([]);
     const [selectedIds, setSelectedIds] = useState<number[]>([currentCategoryId]);
     const [quote, setQuote] = useState<{ unique_user_count: number; total_user_count: number; estimated_fee: number } | null>(null);
@@ -49,38 +33,30 @@ const AdPostModal: React.FC<AdPostModalProps> = ({
     const [adContent, setAdContent] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-
     const [selectedColor, setSelectedColor] = useState('green');
-// 1. カラー定義（アレンジ版：赤・青・紫・白・緑）
-    const colorOptions = [
-        { id: 'green', bg: 'bg-green-50', border: 'border-green-300', text: 'text-green-900', label: '標準' },
-        { id: 'red', bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-900', label: 'RED' },
-        { id: 'blue', bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-900', label: 'BLUE' },
-        { id: 'purple', bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-900', label: 'PURPLE' },
-        { id: 'white', bg: 'bg-slate-50', border: 'border-slate-300', text: 'text-slate-900', label: 'WH/BK' },
-    ];
 
+    const colorOptions = [
+        { id: 'green',  bg: 'bg-green-50',  border: 'border-green-300',  text: 'text-green-900',  label: '標準'   },
+        { id: 'red',    bg: 'bg-red-50',    border: 'border-red-300',    text: 'text-red-900',    label: 'RED'    },
+        { id: 'blue',   bg: 'bg-blue-50',   border: 'border-blue-300',   text: 'text-blue-900',   label: 'BLUE'   },
+        { id: 'purple', bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-900', label: 'PURPLE' },
+        { id: 'white',  bg: 'bg-slate-50',  border: 'border-slate-300',  text: 'text-slate-900',  label: 'WH/BK' },
+    ];
 
     // 関連Chatを取得
     useEffect(() => {
         const loadRelated = async () => {
             try {
                 const res = await authApi.get(`/hobby-categories/categories/${currentCategoryId}/related`);
-                // 現在のChatを先頭に固定
                 const others = res.data.filter((c: RelatedCategory) => c.id !== currentCategoryId);
                 const current = res.data.find((c: RelatedCategory) => c.id === currentCategoryId) || {
                     id: currentCategoryId,
                     name: currentCategoryName,
-                    member_count: 0
+                    member_count: 0,
                 };
                 setRelatedCategories([current, ...others]);
             } catch {
-                // 取得失敗時は現在のChatのみ
-                setRelatedCategories([{
-                    id: currentCategoryId,
-                    name: currentCategoryName,
-                    member_count: 0
-                }]);
+                setRelatedCategories([{ id: currentCategoryId, name: currentCategoryName, member_count: 0 }]);
             }
         };
         loadRelated();
@@ -88,10 +64,7 @@ const AdPostModal: React.FC<AdPostModalProps> = ({
 
     // 選択変更時に見積もりを取得
     useEffect(() => {
-        if (selectedIds.length === 0) {
-            setQuote(null);
-            return;
-        }
+        if (selectedIds.length === 0) { setQuote(null); return; }
         const getQuote = async () => {
             setLoadingQuote(true);
             try {
@@ -107,38 +80,36 @@ const AdPostModal: React.FC<AdPostModalProps> = ({
     }, [selectedIds]);
 
     const toggleCategory = (id: number) => {
-        setSelectedIds(prev =>
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
-// handlePost を以下のように修正
-const handlePost = async () => {
-    if (!adTitle.trim() || !quote || posting) return;
-    setPosting(true);
+    const handlePost = async () => {
+        if (!adTitle.trim() || !quote || posting) return;
+        setPosting(true);
+        try {
+            await startAdCheckout(
+                profile.id,
+                quote.estimated_fee,
+                adTitle,
+                adContent,
+                startDate,
+                endDate,
+                selectedIds,
+                selectedColor,
+            );
+        } catch {
+            alert('決済の準備に失敗しました');
+        } finally {
+            setPosting(false);
+        }
+    };
 
-    try {
-        await startAdCheckout(
-            profile.id,
-            quote.estimated_fee,
-            adTitle,
-            adContent,
-            startDate,
-            endDate,
-            selectedIds,
-            selectedColor,
-        );
-    } catch (e) {
-        alert('決済の準備に失敗しました');
-    } finally {
-        setPosting(false);
-    }
-};
+    const posterName = profile?.nickname || profile?.username || '';
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-[32px] w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
-                
+
                 {/* ヘッダー */}
                 <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center rounded-t-[32px] z-10">
                     <div className="flex items-center gap-2">
@@ -157,63 +128,75 @@ const handlePost = async () => {
 
                 <div className="p-6 space-y-6">
 
+                    {/* 投稿者名プレビュー */}
+                    <div className="flex items-center gap-2 px-1">
+                        <div className="w-6 h-6 rounded-full bg-green-200 flex items-center justify-center text-[10px] font-black text-green-800">
+                            {posterName.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-[11px] font-bold text-gray-500">{posterName}</span>
+                        <span className="text-[9px] text-gray-300 uppercase tracking-widest">· 投稿者</span>
+                    </div>
+
                     {/* 広告内容入力 */}
                     <div className="bg-green-50 border-2 border-green-200 rounded-[24px] p-4 space-y-3">
                         <p className="text-[9px] font-black text-green-700 uppercase tracking-widest">AD CONTENT</p>
-                        
-                        <div>
-                            <label className="text-[10px] font-bold text-green-800 mb-1 block">広告タイトル *</label>
-                            <input
-                                value={adTitle}
-                                onChange={e => setAdTitle(e.target.value)}
-                                placeholder="例: 〇〇で蚤の市開催！"
-                                className="w-full px-3 py-2.5 rounded-xl border-2 border-green-200 bg-white text-[13px] outline-none focus:border-green-400 font-bold"
-                            />
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        {/* ★ ここが修正ポイント: bg-white/50 の div を正しく閉じる */}
+                        <div className="bg-white/50 rounded-xl p-3 border border-green-100 space-y-3">
                             <div>
-                                <label className="text-[10px] font-bold text-green-800 mb-1 block flex items-center gap-1">
-                                    <Calendar size={10} /> 掲載開始日
-                                </label>
+                                <label className="text-[10px] font-bold text-green-800 mb-1 block">広告タイトル *</label>
                                 <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={e => setStartDate(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-xl border-2 border-green-200 bg-white text-[12px] outline-none focus:border-green-400"
+                                    value={adTitle}
+                                    onChange={e => setAdTitle(e.target.value)}
+                                    placeholder="例: 〇〇で蚤の市開催！"
+                                    className="w-full px-3 py-2.5 rounded-xl border-2 border-green-200 bg-white text-[13px] outline-none focus:border-green-400 font-bold"
                                 />
                             </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-green-800 mb-1 flex items-center gap-1">
+                                        <Calendar size={10} /> 掲載開始日
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={startDate}
+                                        onChange={e => setStartDate(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border-2 border-green-200 bg-white text-[12px] outline-none focus:border-green-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-green-800 mb-1 flex items-center gap-1">
+                                        <Calendar size={10} /> 掲載終了日
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={e => setEndDate(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border-2 border-green-200 bg-white text-[12px] outline-none focus:border-green-400"
+                                    />
+                                </div>
+                            </div>
+
                             <div>
-                                <label className="text-[10px] font-bold text-green-800 mb-1 block flex items-center gap-1">
-                                    <Calendar size={10} /> 掲載終了日
-                                </label>
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={e => setEndDate(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-xl border-2 border-green-200 bg-white text-[12px] outline-none focus:border-green-400"
+                                <label className="text-[10px] font-bold text-green-800 mb-1 block">広告内容</label>
+                                <textarea
+                                    value={adContent}
+                                    onChange={e => setAdContent(e.target.value)}
+                                    placeholder="詳細内容を入力..."
+                                    className="w-full px-3 py-2.5 rounded-xl border-2 border-green-200 bg-white text-[12px] h-[120px] resize-none outline-none focus:border-green-400 leading-relaxed"
                                 />
                             </div>
-                        </div>
+                        </div> {/* ← bg-white/50 の閉じタグ */}
+                    </div> {/* ← bg-green-50 の閉じタグ */}
 
-                        <div>
-                            <label className="text-[10px] font-bold text-green-800 mb-1 block">広告内容</label>
-                            <textarea
-                                value={adContent}
-                                onChange={e => setAdContent(e.target.value)}
-                                placeholder="詳細内容を入力..."
-                                className="w-full px-3 py-2.5 rounded-xl border-2 border-green-200 bg-white text-[12px] h-[120px] resize-none outline-none focus:border-green-400 leading-relaxed"
-                            />
-                        </div>
-                    </div>
-
-                    {/* ★ 4. カラー選択 UI をここに追加 */}
+                    {/* カラー選択 */}
                     <div>
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Pick Member Color / 投稿色を選択</p>
                         <div className="flex gap-4 p-4 bg-gray-50 rounded-[24px] border border-gray-100 items-center justify-around">
                             {colorOptions.map(col => (
                                 <div key={col.id} className="flex flex-col items-center gap-1">
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={() => setSelectedColor(col.id)}
                                         className={`w-10 h-10 rounded-full ${col.bg} border-2 transition-all transform hover:scale-110 ${
@@ -262,7 +245,6 @@ const handlePost = async () => {
                     {loadingQuote && (
                         <p className="text-center text-gray-400 text-[11px] animate-pulse">計算中...</p>
                     )}
-
                     {quote && !loadingQuote && (
                         <div className="bg-gray-900 rounded-[24px] p-5 text-white">
                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-4">Ad Quote</p>
@@ -301,6 +283,7 @@ const handlePost = async () => {
                         <Send size={16} />
                         {posting ? '投稿中...' : `${selectedIds.length}個のChatに投稿する`}
                     </button>
+
                 </div>
             </div>
         </div>

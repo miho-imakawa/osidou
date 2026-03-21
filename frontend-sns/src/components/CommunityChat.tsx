@@ -497,45 +497,84 @@ const submitPost = async () => {
                                             </div>
                                         </div>
                                     ) : (
-                                        /* フル表示 */
-                                        <div className={`p-4 rounded-[28px] border-2 shadow-sm ${adBg} ${adBorder}`}>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[9px] font-black bg-gray-900 text-white px-2 py-0.5 rounded-full uppercase">AD</span>
-                                                    <h3 className="font-black text-sm leading-tight">
-                                                        {post.content.split('\n')[0]}
-                                                    </h3>
-                                                </div>
+                                    /* フル表示 */
+                                    <div className={`p-4 rounded-[28px] border-2 shadow-sm ${adBg} ${adBorder}`}>
+
+                                        {/* ★ 投稿者名（上部：アイコン＋名義＋ADラベル） */}
+                                        <div className="flex items-center gap-1.5 mb-2">
+                                            <div className="w-5 h-5 rounded-full bg-black/10 flex items-center justify-center text-[9px] font-black shrink-0">
+                                                {(post.author_nickname || '?').charAt(0).toUpperCase()}
                                             </div>
-                                            <p className="text-[12px] opacity-90 whitespace-pre-wrap leading-relaxed mt-2 mb-3">
-                                                {post.content.split('\n').slice(1).join('\n')}
-                                            </p>
-                                            <div className="pt-3 border-t border-black/5 space-y-1">
-                                                {post.ad_end_date && (
-                                                    <span className="text-[9px] font-bold opacity-60 block">{post.ad_end_date.slice(0, 10)} 終了</span>
-                                                )}
-                                                <div className="flex gap-2 items-center">
-                                                    <button
-                                                        onClick={() => handleAdAction(post.id, 'like')}
-                                                        className={`px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}
-                                                    >
-                                                        👍 Vibe
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAdAction(post.id, 'pin')}
-                                                        className={`px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}
-                                                    >
-                                                        📌 PIN
-                                                    </button>
-                                                    <button
-                                                        onClick={() => toggleAdCollapse(post.id)}
-                                                        className="px-3 py-1.5 bg-white/70 border border-gray-200 rounded-full text-[10px] font-black text-gray-500 ml-auto"
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </div>
+                                            <span className="text-[10px] font-bold opacity-60 truncate">
+                                                {post.author_nickname || 'Unknown'}
+                                            </span>
+                                            <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded-full uppercase ml-1 shrink-0">AD</span>
+                                        </div>
+
+                                        {/* タイトル */}
+                                        <h3 className="font-black text-sm leading-tight mb-2">
+                                            {post.content.split('\n')[0]}
+                                        </h3>
+
+                                        {/* 本文 */}
+                                        <p className="text-[12px] opacity-90 whitespace-pre-wrap leading-relaxed mb-3">
+                                            {post.content.split('\n').slice(1).join('\n')}
+                                        </p>
+
+                                        {/* 💡 広告主専用：編集・追記メニュー（本人にのみ表示） */}
+                                        {post.user_id === currentUserId && (
+                                            <div className="mb-3 pt-2 border-t border-dashed border-black/10">
+                                                <button 
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        const newContent = window.prompt("広告の文言を編集・追記しますか？", post.content);
+                                                        if (newContent !== null && newContent !== post.content) {
+                                                            try {
+                                                                // ※ authApi.patch を呼び出す（バックエンド未実装の場合はエラーになりますが、コードはこれで正解です）
+                                                                await authApi.patch(`/posts/${post.id}`, { content: newContent });
+                                                                fetchPosts();
+                                                            } catch (err) {
+                                                                alert("更新に失敗しました。サーバー側の設定を確認してください。");
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="text-[10px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                                >
+                                                    <CheckSquare size={12} /> 文言を編集・追記する
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* フッター：日付とアクションボタン */}
+                                        <div className="pt-3 border-t border-black/5 space-y-1">
+                                            {post.ad_end_date && (
+                                                <span className="text-[9px] font-bold opacity-60 block">{post.ad_end_date.slice(0, 10)} 終了</span>
+                                            )}
+                                            <div className="flex gap-2 items-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAdAction(post.id, 'like')}
+                                                    className={`px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}
+                                                >
+                                                    👍 Vibe
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAdAction(post.id, 'pin')}
+                                                    className={`px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}
+                                                >
+                                                    📌 PIN
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleAdCollapse(post.id)}
+                                                    className="px-3 py-1.5 bg-white/70 border border-gray-200 rounded-full text-[10px] font-black text-gray-500 ml-auto"
+                                                >
+                                                    ✕
+                                                </button>
                                             </div>
                                         </div>
+                                    </div>
                                     )}
                                 </div>
                             ) : post.is_meetup ? (

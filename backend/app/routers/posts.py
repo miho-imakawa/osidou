@@ -496,3 +496,37 @@ async def report_post(
         "report_count": report_count,
         "is_hidden": target_post.is_hidden
     }
+
+# ============================================================
+# AD追記機能（投稿者本人のみ content を更新可能）
+# ============================================================
+
+class PostContentUpdate(BaseModel):
+    content: str
+
+@router.patch("/posts/{post_id}")
+def update_post_content(
+    post_id: int,
+    data: PostContentUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    post = db.query(models.HobbyPost).filter(
+        models.HobbyPost.id == post_id
+    ).first()
+
+    if not post:
+        raise HTTPException(status_code=404, detail="投稿が見つかりません")
+
+    if post.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="投稿者本人のみ編集できます")
+
+    if not post.is_ad:
+        raise HTTPException(status_code=403, detail="AD投稿のみ編集できます")
+
+    post.content = data.content
+    db.commit()
+    db.refresh(post)
+
+    post.author_nickname = current_user.nickname or f"User{current_user.id}"
+    return post
