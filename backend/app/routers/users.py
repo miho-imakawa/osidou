@@ -123,18 +123,28 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
         models.User.is_mood_visible == True
     ).all()
 
+# friendshipをuser_idで引けるようにマップ化
+    friendship_map = {}
+    for f in friendships:
+        if f.user_id == current_user.id:
+            friendship_map[f.friend_id] = f
+        else:
+            friendship_map[f.user_id] = f
+
     moods = []
     for user in users:
+        fs = friendship_map.get(user.id)
         moods.append({
             "user_id": user.id,
             "nickname": user.nickname,
+            "username": user.username,
             "email": user.email,
             "current_mood": user.current_mood,
             "current_mood_comment": user.current_mood_comment,
             "mood_updated_at": user.mood_updated_at,
-            # 💡 ここを修正！ is_mood_comment_visible は存在しないので、is_mood_visible を使います
-            "is_mood_comment_visible": user.is_mood_visible, 
-            "friend_note": None 
+            "is_mood_comment_visible": user.is_mood_visible,
+            "friend_note": fs.friend_note if fs else None,
+            "is_muted": fs.is_muted if fs else False,  # ← 追加
         })
     return moods
 

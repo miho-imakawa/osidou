@@ -540,7 +540,7 @@ const submitPost = async () => {
                                                     }}
                                                     className="text-[8px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1"
                                                 >
-                                                    <CheckSquare size={12} /> 文言を追記する
+                                                    <CheckSquare size={14} /> 文言を追記する
                                                 </button>
                                             </div>
                                         )}
@@ -664,7 +664,7 @@ const submitPost = async () => {
                                                     }}
                                                     className="text-[8px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1"
                                                 >
-                                                    <CheckSquare size={12} /> 文言を追記する
+                                                    <CheckSquare size={14} /> 文言を追記する
                                                 </button>
                                             </div>
                                         )}

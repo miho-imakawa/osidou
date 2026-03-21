@@ -351,3 +351,29 @@ class FriendLimitResponse(BaseModel):
     stripe_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+# -------------------------------------------------------
+# ともだち解除（通知なし・静かに削除）
+# -------------------------------------------------------
+@router.delete("/friendships/{friendship_id}")
+def delete_friendship(
+    friendship_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    friendship = db.query(models.Friendship).filter(
+        models.Friendship.id == friendship_id
+    ).first()
+
+    if not friendship:
+        raise HTTPException(status_code=404, detail="見つかりません")
+
+    # 自分が関係者かチェック
+    if friendship.user_id != current_user.id and friendship.friend_id != current_user.id:
+        raise HTTPException(status_code=403, detail="権限がありません")
+
+    db.delete(friendship)
+    db.commit()
+
+    # 通知なし・相手には何も送らない
+    return {"status": "deleted"}

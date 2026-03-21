@@ -218,6 +218,16 @@ const FriendList: React.FC = () => {
         }
     };
 
+    const handleDelete = async (friendshipId: number) => {
+        // 確認なし・静かに削除
+        try {
+            await authApi.delete(`/friends/friendships/${friendshipId}`);
+            load();
+        } catch {
+            alert('解除に失敗しました');
+        }
+    };
+
     return (
         <ul className="divide-y bg-white rounded shadow">
             {friends.map(f => (
@@ -252,16 +262,34 @@ const FriendList: React.FC = () => {
                         </div>
                     </div>
 
-                    <button
-                        onClick={() =>
-                            authApi.put(`/friends/friendships/${f.id}`, {
-                                is_muted: !f.is_muted
-                            }).then(load)
-                        }
-                        className={`p-2 rounded-full ${f.is_muted ? 'bg-gray-200' : 'bg-pink-100'}`}
-                    >
-                        {f.is_muted ? '🔇' : '📣'}
-                    </button>
+                    {/* 右側ボタン群 */}
+                    <div className="flex flex-col gap-1 items-center">
+                        {/* MUTE：感情のみ表示 */}
+                        <button
+                            onClick={() =>
+                                authApi.put(`/friends/friendships/${f.id}`, {
+                                    is_muted: !f.is_muted
+                                }).then(load)
+                            }
+                            className={`p-2 rounded-full text-[10px] font-black transition-colors ${
+                                f.is_muted
+                                    ? 'bg-gray-200 text-gray-500'
+                                    : 'bg-pink-100 text-pink-500'
+                            }`}
+                            title={f.is_muted ? '感情のみ表示中' : 'Feeling Log全表示'}
+                        >
+                            {f.is_muted ? '🔇' : '📣'}
+                        </button>
+
+                        {/* ともだち解除（確認なし・静かに） */}
+                        <button
+                            onClick={() => handleDelete(f.id)}
+                            className="p-1 text-[9px] text-gray-300 hover:text-gray-400 transition-colors"
+                            title="ともだち解除"
+                        >
+                            ···
+                        </button>
+                    </div>
                 </li>
             ))}
         </ul>
