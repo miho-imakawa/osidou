@@ -94,6 +94,12 @@ def toggle_mood_visibility(is_visible: bool, db: Session = Depends(get_db), curr
     db.commit()
     return {"message": "設定を更新しました"}
 
+@router.patch("/me/mood-comment-visibility")
+def toggle_mood_comment_visibility(is_visible: bool, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    current_user.is_mood_comment_visible = is_visible
+    db.commit()
+    return {"message": "設定を更新しました"}
+
 @router.get("/me/notifications", response_model=List[schemas.NotificationResponse])
 def read_my_notifications(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user), limit: int = 20, offset: int = 0):
     return db.query(models.Notification).filter(models.Notification.recipient_id == current_user.id).order_by(desc(models.Notification.created_at)).offset(offset).limit(limit).all()
@@ -142,7 +148,7 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
             "current_mood": user.current_mood,
             "current_mood_comment": user.current_mood_comment,
             "mood_updated_at": user.mood_updated_at,
-            "is_mood_comment_visible": user.is_mood_visible,
+            "is_mood_comment_visible": user.is_mood_comment_visible,
             "friend_note": fs.friend_note if fs else None,
             "is_muted": fs.is_muted if (fs and fs.user_id == current_user.id) else False,
         })

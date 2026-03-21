@@ -91,6 +91,7 @@ class UserPublic(BaseModel):
     current_mood_comment: Optional[str] = None
     mood_updated_at: Optional[datetime] = None
     is_mood_visible: bool = True # 感情ログの公開設定
+    is_mood_comment_visible: Optional[bool] = True  # ← 追加
     
     # 💡 新規追加: 公開設定フラグ (出力用)
     is_member_count_visible: bool
@@ -117,6 +118,7 @@ class UserMe(UserPublic):
     # 💡 追加：自分のプロフィール確認・編集画面で表示するために必要
     birth_year_month: Optional[str] = None
     gender: Optional[str] = None
+    is_mood_comment_visible: Optional[bool] = True
 
     # 住所情報（本人にのみ返す）
     prefecture: Optional[str] = None
