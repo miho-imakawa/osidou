@@ -18,6 +18,8 @@ class FriendshipUpdate(BaseModel):
     friend_note: Optional[str] = None
     is_muted: Optional[bool] = None
 
+FRIEND_REQUEST_LIMIT = 3
+
 router = APIRouter(tags=["Friend Requests"])
 
 
@@ -26,6 +28,10 @@ router = APIRouter(tags=["Friend Requests"])
 #    申請者が FRIEND_FREE_LIMIT 人以上 → 402 を返す
 #    フロントは 402 を受け取ったら setup-intent エンドポイントへ
 # -----------------------------------------------------
+# 1. ファイル上部（router = APIRouter(...) の上など）に定義
+FRIEND_REQUEST_LIMIT = 3  # 同一相手への累計申請上限
+
+# 2. send_friend_request 関数内を以下のように修正
 @router.post(
     "/{receiver_id}/friend_request",
     response_model=schemas.FriendRequestBase,
@@ -43,6 +49,23 @@ def send_friend_request(
     if not receiver:
         raise HTTPException(status_code=404, detail="申請先のユーザーが見つかりません。")
 
+    # ── 同一相手への累計申請上限チェック ──
+    # 過去の申請履歴（PENDING, ACCEPTED, REJECTEDすべて）をカウント
+    sent_count = (
+        db.query(models.FriendRequest)
+        .filter(
+            models.FriendRequest.requester_id == current_user.id,
+            models.FriendRequest.receiver_id == receiver_id
+        )
+        .count()
+    )
+    if sent_count >= FRIEND_REQUEST_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=f"同一相手への申請は{FRIEND_REQUEST_LIMIT}回までです。"
+        )
+
+    # ── 現在進行中の（PENDING）申請チェック ──
     existing_request = (
         db.query(models.FriendRequest)
         .filter(
@@ -65,7 +88,7 @@ def send_friend_request(
     print(f"DEBUG: user={current_user.id} friend_count={friend_count} limit={FRIEND_FREE_LIMIT}")
 
     # 友達数がリミット以上の場合のみ、サブスク（カード登録）チェックを行う
-    if friend_count >= FRIEND_FREE_LIMIT:
+    if friend_count + 1 >= FRIEND_FREE_LIMIT:
         # アクティブなサブスクがすでにあれば追加課金は承認後に自動処理 → 申請OK
         sub_row = db.execute(
             text("""

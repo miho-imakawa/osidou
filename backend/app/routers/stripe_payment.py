@@ -22,7 +22,7 @@ PRICE_FRIENDS_LOG    = 1000
 PRICE_MEETUP         = 500
 PRICE_AFFILIATE_NONE = 200
 PRICE_PER_FRIEND     = 100   # 11人目以降1人あたり月100円
-FRIEND_FREE_LIMIT    = 1   # 無料枠 ※一旦変更中
+FRIEND_FREE_LIMIT    = 10   # 無料枠 
 
 
 # ===============================================================
