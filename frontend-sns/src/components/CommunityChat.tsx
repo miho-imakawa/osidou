@@ -1143,7 +1143,7 @@ const submitPost = async () => {
                         <p className="text-[11px] font-black text-orange-800">{meetupDetails.title}</p>
                         {meetupDetails.date && (
                             <p className="text-[10px] text-orange-600">
-                                📅 {meetupDetails.date.slice(0, 10).replace(/-/g, '/')}
+                                📅 {meetupDetails.date.slice(0, 16).replace('T', ' ')}
                             </p>
                         )}
                         {meetupDetails.pref && (
