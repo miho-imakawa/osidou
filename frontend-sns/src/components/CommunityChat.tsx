@@ -196,7 +196,6 @@ useEffect(() => {
             alert('✅ カード登録完了！参加が確定しました。開催決定後に課金されます。');
         }
             window.history.replaceState({}, '', window.location.pathname);
-            fetchPosts();
         })
         .catch(() => alert('参加登録に失敗しました。'));
     }
@@ -205,9 +204,9 @@ useEffect(() => {
     const waitlistPostId = params.get('post_id');
     const waitlistSessionId = params.get('setup_session_id');
     if (meetupWaitlistDone && waitlistPostId && waitlistSessionId) {
+        // 先にURLパラメータをクリアして2重実行を防ぐ
+        window.history.replaceState({}, '', window.location.pathname);
         fetch(`${BACKEND_URL}/api/stripe/meetup-waitlist-join`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 userId: currentUserId,
                 postId: parseInt(waitlistPostId),
