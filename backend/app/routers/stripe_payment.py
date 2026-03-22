@@ -1475,16 +1475,44 @@ async def meetup_cancel(data: dict, db: Session = Depends(get_db)):
         LIMIT 1
     """), {"pid": post_id}).fetchone()
 
+    # キャンセル待ち全員に通知レコードを作成
+    if waitlist:
+        waitlist_all = db.execute(text("""
+            SELECT pr.user_id
+            FROM post_responses pr
+            WHERE pr.post_id = :pid
+              AND pr.content = 'Waitlist'
+            ORDER BY pr.created_at ASC
+        """), {"pid": post_id}).fetchall()
+
+        post_info = db.execute(
+            text("SELECT hobby_category_id, user_id FROM hobby_posts WHERE id = :pid"),
+            {"pid": post_id}
+        ).fetchone()
+
+        for w in waitlist_all:
+            try:
+                db.execute(text("""
+                    INSERT INTO notifications
+                        (recipient_id, sender_id, hobby_category_id, message, event_post_id, is_read)
+                    VALUES (:recipient, :sender, :cat_id, :msg, :post_id, false)
+                """), {
+                    "recipient": w.user_id,
+                    "sender":    post_info.user_id,
+                    "cat_id":    post_info.hobby_category_id,
+                    "msg":       "キャンセルが出ました！参加できますか？",
+                    "post_id":   post_id,
+                })
+            except Exception:
+                pass
+
     db.commit()
 
     return {
-        "status":       "cancelled",
-        "cancel_fee":   cancel_fee,
-        "is_same_day":  is_same_day,
-        "waitlist_user": {
-            "user_id":  waitlist.user_id,
-            "nickname": waitlist.nickname,
-        } if waitlist else None,
+        "status":      "cancelled",
+        "cancel_fee":  cancel_fee,
+        "is_same_day": is_same_day,
+        "waitlist_notified": len(waitlist_all) if waitlist else 0,
     }
 
 

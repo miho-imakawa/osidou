@@ -779,8 +779,8 @@ const submitPost = async () => {
                                                                     } else {
                                                                         alert("キャンセルしました。");
                                                                     }
-                                                                    if (result.waitlist_user) {
-                                                                        alert(`キャンセル待ち中の ${result.waitlist_user.nickname} さんに通知しました。`);
+                                                                    if (result.waitlist_notified > 0) {
+                                                                        alert(`キャンセル待ち${result.waitlist_notified}名に通知しました。`);
                                                                     }
                                                                     fetchPosts();
                                                                 } catch {
