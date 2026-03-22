@@ -105,31 +105,30 @@ def search_users(query: str = Query(..., min_length=1), db: Session = Depends(ge
 
 @router.get("/following/moods", response_model=List[UserMoodResponse])
 def get_following_moods(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # --- (前段の friendships 取得ロジックはそのまま) ---
+    
+    # 変更前（or_ で双方向取得していた）
+    # friendships = db.query(models.Friendship).filter(
+    #     or_(
+    #         models.Friendship.user_id == current_user.id,
+    #         models.Friendship.friend_id == current_user.id
+    #     )
+    # ).all()
+
+    # 変更後：自分が登録した方向のみ、is_muted でフィルタしない
     friendships = db.query(models.Friendship).filter(
-        or_(
-            models.Friendship.user_id == current_user.id,
-            models.Friendship.friend_id == current_user.id
-        )
+        models.Friendship.user_id == current_user.id,
     ).all()
 
     if not friendships:
         return []
 
-    friend_ids = [f.friend_id if f.user_id == current_user.id else f.user_id for f in friendships]
+    friend_ids = [f.friend_id for f in friendships]
+    friendship_map = {f.friend_id: f for f in friendships}
 
     users = db.query(models.User).filter(
         models.User.id.in_(friend_ids),
         models.User.is_mood_visible == True
     ).all()
-
-# friendshipをuser_idで引けるようにマップ化
-    friendship_map = {}
-    for f in friendships:
-        if f.user_id == current_user.id:
-            # 自分がuser_id側 → is_mutedは自分の設定
-            friendship_map[f.friend_id] = f
-        # friend_id側のレコードはis_mutedを使わない
 
     moods = []
     for user in users:
@@ -144,7 +143,7 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
             "mood_updated_at": user.mood_updated_at,
             "is_mood_comment_visible": user.is_mood_visible,
             "friend_note": fs.friend_note if fs else None,
-            "is_muted": fs.is_muted if (fs and fs.user_id == current_user.id) else False,
+            "is_muted": fs.is_muted if fs else False,  # ← is_muted をそのまま渡す
         })
     return moods
 
