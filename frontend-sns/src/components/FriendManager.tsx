@@ -91,7 +91,7 @@ const UserSearch: React.FC<{ currentUserId: number | null }> = ({ currentUserId 
                 </button>
             </div>
 
-            <ul className="divide-y bg-pink-100 rounded shadow">
+            <ul className="divide-y bg-white rounded shadow">
                 {results.map(u => (
                     <li key={u.id} className="p-4 flex justify-between">
                         <div>
@@ -232,7 +232,7 @@ const FriendList: React.FC = () => {
     };
 
     return (
-        <ul className="divide-y bg-pink-100 rounded shadow">
+        <ul className="divide-y bg-white rounded shadow">
             {friends.map(f => (
                 <li key={f.id} className="p-4 flex justify-between items-center">
                     <div className="flex-grow mr-4">
@@ -277,7 +277,7 @@ const FriendList: React.FC = () => {
                             className={`p-2 rounded-full text-[10px] font-black transition-colors ${
                                 f.is_muted
                                     ? 'bg-gray-200 text-gray-500'
-                                    : 'bg-pink-100 text-pink-500'
+                                    : 'bg-white text-pink-500'
                             }`}
                             title={f.is_muted ? '感情のみ表示中' : 'Feeling Log全表示'}
                         >
