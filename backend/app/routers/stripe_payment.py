@@ -1224,9 +1224,9 @@ async def meetup_join_complete(data: dict, db: Session = Depends(get_db)):
 
     # 既に参加レコードがあれば何もしない
     existing = db.execute(text("""
-        SELECT id FROM post_responses
-        WHERE user_id = :uid AND post_id = :pid AND is_participation = true
-    """), {"uid": user_id, "pid": post_id}).fetchone()
+        INSERT INTO post_responses (user_id, post_id, content, is_participation, is_attended)
+        VALUES (:uid, :pid, :content, true, false)
+    """), {"uid": user_id, "pid": post_id, "content": content})
 
     if existing:
         return {"status": "already_joined"}
