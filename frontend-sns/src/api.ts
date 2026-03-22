@@ -149,7 +149,7 @@ export interface UserMoodResponse {
     current_mood_comment: string | null;
     mood_updated_at: string | null;
     friend_note: string | null;
-    is_mood_comment_visible?: boolean;
+    is_mood_comment_visible: boolean;
     is_muted?: boolean; 
 }
 

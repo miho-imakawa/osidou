@@ -133,15 +133,18 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
     moods = []
     for user in users:
         fs = friendship_map.get(user.id)
+        comment_to_send = user.current_mood_comment
+        if not user.is_mood_comment_visible:
+            comment_to_send = None
         moods.append({
             "user_id": user.id,
             "nickname": user.nickname,
             "username": user.username,
             "email": user.email,
             "current_mood": user.current_mood,
-            "current_mood_comment": user.current_mood_comment,
+            "current_mood_comment": comment_to_send,
             "mood_updated_at": user.mood_updated_at,
-            "is_mood_comment_visible": user.is_mood_visible,
+            "is_mood_comment_visible": user.is_mood_comment_visible,
             "friend_note": fs.friend_note if fs else None,
             "is_muted": fs.is_muted if fs else False,  # ← is_muted をそのまま渡す
         })
