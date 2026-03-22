@@ -454,7 +454,7 @@ class User(Base):
     current_mood_comment = Column(String(200), nullable=True)
     mood_updated_at = Column(DateTime, nullable=True)
     is_mood_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
-    
+    is_mood_comment_visible = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())  # 💡 更新日時追加
     
