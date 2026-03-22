@@ -70,6 +70,15 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       setPendingCount(res.data.pending_count || 0);
     } catch {}
   }, []);
+    const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+
+    const loadUnreadNotifCount = useCallback(async () => {
+        try {
+            const res = await authApi.get('/notifications/unread-count');
+            setUnreadNotifCount(res.data.unread_count || 0);
+        } catch {}
+    }, []);
+
   // -------------------------------------------------------
   // フレンドの気分ログ読み込み
   // -------------------------------------------------------
@@ -113,8 +122,9 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     loadMoods();
     loadFriendsLogStatus();
     loadFriendCount();
-    loadPendingCount(); // ✅ 追加
-}, [loadFriendsLogStatus, loadFriendCount, loadPendingCount]);
+    loadPendingCount(); 
+    loadUnreadNotifCount(); // ← 追加
+}, [loadFriendsLogStatus, loadFriendCount, loadPendingCount, loadUnreadNotifCount]);
 
   // -------------------------------------------------------
   // Stripe 成功後のアクティベート処理
@@ -311,6 +321,15 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
         >
             🔔 ともだち申請が{pendingCount}件あります
         </Link>
+        )}
+
+        {unreadNotifCount > 0 && (
+            <Link
+                to="/community/832"
+                className="block text-xs font-bold text-orange-500 hover:text-orange-600 mb-4"
+            >
+                🔔 MEETUPの通知が{unreadNotifCount}件あります
+            </Link>
         )}
 
       {/* 気分入力 */}

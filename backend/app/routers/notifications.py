@@ -9,6 +9,7 @@ import os
 from .. import models, schemas
 from ..database import get_db
 from .auth import get_current_user
+from fastapi import APIRouter, Depends
 
 router = APIRouter() 
 
@@ -280,3 +281,14 @@ def create_region_notifications_for_post(db: Session, post: models.HobbyPost):
 
     db.add_all(new_notifications)
     db.commit()
+
+@router.get("/notifications/unread-count")
+def get_unread_notification_count(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    count = db.query(func.count(models.Notification.id)).filter(
+        models.Notification.recipient_id == current_user.id,
+        models.Notification.is_read == False
+    ).scalar() or 0
+    return {"unread_count": count}
