@@ -177,6 +177,7 @@ useEffect(() => {
     const joinPostId = params.get('post_id');
     const setupSessionId = params.get('setup_session_id');
     if (meetupJoinDone && joinPostId && setupSessionId) {
+        const isWaitlist = params.get('is_waitlist') === 'true';
         fetch(`${BACKEND_URL}/api/stripe/meetup-join-complete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -184,15 +185,16 @@ useEffect(() => {
                 userId: currentUserId,
                 postId: parseInt(joinPostId),
                 setupSessionId: setupSessionId,
+                isWaitlist: isWaitlist,
             }),
         })
         .then(res => res.json())
         .then(result => {
-            if (result.content === 'Waitlist') {
-                alert('定員に達しているためキャンセル待ちに登録しました。');
-            } else {
-                alert('✅ カード登録完了！参加が確定しました。開催決定後に課金されます。');
-            }
+        if (result.content === 'Waitlist' || isWaitlist) {
+            alert('✅ カード登録完了！キャンセル待ちに登録しました。繰り上がり次第ご連絡します。');
+        } else {
+            alert('✅ カード登録完了！参加が確定しました。開催決定後に課金されます。');
+        }
             window.history.replaceState({}, '', window.location.pathname);
             fetchPosts();
         })
@@ -832,14 +834,35 @@ const submitPost = async () => {
                                                 JOIN THIS MEETUP / 参加を希望する
                                             </button>
                                                     ) : (
-                                                        <button
-                                                            onClick={() => authApi.post(`/posts/${post.id}/responses`, {
-                                                                content: "Waitlist", is_participation: true
-                                                            }).then(fetchPosts)}
-                                                            className="w-full py-2.5 bg-gray-800 text-white rounded-xl text-[11px] font-black hover:bg-gray-900 shadow-md"
-                                                        >
-                                                            JOIN WAITLIST / キャンセル待ち
-                                                        </button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            const fee = Number(post.meetup_fee_info);
+                                                            if (post.meetup_fee_info && !isNaN(fee) && fee > 0) {
+                                                                // 参加費あり → カード登録してからWaitlist登録
+                                                                const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-join-setup`, {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({
+                                                                        userId: currentUserId,
+                                                                        postId: post.id,
+                                                                        categoryId: chatTargetId,
+                                                                        isWaitlist: true,
+                                                                    }),
+                                                                });
+                                                                const { checkout_url } = await res.json();
+                                                                window.location.href = checkout_url;
+                                                            } else {
+                                                                // 参加費なし → 直接Waitlist登録
+                                                                await authApi.post(`/posts/${post.id}/responses`, {
+                                                                    content: "Waitlist", is_participation: true
+                                                                });
+                                                                fetchPosts();
+                                                            }
+                                                        }}
+                                                        className="w-full py-2.5 bg-gray-800 text-white rounded-xl text-[11px] font-black hover:bg-gray-900 shadow-md"
+                                                    >
+                                                        JOIN WAITLIST / キャンセル待ち
+                                                    </button>
                                                     )
                                                 )}
                                                 

@@ -1175,6 +1175,7 @@ async def meetup_join_setup(data: dict, db: Session = Depends(get_db)):
     db.commit()
 
     try:
+        is_waitlist = data.get("isWaitlist", False)
         session = stripe.checkout.Session.create(
             customer=customer_id,
             payment_method_types=["card"],
@@ -1182,6 +1183,7 @@ async def meetup_join_setup(data: dict, db: Session = Depends(get_db)):
             success_url=(
                 f"{FRONTEND_URL}/community/{data.get('categoryId', '')}"
                 f"?meetup_join_done=true&post_id={post_id}"
+                f"&is_waitlist={'true' if is_waitlist else 'false'}"
                 f"&setup_session_id={{CHECKOUT_SESSION_ID}}"
             ),
             cancel_url=f"{FRONTEND_URL}/community/{data.get('categoryId', '')}",
@@ -1201,12 +1203,10 @@ async def meetup_join_setup(data: dict, db: Session = Depends(get_db)):
 # -------------------------------------------------------
 @router.post("/stripe/meetup-join-complete")
 async def meetup_join_complete(data: dict, db: Session = Depends(get_db)):
-    """
-    Stripeカード登録完了後に参加レコードを作成する。
-    """
-    user_id  = data.get("userId")
-    post_id  = data.get("postId")
+    user_id          = data.get("userId")
+    post_id          = data.get("postId")
     setup_session_id = data.get("setupSessionId")
+    is_waitlist      = data.get("isWaitlist", False)
 
     if not user_id or not post_id:
         raise HTTPException(status_code=400, detail="userId と postId が必要です")
@@ -1224,35 +1224,36 @@ async def meetup_join_complete(data: dict, db: Session = Depends(get_db)):
 
     # 既に参加レコードがあれば何もしない
     existing = db.execute(text("""
+        SELECT id FROM post_responses
+        WHERE user_id = :uid AND post_id = :pid AND is_participation = true
+    """), {"uid": user_id, "pid": post_id}).fetchone()
+
+    if existing:
+        return {"status": "already_joined", "content": "Join!"}
+
+    # contentを決定
+    if is_waitlist:
+        content = "Waitlist"
+    else:
+        # 定員確認
+        post = db.execute(
+            text("SELECT meetup_capacity FROM hobby_posts WHERE id = :pid"),
+            {"pid": post_id}
+        ).fetchone()
+        current_count = db.execute(text("""
+            SELECT COUNT(*) as cnt FROM post_responses
+            WHERE post_id = :pid AND is_participation = true AND content != 'Waitlist'
+        """), {"pid": post_id}).fetchone()
+
+        content = "Waitlist" if current_count.cnt >= (post.meetup_capacity or 0) else "Join!"
+
+    # 参加レコード作成
+    db.execute(text("""
         INSERT INTO post_responses (user_id, post_id, content, is_participation, is_attended)
         VALUES (:uid, :pid, :content, true, false)
     """), {"uid": user_id, "pid": post_id, "content": content})
 
-    if existing:
-        return {"status": "already_joined"}
-
-    # 定員確認
-    post = db.execute(
-        text("SELECT meetup_capacity FROM hobby_posts WHERE id = :pid"),
-        {"pid": post_id}
-    ).fetchone()
-
-    current_count = db.execute(text("""
-        SELECT COUNT(*) as cnt FROM post_responses
-        WHERE post_id = :pid AND is_participation = true AND content != 'Waitlist'
-    """), {"pid": post_id}).fetchone()
-
-    content = "Join!"
-    if current_count.cnt >= (post.meetup_capacity or 0):
-        content = "Waitlist"
-
-    # 参加レコード作成
-    db.execute(text("""
-        INSERT INTO post_responses (user_id, post_id, content, is_participation)
-        VALUES (:uid, :pid, :content, true)
-    """), {"uid": user_id, "pid": post_id, "content": content})
-
-    # stripe_customer_idも更新
+    # stripe_customer_idを更新
     customer_id = _get_or_create_stripe_customer_for_user(user_id, db)
     db.execute(text("""
         UPDATE post_responses
