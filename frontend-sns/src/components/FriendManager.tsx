@@ -91,7 +91,7 @@ const UserSearch: React.FC<{ currentUserId: number | null }> = ({ currentUserId 
                 </button>
             </div>
 
-            <ul className="divide-y bg-white rounded shadow">
+            <ul className="divide-y bg-pink-100 rounded shadow">
                 {results.map(u => (
                     <li key={u.id} className="p-4 flex justify-between">
                         <div>
@@ -161,7 +161,7 @@ const RequestList: React.FC = () => {
     }
 
     return (
-        <ul className="divide-y bg-white rounded shadow">
+        <ul className="divide-y bg-pink-100 rounded shadow">
             {requests.map(r => (
                 <li key={r.id} className="p-4 flex justify-between items-center">
                     <p>
@@ -232,7 +232,7 @@ const FriendList: React.FC = () => {
     };
 
     return (
-        <ul className="divide-y bg-white rounded shadow">
+        <ul className="divide-y bg-pink-100 rounded shadow">
             {friends.map(f => (
                 <li key={f.id} className="p-4 flex justify-between items-center">
                     <div className="flex-grow mr-4">
