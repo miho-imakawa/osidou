@@ -105,29 +105,34 @@ def search_users(query: str = Query(..., min_length=1), db: Session = Depends(ge
 
 @router.get("/following/moods", response_model=List[UserMoodResponse])
 def get_following_moods(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-
+    # 1. 自分が登録している友達関係を取得
     friendships = db.query(models.Friendship).filter(
         models.Friendship.user_id == current_user.id,
     ).all()
 
+    # 友達がいない場合は、即座に空のリストを返す（Noneを返すとエラーになります）
     if not friendships:
         return []
 
     friend_ids = [f.friend_id for f in friendships]
     friendship_map = {f.friend_id: f for f in friendships}
 
+    # 2. 全体公開設定がONのユーザーのみ取得
     users = db.query(models.User).filter(
         models.User.id.in_(friend_ids),
         models.User.is_mood_visible == True
     ).all()
 
-    moods = []
+    # 3. 返却用のリストを作成
+    results = []
     for user in users:
         fs = friendship_map.get(user.id)
 
-        final_comment = user.current_mood_comment if user.is_mood_comment_visible else None
+        # 【送り手優先】コメント非公開設定ならコメントをNoneにする
+        is_comment_ok = getattr(user, "is_mood_comment_visible", True)
+        final_comment = user.current_mood_comment if is_comment_ok else None
 
-        moods.append({
+        results.append({
             "user_id": user.id,
             "nickname": user.nickname,
             "username": user.username,
@@ -135,11 +140,13 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
             "current_mood": user.current_mood,
             "current_mood_comment": final_comment,
             "mood_updated_at": user.mood_updated_at,
-            "is_mood_comment_visible": user.is_mood_comment_visible,
+            "is_mood_comment_visible": bool(is_comment_ok),
             "friend_note": fs.friend_note if fs else None,
-            "is_muted": fs.is_muted if fs else False,
+            "is_muted": bool(fs.is_muted) if fs else False,
         })
-    return moods
+    
+    # 4. 最後に必ずリスト（results）を返す
+    return results
 
 # ==========================================
 # 💡 ID指定の操作 (末尾に置く)
