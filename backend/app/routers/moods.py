@@ -45,6 +45,8 @@ class UserMoodResponse(BaseModel):
     current_mood_comment: Optional[str]
     mood_updated_at: Optional[datetime]
     is_mood_visible: bool
+    is_muted: bool = False             # ← 追加
+    friend_note: Optional[str] = None 
 
 # ==========================================
 # 💡 気分ログの作成（アプリ起動時など）
@@ -290,14 +292,14 @@ def get_following_moods(
         if now - cached_time < MOOD_CACHE_TTL:
             return cached_data
 
-    # 1. Friendshipテーブルから「友達のID」を取得
+        # 1. Friendshipテーブルから「友達のID」を取得
     friend_relations = db.query(models.Friendship).filter(
         models.Friendship.user_id == current_user.id,
         models.Friendship.is_hidden == False,
-        models.Friendship.is_muted == False
     ).all()
 
     friend_ids = [rel.friend_id for rel in friend_relations]
+    relation_map = {rel.friend_id: rel for rel in friend_relations}
 
     if not friend_ids:
         return []
@@ -316,7 +318,9 @@ def get_following_moods(
             current_mood=user.current_mood,
             current_mood_comment=user.current_mood_comment,
             mood_updated_at=user.mood_updated_at,
-            is_mood_visible=user.is_mood_visible
+            is_mood_visible=user.is_mood_visible,
+            is_muted=relation_map[user.id].is_muted,        # ← 追加
+            friend_note=relation_map[user.id].friend_note,
         )
         for user in friends_with_mood
     ]

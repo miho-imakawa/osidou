@@ -7,10 +7,11 @@ import {
     rejectFriendRequest,
     fetchMyFriends,
     UserProfileType,
-    FriendRequest
+    FriendRequest,
+    authApi
 } from '../api';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { authApi } from '../api';
+import { Eye, EyeOff } from 'lucide-react';
 
 /* ======================
    ユーザー検索
@@ -274,14 +275,17 @@ const FriendList: React.FC = () => {
                                     is_muted: !f.is_muted
                                 }).then(load)
                             }
-                            className={`p-2 rounded-full text-[10px] font-black transition-colors ${
+                            className={`p-2 rounded-full transition-colors ${
                                 f.is_muted
-                                    ? 'bg-gray-200 text-gray-500'
-                                    : 'bg-white text-pink-500'
+                                    ? 'bg-gray-100 text-gray-300 hover:text-gray-400'
+                                    : 'bg-pink-50 text-pink-400 hover:bg-pink-100'
                             }`}
-                            title={f.is_muted ? '感情のみ表示中' : 'Feeling Log全表示'}
+                            title={f.is_muted
+                                ? 'EMOJI+MOODのみ表示中（クリックで全表示）'
+                                : '全表示中（クリックでコメント非表示）'
+                            }
                         >
-                            {f.is_muted ? '🔇' : '📣'}
+                            {f.is_muted ? <EyeOff size={15} /> : <Eye size={15} />}
                         </button>
 
                         {/* ともだち解除（確認なし・静かに） */}
