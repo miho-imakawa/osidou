@@ -136,6 +136,30 @@ def get_my_hosted_meetups(
     
     return meetups
 
+@router.get("/posts/{post_id}/responses")
+def get_post_responses(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    responses = db.query(models.PostResponse).filter(
+        models.PostResponse.post_id == post_id,
+        models.PostResponse.is_participation == True
+    ).all()
+    
+    result = []
+    for r in responses:
+        user = db.query(models.User).filter(models.User.id == r.user_id).first()
+        result.append({
+            "id": r.id,
+            "user_id": r.user_id,
+            "author_nickname": user.nickname or user.username if user else f"User-{r.user_id}",
+            "content": r.content,
+            "is_participation": r.is_participation,
+            "is_attended": r.is_attended,
+        })
+    return result
+
 # ==========================================
 # 💡 参加表明（JOIN）ロジックの修正
 # ==========================================
