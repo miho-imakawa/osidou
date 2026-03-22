@@ -39,7 +39,8 @@ class UserProfileUpdate(BaseModel):
     oshi_page_url: Optional[str] = None
     
     # 💡 修正: 公開設定フラグ (入力用)
-    is_mood_visible: Optional[bool] = None # 👈 これを追加！
+    is_mood_visible: Optional[bool] = None 
+    is_mood_comment_visible: Optional[bool] = None
     is_member_count_visible: Optional[bool] = None
     is_pref_visible: Optional[bool] = None
     is_city_visible: Optional[bool] = None
