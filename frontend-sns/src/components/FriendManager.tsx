@@ -219,9 +219,12 @@ const FriendList: React.FC = () => {
     };
 
     const handleDelete = async (friendshipId: number) => {
-        // 確認なし・静かに削除
+        // 💡 確認ダイアログを追加
+        if (!window.confirm('ともだちを解除しますか？\n解除しても相手には通知されません。')) return;
+
         try {
             await authApi.delete(`/friends/friendships/${friendshipId}`);
+            // リロードして一覧を更新
             load();
         } catch {
             alert('解除に失敗しました');
@@ -287,7 +290,7 @@ const FriendList: React.FC = () => {
                             className="p-1 text-[9px] text-gray-300 hover:text-gray-400 transition-colors"
                             title="ともだち解除"
                         >
-                            ···
+                            ❁
                         </button>
                     </div>
                 </li>

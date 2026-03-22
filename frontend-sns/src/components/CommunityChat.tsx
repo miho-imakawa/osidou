@@ -943,8 +943,13 @@ const submitPost = async () => {
                                                     {/* 主催者向けボタン群 */}
                                                     {isOwner && (
                                                         <div className="space-y-2 pt-2 border-t border-orange-100">
-                                                            {/* 開催決定 */}
-                                                            {!post.meetup_confirmed_at && (
+                                                        {/* 開催決定 */}
+                                                        {!post.meetup_confirmed_at && (
+                                                            post.meetup_organizer_showed === false ? (
+                                                                <div className="w-full py-2 bg-red-50 text-red-400 rounded-xl text-[11px] font-black text-center">
+                                                                    ⚠️ No Show報告済み・開催不可
+                                                                </div>
+                                                            ) : (
                                                                 <button
                                                                     onClick={async () => {
                                                                         if (!window.confirm("開催を決定しますか？\n参加費ありの参加者に課金が発生します。")) return;
@@ -968,15 +973,15 @@ const submitPost = async () => {
                                                                 >
                                                                     🎉 開催決定する
                                                                 </button>
-                                                            )}
+                                                            )
+                                                        )}
 
-                                                            {/* 開催済み表示 */}
-                                                            {post.meetup_confirmed_at && (
-                                                                <div className="w-full py-2 bg-green-500 text-white rounded-xl text-[11px] font-black text-center">
-                                                                    ✅ 開催決定済み
-                                                                </div>
-                                                            )}
-
+                                                        {/* 開催済み表示 */}
+                                                        {post.meetup_confirmed_at && (
+                                                            <div className="w-full py-2 bg-green-500 text-white rounded-xl text-[11px] font-black text-center">
+                                                                ✅ 開催決定済み
+                                                            </div>
+                                                        )}
                                                             {/* No Show報告（参加者個別）は MeetupChatModal側で対応 */}
                                                         </div>
                                                     )}
