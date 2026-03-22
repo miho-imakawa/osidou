@@ -326,6 +326,12 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
         {unreadNotifCount > 0 && (
             <Link
                 to="/community/832"
+                onClick={async () => {
+                    try {
+                        await authApi.patch('/notifications/read-all');
+                        setUnreadNotifCount(0);
+                    } catch {}
+                }}
                 className="block text-xs font-bold text-orange-500 hover:text-orange-600 mb-4"
             >
                 🔔 MEETUPの通知が{unreadNotifCount}件あります

@@ -292,3 +292,15 @@ def get_unread_notification_count(
         models.Notification.is_read == False
     ).scalar() or 0
     return {"unread_count": count}
+
+@router.patch("/notifications/read-all")
+def mark_all_notifications_read(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    db.query(models.Notification).filter(
+        models.Notification.recipient_id == current_user.id,
+        models.Notification.is_read == False
+    ).update({"is_read": True})
+    db.commit()
+    return {"status": "ok"}
