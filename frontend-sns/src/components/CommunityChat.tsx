@@ -173,6 +173,32 @@ useEffect(() => {
         window.history.replaceState({}, '', window.location.pathname);
     }
 
+    const meetupJoinDone = params.get('meetup_join_done');
+    const joinPostId = params.get('post_id');
+    const setupSessionId = params.get('setup_session_id');
+    if (meetupJoinDone && joinPostId && setupSessionId) {
+        fetch(`${BACKEND_URL}/api/stripe/meetup-join-complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: currentUserId,
+                postId: parseInt(joinPostId),
+                setupSessionId: setupSessionId,
+            }),
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.content === 'Waitlist') {
+                alert('定員に達しているためキャンセル待ちに登録しました。');
+            } else {
+                alert('✅ カード登録完了！参加が確定しました。開催決定後に課金されます。');
+            }
+            window.history.replaceState({}, '', window.location.pathname);
+            fetchPosts();
+        })
+        .catch(() => alert('参加登録に失敗しました。'));
+    }
+
     if (adSessionId) {
         fetch(`${BACKEND_URL}/api/stripe/ad-activate`, {
             method: 'POST',
@@ -691,35 +717,34 @@ const submitPost = async () => {
                                                 {/* ✅ 参加者リストのすぐ下に続くロジック */}
                                                 {!isJoined && !isOwner && (
                                                     dbParticipants.length < (post.meetup_capacity || 0) ? (
-                                                        <button
-                                                            onClick={async () => {
-                                                                // まずpost_responsesにレコード作成
-                                                                await authApi.post(`/posts/${post.id}/responses`, {
-                                                                    content: "Join!", is_participation: true
-                                                                });
-                                                                // 参加費が数値でありかつ0より大きい場合→カード登録へ
-                                                                const fee = Number(post.meetup_fee_info);
-                                                                if (post.meetup_fee_info && !isNaN(fee) && fee > 0) {
-                                                                    const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-join-setup`, {
-                                                                        method: 'POST',
-                                                                        headers: { 'Content-Type': 'application/json' },
-                                                                        body: JSON.stringify({
-                                                                            userId: currentUserId,
-                                                                            postId: post.id,
-                                                                            categoryId: chatTargetId,
-                                                                        }),
-                                                                    });
-                                                                    const { checkout_url } = await res.json();
-                                                                    window.location.href = checkout_url;
-                                                                } else {
-                                                                    // 参加費なし → そのまま参加完了
-                                                                    fetchPosts();
-                                                                }
-                                                            }}
-                                                            className="w-full py-2.5 bg-orange-600 text-white rounded-xl text-[11px] font-black hover:bg-orange-700 shadow-md"
-                                                        >
-                                                            JOIN THIS MEETUP / 参加を希望する
-                                                        </button>
+                                            <button
+                                                onClick={async () => {
+                                                    const fee = Number(post.meetup_fee_info);
+                                                    if (post.meetup_fee_info && !isNaN(fee) && fee > 0) {
+                                                        // 参加費あり → 先にStripeへ（レコードはまだ作らない）
+                                                        const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-join-setup`, {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({
+                                                                userId: currentUserId,
+                                                                postId: post.id,
+                                                                categoryId: chatTargetId,
+                                                            }),
+                                                        });
+                                                        const { checkout_url } = await res.json();
+                                                        window.location.href = checkout_url;
+                                                    } else {
+                                                        // 参加費なし → 参加レコード作成
+                                                        await authApi.post(`/posts/${post.id}/responses`, {
+                                                            content: "Join!", is_participation: true
+                                                        });
+                                                        fetchPosts();
+                                                    }
+                                                }}
+                                                className="w-full py-2.5 bg-orange-600 text-white rounded-xl text-[11px] font-black hover:bg-orange-700 shadow-md"
+                                            >
+                                                JOIN THIS MEETUP / 参加を希望する
+                                            </button>
                                                     ) : (
                                                         <button
                                                             onClick={() => authApi.post(`/posts/${post.id}/responses`, {

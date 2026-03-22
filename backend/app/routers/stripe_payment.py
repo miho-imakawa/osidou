@@ -1197,6 +1197,73 @@ async def meetup_join_setup(data: dict, db: Session = Depends(get_db)):
 
 
 # -------------------------------------------------------
+# M-1-2. JOIN SetupIntent完了後 → 参加レコード作成
+# -------------------------------------------------------
+@router.post("/stripe/meetup-join-complete")
+async def meetup_join_complete(data: dict, db: Session = Depends(get_db)):
+    """
+    Stripeカード登録完了後に参加レコードを作成する。
+    """
+    user_id  = data.get("userId")
+    post_id  = data.get("postId")
+    setup_session_id = data.get("setupSessionId")
+
+    if not user_id or not post_id:
+        raise HTTPException(status_code=400, detail="userId と postId が必要です")
+
+    user_id = int(user_id)
+    post_id = int(post_id)
+
+    # SetupIntent完了確認
+    try:
+        session = stripe.checkout.Session.retrieve(setup_session_id)
+        if session.status != "complete":
+            raise HTTPException(status_code=403, detail="カード登録が完了していません")
+    except stripe.error.StripeError:
+        raise HTTPException(status_code=400, detail="無効なセッションです")
+
+    # 既に参加レコードがあれば何もしない
+    existing = db.execute(text("""
+        SELECT id FROM post_responses
+        WHERE user_id = :uid AND post_id = :pid AND is_participation = true
+    """), {"uid": user_id, "pid": post_id}).fetchone()
+
+    if existing:
+        return {"status": "already_joined"}
+
+    # 定員確認
+    post = db.execute(
+        text("SELECT meetup_capacity FROM hobby_posts WHERE id = :pid"),
+        {"pid": post_id}
+    ).fetchone()
+
+    current_count = db.execute(text("""
+        SELECT COUNT(*) as cnt FROM post_responses
+        WHERE post_id = :pid AND is_participation = true AND content != 'Waitlist'
+    """), {"pid": post_id}).fetchone()
+
+    content = "Join!"
+    if current_count.cnt >= (post.meetup_capacity or 0):
+        content = "Waitlist"
+
+    # 参加レコード作成
+    db.execute(text("""
+        INSERT INTO post_responses (user_id, post_id, content, is_participation)
+        VALUES (:uid, :pid, :content, true)
+    """), {"uid": user_id, "pid": post_id, "content": content})
+
+    # stripe_customer_idも更新
+    customer_id = _get_or_create_stripe_customer_for_user(user_id, db)
+    db.execute(text("""
+        UPDATE post_responses
+        SET stripe_customer_id = :cid
+        WHERE user_id = :uid AND post_id = :pid
+    """), {"cid": customer_id, "uid": user_id, "pid": post_id})
+
+    db.commit()
+    return {"status": "joined", "content": content}
+
+# -------------------------------------------------------
 # M-2. 主催者「開催決定」→ 参加者全員に課金
 # -------------------------------------------------------
 @router.post("/stripe/meetup-confirm")
