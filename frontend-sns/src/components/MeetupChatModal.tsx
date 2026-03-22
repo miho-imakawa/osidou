@@ -36,10 +36,40 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
   };
 
   useEffect(() => {
-    fetchMessages();
-    fetchParticipants();
-    const interval = setInterval(fetchMessages, 3000);
-    return () => clearInterval(interval);
+      fetchMessages();
+      fetchParticipants();
+      let interval = setInterval(fetchMessages, 3000);
+      let idleTimer: ReturnType<typeof setTimeout>;
+
+      const resetIdleTimer = () => {
+          clearTimeout(idleTimer);
+          clearInterval(interval);
+          interval = setInterval(fetchMessages, 3000);
+          idleTimer = setTimeout(() => {
+              clearInterval(interval);
+          }, 10 * 60 * 1000);
+      };
+
+      const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+      events.forEach(e => document.addEventListener(e, resetIdleTimer));
+      resetIdleTimer();
+
+      const handleVisibilityChange = () => {
+          if (document.hidden) {
+              clearInterval(interval);
+              clearTimeout(idleTimer);
+          } else {
+              resetIdleTimer();
+          }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      return () => {
+          clearInterval(interval);
+          clearTimeout(idleTimer);
+          events.forEach(e => document.removeEventListener(e, resetIdleTimer));
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
   }, [postId]);
 
   const handleSend = async (e: React.FormEvent) => {
