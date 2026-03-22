@@ -130,23 +130,42 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
         models.User.is_mood_visible == True
     ).all()
 
+@router.get("/following/moods", response_model=List[UserMoodResponse])
+def get_following_moods(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+
+    friendships = db.query(models.Friendship).filter(
+        models.Friendship.user_id == current_user.id,
+    ).all()
+
+    if not friendships:
+        return []
+
+    friend_ids = [f.friend_id for f in friendships]
+    friendship_map = {f.friend_id: f for f in friendships}
+
+    users = db.query(models.User).filter(
+        models.User.id.in_(friend_ids),
+        models.User.is_mood_visible == True
+    ).all()
+
     moods = []
     for user in users:
         fs = friendship_map.get(user.id)
-        comment_to_send = user.current_mood_comment
-        if not user.is_mood_comment_visible:
-            comment_to_send = None
+
+        # 【送り手優先】is_mood_comment_visible=False ならバックエンドでコメントを消す
+        final_comment = user.current_mood_comment if user.is_mood_comment_visible else None
+
         moods.append({
             "user_id": user.id,
             "nickname": user.nickname,
             "username": user.username,
             "email": user.email,
             "current_mood": user.current_mood,
-            "current_mood_comment": comment_to_send,
+            "current_mood_comment": final_comment,          # 安全な値のみ渡す
             "mood_updated_at": user.mood_updated_at,
             "is_mood_comment_visible": user.is_mood_comment_visible,
             "friend_note": fs.friend_note if fs else None,
-            "is_muted": fs.is_muted if fs else False,  # ← is_muted をそのまま渡す
+            "is_muted": fs.is_muted if fs else False,
         })
     return moods
 
