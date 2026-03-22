@@ -351,7 +351,7 @@ const submitPost = async () => {
 
     const allParentPosts = posts.filter(p => {
         if (p.parent_id) return false;
-        if (p.is_meetup && p.meetup_date && new Date(p.meetup_date) < new Date()) return false;
+        if (p.is_meetup && p.meetup_date && new Date(new Date(p.meetup_date).getTime() + 4 * 60 * 60 * 1000) < new Date()) return false;
         return true;
     });
 
