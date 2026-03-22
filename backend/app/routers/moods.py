@@ -289,7 +289,7 @@ def get_following_moods(
     now = time.time()
     if cache_key in _following_moods_cache:
         cached_data, cached_time = _following_moods_cache[cache_key]
-        if now - cached_time < MOOD_CACHE_TTL:
+        if now - cached_time < MOOD_CACHE_TTL and cached_data is not None:
             return cached_data
 
         # 1. Friendshipテーブルから「友達のID」を取得

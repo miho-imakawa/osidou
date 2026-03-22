@@ -105,33 +105,6 @@ def search_users(query: str = Query(..., min_length=1), db: Session = Depends(ge
 
 @router.get("/following/moods", response_model=List[UserMoodResponse])
 def get_following_moods(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    
-    # 変更前（or_ で双方向取得していた）
-    # friendships = db.query(models.Friendship).filter(
-    #     or_(
-    #         models.Friendship.user_id == current_user.id,
-    #         models.Friendship.friend_id == current_user.id
-    #     )
-    # ).all()
-
-    # 変更後：自分が登録した方向のみ、is_muted でフィルタしない
-    friendships = db.query(models.Friendship).filter(
-        models.Friendship.user_id == current_user.id,
-    ).all()
-
-    if not friendships:
-        return []
-
-    friend_ids = [f.friend_id for f in friendships]
-    friendship_map = {f.friend_id: f for f in friendships}
-
-    users = db.query(models.User).filter(
-        models.User.id.in_(friend_ids),
-        models.User.is_mood_visible == True
-    ).all()
-
-@router.get("/following/moods", response_model=List[UserMoodResponse])
-def get_following_moods(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
 
     friendships = db.query(models.Friendship).filter(
         models.Friendship.user_id == current_user.id,
@@ -152,7 +125,6 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
     for user in users:
         fs = friendship_map.get(user.id)
 
-        # 【送り手優先】is_mood_comment_visible=False ならバックエンドでコメントを消す
         final_comment = user.current_mood_comment if user.is_mood_comment_visible else None
 
         moods.append({
@@ -161,7 +133,7 @@ def get_following_moods(db: Session = Depends(get_db), current_user: models.User
             "username": user.username,
             "email": user.email,
             "current_mood": user.current_mood,
-            "current_mood_comment": final_comment,          # 安全な値のみ渡す
+            "current_mood_comment": final_comment,
             "mood_updated_at": user.mood_updated_at,
             "is_mood_comment_visible": user.is_mood_comment_visible,
             "friend_note": fs.friend_note if fs else None,
