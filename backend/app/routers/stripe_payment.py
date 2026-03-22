@@ -1264,6 +1264,118 @@ async def meetup_join_complete(data: dict, db: Session = Depends(get_db)):
     return {"status": "joined", "content": content}
 
 # -------------------------------------------------------
+# M-1-3. Waitlist → 参加昇格（50%オフ課金）
+# -------------------------------------------------------
+@router.post("/stripe/meetup-waitlist-join")
+async def meetup_waitlist_join(data: dict, db: Session = Depends(get_db)):
+    """
+    Waitlistの人が「参加する」を押したとき。
+    参加費がある場合は50%オフで課金。
+    カード登録済みなら即課金、未登録ならSetupIntentへ。
+    """
+    user_id = data.get("userId")
+    post_id = data.get("postId")
+    if not user_id or not post_id:
+        raise HTTPException(status_code=400, detail="userId と postId が必要です")
+
+    user_id = int(user_id)
+    post_id = int(post_id)
+
+    # Waitlistレコード確認
+    response = db.execute(text("""
+        SELECT id, stripe_customer_id
+        FROM post_responses
+        WHERE user_id = :uid AND post_id = :pid AND content = 'Waitlist'
+    """), {"uid": user_id, "pid": post_id}).fetchone()
+
+    if not response:
+        raise HTTPException(status_code=404, detail="Waitlistレコードが見つかりません")
+
+    # 投稿情報
+    post = db.execute(
+        text("SELECT meetup_fee_info, hobby_category_id FROM hobby_posts WHERE id = :pid"),
+        {"pid": post_id}
+    ).fetchone()
+
+    try:
+        fee = int(post.meetup_fee_info or 0)
+    except (TypeError, ValueError):
+        fee = 0
+
+    discount_fee = fee // 2  # 50%オフ
+
+    # カード登録済みの場合 → 即課金
+    if response.stripe_customer_id and discount_fee > 0:
+        try:
+            pms = stripe.PaymentMethod.list(
+                customer=response.stripe_customer_id, type="card"
+            )
+            if pms.data:
+                stripe.PaymentIntent.create(
+                    amount=discount_fee,
+                    currency="jpy",
+                    customer=response.stripe_customer_id,
+                    payment_method=pms.data[0].id,
+                    confirm=True,
+                    off_session=True,
+                    metadata={
+                        "user_id": str(user_id),
+                        "post_id": str(post_id),
+                        "product": "meetup_waitlist_fee",
+                    },
+                )
+                # Waitlist → Join!に昇格
+                db.execute(text("""
+                    UPDATE post_responses
+                    SET content = 'Join!', cancel_charged_at = NOW()
+                    WHERE id = :rid
+                """), {"rid": response.id})
+                db.commit()
+                return {"status": "joined", "charged": discount_fee}
+        except stripe.error.StripeError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # 参加費なし or カード未登録で参加費なし → 直接昇格
+    if discount_fee == 0:
+        db.execute(text("""
+            UPDATE post_responses
+            SET content = 'Join!'
+            WHERE id = :rid
+        """), {"rid": response.id})
+        db.commit()
+        return {"status": "joined", "charged": 0}
+
+    # カード未登録で参加費あり → SetupIntentへ
+    customer_id = _get_or_create_stripe_customer_for_user(user_id, db)
+    db.execute(text("""
+        UPDATE post_responses
+        SET stripe_customer_id = :cid
+        WHERE id = :rid
+    """), {"cid": customer_id, "rid": response.id})
+    db.commit()
+
+    try:
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            mode="setup",
+            success_url=(
+                f"{FRONTEND_URL}/community/{post.hobby_category_id}"
+                f"?meetup_waitlist_done=true&post_id={post_id}"
+                f"&setup_session_id={{CHECKOUT_SESSION_ID}}"
+            ),
+            cancel_url=f"{FRONTEND_URL}/community/{post.hobby_category_id}",
+            metadata={
+                "user_id": str(user_id),
+                "post_id": str(post_id),
+                "product": "meetup_waitlist",
+            },
+        )
+        return {"checkout_url": session.url}
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# -------------------------------------------------------
 # M-2. 主催者「開催決定」→ 参加者全員に課金
 # -------------------------------------------------------
 @router.post("/stripe/meetup-confirm")

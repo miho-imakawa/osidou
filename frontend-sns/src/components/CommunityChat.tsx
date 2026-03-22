@@ -199,6 +199,28 @@ useEffect(() => {
         .catch(() => alert('参加登録に失敗しました。'));
     }
 
+    const meetupWaitlistDone = params.get('meetup_waitlist_done');
+    const waitlistPostId = params.get('post_id');
+    const waitlistSessionId = params.get('setup_session_id');
+    if (meetupWaitlistDone && waitlistPostId && waitlistSessionId) {
+        fetch(`${BACKEND_URL}/api/stripe/meetup-waitlist-join`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: currentUserId,
+                postId: parseInt(waitlistPostId),
+                setupSessionId: waitlistSessionId,
+            }),
+        })
+        .then(res => res.json())
+        .then(() => {
+            alert('✅ 参加が確定しました！');
+            window.history.replaceState({}, '', window.location.pathname);
+            fetchPosts();
+        });
+    }
+
+
     if (adSessionId) {
         fetch(`${BACKEND_URL}/api/stripe/ad-activate`, {
             method: 'POST',
@@ -696,9 +718,10 @@ const submitPost = async () => {
                                         )}
 
                                         <div className="border-t border-orange-50 pt-3">
+                                                {/* 参加者 */}
                                                 <p className="text-[9px] font-black text-orange-400 mb-2 uppercase tracking-widest">Participants</p>
-                                                <div className="flex flex-wrap gap-2 mb-4">
-                                                    {allParticipants.map(p => (
+                                                <div className="flex flex-wrap gap-2 mb-3">
+                                                    {allParticipants.filter(p => p.id === -1 || p.content !== 'Waitlist').map(p => (
                                                         <div key={p.id} className="flex items-center gap-1.5 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
                                                             {isOwner && p.id !== -1 && (
                                                                 <button onClick={() => toggleAttendance(p.id).then(fetchPosts)} className="text-orange-500 hover:scale-110 transition-transform">
@@ -712,6 +735,69 @@ const submitPost = async () => {
                                                         </div>
                                                     ))}
                                                 </div>
+
+                                                {/* Waitlistセクション */}
+                                                {dbParticipants.filter(p => p.content === 'Waitlist').length > 0 && (
+                                                    <div className="mb-3">
+                                                        <p className="text-[9px] font-black text-gray-400 mb-2 uppercase tracking-widest">Waitlist</p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {dbParticipants.filter(p => p.content === 'Waitlist').map(p => (
+                                                                <div key={p.id} className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
+                                                                    <span className="text-[11px] font-bold text-gray-500">
+                                                                        {p.author_nickname}
+                                                                    </span>
+                                                                    {/* 自分がWaitlistの場合→参加ボタン（50%オフ） */}
+                                                                    {p.user_id === currentUserId && (
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                if (!window.confirm('50%オフで参加しますか？\n参加費がある場合は決済が発生します。')) return;
+                                                                                try {
+                                                                                    const fee = Number(post.meetup_fee_info);
+                                                                                    if (fee > 0) {
+                                                                                        const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-waitlist-join`, {
+                                                                                            method: 'POST',
+                                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                                            body: JSON.stringify({
+                                                                                                userId: currentUserId,
+                                                                                                postId: post.id,
+                                                                                                categoryId: chatTargetId,
+                                                                                            }),
+                                                                                        });
+                                                                                        const result = await res.json();
+                                                                                        if (result.checkout_url) {
+                                                                                            window.location.href = result.checkout_url;
+                                                                                        } else if (result.status === 'joined') {
+                                                                                            alert('✅ 参加が確定しました！');
+                                                                                            fetchPosts();
+                                                                                        }
+                                                                                    } else {
+                                                                                        // 参加費なし → 直接昇格
+                                                                                        await fetch(`${BACKEND_URL}/api/stripe/meetup-waitlist-join`, {
+                                                                                            method: 'POST',
+                                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                                            body: JSON.stringify({
+                                                                                                userId: currentUserId,
+                                                                                                postId: post.id,
+                                                                                                categoryId: chatTargetId,
+                                                                                            }),
+                                                                                        });
+                                                                                        alert('✅ 参加が確定しました！');
+                                                                                        fetchPosts();
+                                                                                    }
+                                                                                } catch {
+                                                                                    alert('エラーが発生しました。');
+                                                                                }
+                                                                            }}
+                                                                            className="text-[9px] font-black bg-orange-500 text-white px-2 py-0.5 rounded-full hover:bg-orange-600"
+                                                                        >
+                                                                            参加する
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {/* 参加・キャンセル待ちボタン */}
                                                 {/* ✅ 参加者リストのすぐ下に続くロジック */}
