@@ -588,7 +588,7 @@ const submitPost = async () => {
                                                 </div>
                                             </div>
                                             {/* 親投稿の文字を大きく */}
-                                            <p className="text-gray-800 text-[14px] leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                                            <p className="text-gray-800 text-[13px] leading-relaxed whitespace-pre-wrap">{post.content}</p>
                                             <button
                                                 type="button"
                                                 onClick={() => {
