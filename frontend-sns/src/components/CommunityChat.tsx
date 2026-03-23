@@ -1051,8 +1051,20 @@ const submitPost = async () => {
                                             </button>
                                         </div>
                                     </div>
+                                )}
+                                    {/* 返信一覧 - Google Chat風 */}
+                                    {posts.filter(r => r.parent_id === post.id).length > 0 && (
+                                        <div className="ml-6 mt-1 border-l-2 border-pink-100 pl-3 space-y-1">
+                                            {posts.filter(r => r.parent_id === post.id).map(reply => (
+                                                <div key={reply.id} className="bg-white border border-gray-100 rounded-2xl px-3 py-2">
+                                                    <span className="font-black text-[10px] text-pink-400 block">{reply.author_nickname}</span>
+                                                    <p className="text-gray-600 text-[12px] leading-relaxed whitespace-pre-wrap">{reply.content}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                     
-                                )}                        </div>
+                                )</div>
                     );
                 })}
             </div>
@@ -1354,7 +1366,7 @@ const submitPost = async () => {
             </div>
         )}
         </div>
-    );
+    ); 
 };
 
 export default CommunityChat;
