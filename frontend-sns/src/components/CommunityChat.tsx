@@ -26,6 +26,10 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
     const [newPost, setNewPost] = useState<string>(''); 
     const [loading, setLoading] = useState(true);
     const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set());
+    const [replyTo, setReplyTo] = useState<{
+        postId: number;
+        nickname: string;
+    } | null>(null);
     const [postType, setPostType] = useState<'normal' | 'meetup'>('normal');
     const [activeChat, setActiveChat] = useState<{id: number, title: string} | null>(null);
     const [showAdModal, setShowAdModal] = useState(false);
@@ -413,6 +417,7 @@ const submitPost = async () => {
         });
         setNewPost('');
         setPostType('normal');
+        setReplyTo(null); 
         fetchPosts();
     } catch (err) {
         console.error('送信エラー:', err);
@@ -1033,8 +1038,20 @@ const submitPost = async () => {
                                             </div>
                                             
                                             <p className="text-gray-700 text-[13px] leading-relaxed whitespace-pre-wrap">{post.content}</p>
+
+                                            {/* ↓ 返信ボタンを追加 */}
+                                            <button
+                                                onClick={() => {
+                                                    setReplyTo({ postId: post.id, nickname: post.author_nickname });
+                                                    setNewPost(`@${post.author_nickname} #${post.id}\n`);
+                                                }}
+                                                className="mt-2 text-[10px] text-gray-300 hover:text-pink-400 font-bold transition-colors"
+                                            >
+                                                返信する
+                                            </button>
                                         </div>
                                     </div>
+                                    
                                 )}                        </div>
                     );
                 })}
