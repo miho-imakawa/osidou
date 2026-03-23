@@ -91,8 +91,9 @@ class UserPublic(BaseModel):
     current_mood: Optional[str] = None 
     current_mood_comment: Optional[str] = None
     mood_updated_at: Optional[datetime] = None
-    is_mood_visible: bool = True # 感情ログの公開設定
     is_mood_comment_visible: bool = True
+    is_mood_visible: bool = True # 感情ログの公開設定
+
     
     # 💡 新規追加: 公開設定フラグ (出力用)
     is_member_count_visible: bool

@@ -209,7 +209,7 @@ useEffect(() => {
   }, {});
 
   const toggleEdit = () => {
-    setTempProfile({ ...displayProfile });
+    setTempProfile({ ...myProfile }); 
     setIsEditing(!isEditing);
   };
 
