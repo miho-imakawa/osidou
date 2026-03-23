@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPost, fetchPostsByCategory, Post, authApi, toggleAttendance, adInteraction, fetchMyAdInteractions, createSubCategory  } from '../api';
 import { 
-  Send, MessageSquare, MapPin, Users, CheckSquare, Square, Clock, Coins, Pin, Calendar, EyeOff, AlertTriangle
+  Send, MessageSquare, MapPin, Users, CheckSquare, Square, Clock, Coins, Pin, Calendar, EyeOff, AlertTriangle, ChevronDown, ChevronUp
 } from 'lucide-react';
 import MeetupChatModal from './MeetupChatModal';
 import AdPostModal from './AdPostModal';
@@ -1031,13 +1031,36 @@ const submitPost = async () => {
                                     </div>
                                     {/* 返信一覧 */}
                                     {posts.filter(r => r.parent_id === post.id).length > 0 && (
-                                        <div className="ml-6 mt-1 border-l-2 border-pink-100 pl-3 space-y-1">
-                                            {posts.filter(r => r.parent_id === post.id).map(reply => (
-                                                <div key={reply.id} className="bg-white border border-gray-100 rounded-2xl px-3 py-2">
-                                                    <span className="font-black text-[10px] text-pink-400 block">{reply.author_nickname}</span>
-                                                    <p className="text-gray-600 text-[12px] leading-relaxed whitespace-pre-wrap">{reply.content}</p>
+                                        <div className="ml-6 mt-1">
+                                            {/* 💡 返信を展開・格納するボタン */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setExpandedThreads(prev => {
+                                                    const newSet = new Set(prev);
+                                                    if (newSet.has(post.id)) newSet.delete(post.id);
+                                                    else newSet.add(post.id);
+                                                    return newSet;
+                                                })}
+                                                className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-pink-50 transition-colors text-[10px] font-black text-pink-500"
+                                            >
+                                                <div className="w-4 h-4 rounded-full bg-pink-100 flex items-center justify-center text-[8px]">💬</div>
+                                                <span>
+                                                    {posts.filter(r => r.parent_id === post.id).length} 件の返信
+                                                </span>
+                                                {expandedThreads.has(post.id) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                            </button>
+
+                                            {/* 💡 expandedThreads に ID が入っている時だけリストを表示 */}
+                                            {expandedThreads.has(post.id) && (
+                                                <div className="mt-2 border-l-2 border-pink-100 pl-3 space-y-1 animate-in slide-in-from-top-1 duration-200">
+                                                    {posts.filter(r => r.parent_id === post.id).map(reply => (
+                                                        <div key={reply.id} className="bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm">
+                                                            <span className="font-black text-[10px] text-pink-400 block">{reply.author_nickname}</span>
+                                                            <p className="text-gray-600 text-[12px] leading-relaxed whitespace-pre-wrap">{reply.content}</p>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
                                     )}
                                 </div>
