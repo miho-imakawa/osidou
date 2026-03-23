@@ -500,7 +500,7 @@ const submitPost = async () => {
             </div>
         )}
 
-            {/* 2. Chat Timeline */}
+        {/* 2. Chat Timeline */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
                 {parentPosts.map((post) => {
                     const rawResponses = post.responses || [];
@@ -522,7 +522,6 @@ const submitPost = async () => {
                     const allParticipants = [organizer, ...dbParticipants];
                     const isExpanded = expandedThreads.has(post.id);
                     const isOwner = currentUserId === post.user_id;
-                    const isJoined = allParticipants.some(p => p.user_id === currentUserId);
                     const interaction = adInteractions[post.id];
                     const isClosed = closedAds.has(post.id);
 
@@ -531,478 +530,49 @@ const submitPost = async () => {
                     const adBorderL = post.ad_color === 'red' ? 'border-red-400' : post.ad_color === 'blue' ? 'border-blue-400' : post.ad_color === 'purple' ? 'border-purple-400' : post.ad_color === 'white' ? 'border-slate-300' : 'border-green-400';
 
                     return (
-                       <div key={post.id} id={`post-${post.id}`} className="animate-in fade-in slide-in-from-bottom-2">
-                        {post.is_ad ? (
-                            <div className="mb-4">
-                                {isClosed ?(
-                                        /* コンパクト表示 */
+                        <div key={post.id} id={`post-${post.id}`} className="animate-in fade-in slide-in-from-bottom-2">
+                            {post.is_ad ? (
+                                <div className="mb-4">
+                                    {isClosed ? (
                                         <div className={`p-3 border-l-4 rounded-r-2xl ${adBg} ${adBorderL}`}>
-                                        {/* --- ここから差し替え --- */}
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                <span className="text-[8px] font-black bg-gray-800 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
-                                                
-                                                {/* タイトルと日付を縦に並べるための div */}
-                                                <div className="flex flex-col min-w-0">
-                                                    <span className="text-[14px] font-bold text-gray-700 truncate">
-                                                        {post.content.split('\n')[0]}
-                                                    </span>
-                                                    {/* ★ 掲載終了日をコンパクトに表示 */}
-                                                    {post.ad_start_date && post.ad_end_date && (
-                                                        <span className="text-[9px] font-bold opacity-80 leading-none mt-1">
-                                                            掲載期間: {post.ad_start_date.slice(0, 10).replace(/-/g, '/')} 〜 {post.ad_end_date.slice(0, 10).replace(/-/g, '/')}
-                                                        </span>
-                                                    )}
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                    <span className="text-[8px] font-black bg-gray-800 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
+                                                    <span className="text-[14px] font-bold text-gray-700 truncate">{post.content.split('\n')[0]}</span>
                                                 </div>
-                                            </div>
-                                            <button
-                                                onClick={() => toggleAdCollapse(post.id)}
-                                                className="px-3 py-1 bg-white border border-gray-200 rounded-full text-[10px] font-black text-gray-600 shrink-0 ml-2 shadow-sm active:scale-95 transition-transform"
-                                            >
-                                                RE-OPEN
-                                            </button>
-                                        </div>
-                                        {/* --- ここまで --- */}
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <button
-                                                    onClick={() => handleAdAction(post.id, 'like')}
-                                                    className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-400 border border-gray-200'}`}
-                                                >
-                                                    👍 Vibe
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAdAction(post.id, 'pin')}
-                                                    className={`px-2 py-1 rounded-full text-[9px] font-black transition-all ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-400 border border-gray-200'}`}
-                                                >
-                                                    📌 PIN
-                                                </button>
-                                                {post.ad_end_date && (
-                                                    <span className="text-[9px] text-gray-400 ml-auto">〜{post.ad_end_date.slice(0, 10)}</span>
-                                                )}
+                                                <button type="button" onClick={() => toggleAdCollapse(post.id)} className="px-3 py-1 bg-white border border-gray-200 rounded-full text-[10px] font-black text-gray-600 shadow-sm">RE-OPEN</button>
                                             </div>
                                         </div>
                                     ) : (
-                                    /* フル表示 */
-                                    <div className={`p-4 rounded-[28px] border-2 shadow-sm ${adBg} ${adBorder}`}>
-
-                                        {/* ★ 投稿者名（上部：アイコン＋名義＋ADラベル） */}
-                                        <div className="flex items-center gap-1.5 mb-2">
-                                            <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded-full uppercase shrink-0">AD</span>
-                                            <div className="w-5 h-5 rounded-full bg-black/10 flex items-center justify-center text-[9px] font-black shrink-0">
-                                                {(post.author_nickname || '?').charAt(0).toUpperCase()}
+                                        <div className={`p-4 rounded-[28px] border-2 shadow-sm ${adBg} ${adBorder}`}>
+                                            <div className="flex items-center gap-1.5 mb-2">
+                                                <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
+                                                <span className="text-[10px] font-bold opacity-60 truncate">{post.author_nickname}</span>
+                                                <button type="button" onClick={() => toggleAdCollapse(post.id)} className="px-3 py-1.5 bg-white/70 border border-gray-200 rounded-full text-[10px] font-black text-gray-500 ml-auto">✕</button>
                                             </div>
-                                            <span className="text-[10px] font-bold opacity-60 truncate">
-                                                {post.author_nickname || 'Unknown'}
-                                            </span>
-                                        </div>
-
-                                        {/* タイトル */}
-                                        <h3 className="font-black text-sm leading-tight mb-2">
-                                            {post.content.split('\n')[0]}
-                                        </h3>
-
-                                        {/* 本文 */}
-                                        <p className="text-[12px] opacity-90 whitespace-pre-wrap leading-relaxed mb-3">
-                                            {post.content.split('\n').slice(1).join('\n')}
-                                        </p>
-
-                                        {/* 💡 広告主専用：編集・追記メニュー（本人にのみ表示） */}
-                                        {post.user_id === currentUserId && (
-                                            <div className="mb-3 pt-2 border-t border-dashed border-black/10">
-                                                <button 
-                                                    type="button"
-                                                    onClick={async () => {
-                                                        const addText = window.prompt("追記する内容を入力してください：");
-                                                        if (addText && addText.trim()) {
-                                                            try {
-                                                                const updatedContent = `${post.content}\n\n📌 追記：${addText.trim()}`;
-                                                                await authApi.patch(`/posts/${post.id}`, { content: updatedContent });
-                                                                fetchPosts();
-                                                            } catch (err) {
-                                                                alert("追記に失敗しました。");
-                                                            }
-                                                        }
-                                                    }}
-                                                    className="text-[8px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                                >
-                                                    <CheckSquare size={14} /> 文言を追記する
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* フッター：日付とアクションボタン */}
-                                        <div className="pt-3 border-t border-black/5 space-y-1">
-                                            {post.ad_end_date && (
-                                                <span className="text-[9px] font-bold opacity-60 block">{post.ad_end_date.slice(0, 10)} 終了</span>
-                                            )}
-                                            <div className="flex gap-2 items-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleAdAction(post.id, 'like')}
-                                                    className={`px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}
-                                                >
-                                                    👍 Vibe
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleAdAction(post.id, 'pin')}
-                                                    className={`px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}
-                                                >
-                                                    📌 PIN
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => toggleAdCollapse(post.id)}
-                                                    className="px-3 py-1.5 bg-white/70 border border-gray-200 rounded-full text-[10px] font-black text-gray-500 ml-auto"
-                                                >
-                                                    ✕
-                                                </button>
+                                            <h3 className="font-black text-sm leading-tight mb-2">{post.content.split('\n')[0]}</h3>
+                                            <p className="text-[12px] opacity-90 whitespace-pre-wrap leading-relaxed mb-3">{post.content.split('\n').slice(1).join('\n')}</p>
+                                            <div className="flex gap-2">
+                                                <button type="button" onClick={() => handleAdAction(post.id, 'like')} className={`px-3 py-1.5 rounded-full text-[10px] font-black ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}>👍 Vibe</button>
+                                                <button type="button" onClick={() => handleAdAction(post.id, 'pin')} className={`px-3 py-1.5 rounded-full text-[10px] font-black ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}>📌 PIN</button>
                                             </div>
                                         </div>
-                                    </div>
                                     )}
                                 </div>
                             ) : post.is_meetup ? (
-                                /* 🟠 MEETUP カード 完全復活版 */
                                 <div className="space-y-2 mb-4">
-                                    <div className={`p-3 rounded-[24px] border-2 shadow-sm bg-orange-50 border-orange-200 text-left`}>
-                                        
-                                        {/* 💡 1行目：開催名 & 日時 */}
+                                    <div className="p-3 rounded-[24px] border-2 shadow-sm bg-orange-50 border-orange-200 text-left">
                                         <div className="flex justify-between items-center mb-1.5 px-1">
-                                            <h3 className="text-[13px] font-black text-orange-800 truncate flex-1 leading-tight">
-                                                {post.content.split('\n')[0]}
-                                            </h3>
-                                            <div className="flex items-center gap-1 text-orange-700 font-black text-[11px] shrink-0 leading-none">
-                                                <Clock size={12} className="text-orange-500" />
-                                                <span>
-                                                    {post.meetup_date 
-                                                        ? `${post.meetup_date.slice(5, 10).replace('-', '/')} ${post.meetup_date.slice(11, 16)}` 
-                                                        : '日時未定'}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* 💡 2行目：場所 & 人数 & 費用 & ボタン */}
-                                        <div className="flex items-center justify-between px-1">
-                                            <div className="flex flex-col gap-1">
-                                                {/* 場所 */}
-                                                <div className="flex items-center gap-1 text-[10px] text-gray-600 font-bold">
-                                                    <MapPin size={11} className="text-orange-500" />
-                                                    <span className="truncate max-w-[180px]">{post.meetup_location || '場所未定'}</span>
-                                                </div>
-                                                {/* 人数 & 費用 */}
-                                                <div className="flex items-center gap-2 text-[10px] text-gray-600 font-bold">
-                                                    <Users size={11} className="text-orange-400" />
-                                                    <span>{dbParticipants.length}/{post.meetup_capacity}人</span>
-                                                    <Coins size={11} className="text-orange-400" />
-                                                    <span className="text-orange-600 font-black text-[10px]">
-                                                        {post.meetup_fee_info && !isNaN(Number(post.meetup_fee_info)) && Number(post.meetup_fee_info) > 0 
-                                                            ? `¥${post.meetup_fee_info}` 
-                                                            : (post.meetup_fee_info || 'お茶代')}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* ボタン類 */}
-                                            <div className="flex flex-col gap-1 items-end">
-                                                {(isJoined || isOwner) && (
-                                                    <button 
-                                                        onClick={() => setActiveChat({ id: post.id, title: post.content.split('\n')[0] })}
-                                                        className="px-3 py-1 bg-blue-600 text-white rounded-full text-[9px] font-black shadow-sm flex items-center gap-1 hover:bg-blue-700 transition-colors"
-                                                    >
-                                                        <MessageSquare size={10} /> CHAT
-                                                    </button>
-                                                )}
-                                                <button 
-                                                    onClick={() => setExpandedThreads(p => { const n = new Set(p); n.has(post.id) ? n.delete(post.id) : n.add(post.id); return n; })} 
-                                                    className="px-3 py-1 bg-orange-600 text-white rounded-full text-[9px] font-black shadow-sm hover:bg-orange-700 transition-colors"
-                                                >
-                                                    {isExpanded ? "CLOSE" : "DETAILS"}
-                                                </button>
-                                            </div>
+                                            <h3 className="text-[13px] font-black text-orange-800 truncate flex-1 leading-tight">{post.content.split('\n')[0]}</h3>
+                                            <button type="button" onClick={() => setExpandedThreads(p => { const n = new Set(p); n.has(post.id) ? n.delete(post.id) : n.add(post.id); return n; })} className="px-3 py-1 bg-orange-600 text-white rounded-full text-[9px] font-black ml-2">DETAILS</button>
                                         </div>
                                     </div>
-
-                                    {/* 📖 詳細展開エリア（参加ボタン・参加者リストを含む） */}
-                                    {isExpanded && (
-                                        <div className="p-4 bg-white rounded-3xl border border-orange-100 shadow-inner animate-in fade-in slide-in-from-top-1 text-left">
-                                        <p className="text-[12px] text-gray-700 whitespace-pre-wrap mb-4 leading-relaxed">
-                                            {post.content}
-                                        </p>
-
-                                        {/* 主催者：文言追記 */}
-                                        {isOwner && (
-                                            <div className="mb-3 pb-3 border-b border-dashed border-orange-200">
-                                                <button
-                                                    type="button"
-                                                    onClick={async () => {
-                                                        const addText = window.prompt("追記する内容を入力してください：");
-                                                        if (addText && addText.trim()) {
-                                                            try {
-                                                                const updatedContent = `${post.content}\n\n📌 追記：${addText.trim()}`;
-                                                                await authApi.patch(`/posts/${post.id}`, { content: updatedContent });
-                                                                fetchPosts();
-                                                            } catch {
-                                                                alert("追記に失敗しました。");
-                                                            }
-                                                        }
-                                                    }}
-                                                    className="text-[8px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                                >
-                                                    <CheckSquare size={14} /> 文言を追記する
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        <div className="border-t border-orange-50 pt-3">
-                                                {/* 参加者 */}
-                                                <p className="text-[9px] font-black text-orange-400 mb-2 uppercase tracking-widest">Participants</p>
-                                                <div className="flex flex-wrap gap-2 mb-3">
-                                                    {allParticipants.filter(p => p.id === -1 || p.content !== 'Waitlist').map(p => (
-                                                        <div key={p.id} className="flex items-center gap-1.5 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
-                                                            {isOwner && p.id !== -1 && (
-                                                                <button onClick={() => toggleAttendance(p.id).then(fetchPosts)} className="text-orange-500 hover:scale-110 transition-transform">
-                                                                    {p.is_attended ? <CheckSquare size={14} /> : <Square size={14} />}
-                                                                </button>
-                                                            )}
-                                                            <span className={`text-[11px] font-bold ${p.is_attended ? 'text-gray-400 line-through' : 'text-orange-900'}`}>
-                                                                {p.author_nickname}
-                                                                {p.id === -1 && <span className="ml-1 text-[8px] bg-orange-200 px-1 rounded text-orange-700">HOST</span>}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-
-                                                {/* Waitlistセクション */}
-                                                {dbParticipants.filter(p => p.content === 'Waitlist').length > 0 && (
-                                                    <div className="mb-3">
-                                                        <p className="text-[9px] font-black text-gray-400 mb-2 uppercase tracking-widest">Waitlist</p>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {dbParticipants.filter(p => p.content === 'Waitlist').map(p => (
-                                                                <div key={p.id} className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
-                                                                    <span className="text-[11px] font-bold text-gray-500">
-                                                                        {p.author_nickname}
-                                                                    </span>
-                                                                    {/* 自分がWaitlistの場合→参加ボタン（50%オフ） */}
-                                                                    {p.user_id === currentUserId && (
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                if (!window.confirm('50%オフで参加しますか？\n参加費がある場合は決済が発生します。')) return;
-                                                                                try {
-                                                                                    const fee = Number(post.meetup_fee_info);
-                                                                                    if (fee > 0) {
-                                                                                        const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-waitlist-join`, {
-                                                                                            method: 'POST',
-                                                                                            headers: { 'Content-Type': 'application/json' },
-                                                                                            body: JSON.stringify({
-                                                                                                userId: currentUserId,
-                                                                                                postId: post.id,
-                                                                                                categoryId: chatTargetId,
-                                                                                            }),
-                                                                                        });
-                                                                                        const result = await res.json();
-                                                                                        if (result.checkout_url) {
-                                                                                            window.location.href = result.checkout_url;
-                                                                                        } else if (result.status === 'joined') {
-                                                                                            alert('✅ 参加が確定しました！');
-                                                                                            fetchPosts();
-                                                                                        }
-                                                                                    } else {
-                                                                                        // 参加費なし → 直接昇格
-                                                                                        await fetch(`${BACKEND_URL}/api/stripe/meetup-waitlist-join`, {
-                                                                                            method: 'POST',
-                                                                                            headers: { 'Content-Type': 'application/json' },
-                                                                                            body: JSON.stringify({
-                                                                                                userId: currentUserId,
-                                                                                                postId: post.id,
-                                                                                                categoryId: chatTargetId,
-                                                                                            }),
-                                                                                        });
-                                                                                        alert('✅ 参加が確定しました！');
-                                                                                        fetchPosts();
-                                                                                    }
-                                                                                } catch {
-                                                                                    alert('エラーが発生しました。');
-                                                                                }
-                                                                            }}
-                                                                            className="text-[9px] font-black bg-orange-500 text-white px-2 py-0.5 rounded-full hover:bg-orange-600"
-                                                                        >
-                                                                            参加する
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* 参加・キャンセル待ちボタン */}
-                                                {/* ✅ 参加者リストのすぐ下に続くロジック */}
-                                                {!isJoined && !isOwner && (
-                                                    dbParticipants.length < (post.meetup_capacity || 0) ? (
-                                            <button
-                                                onClick={async () => {
-                                                    const fee = Number(post.meetup_fee_info);
-                                                    if (post.meetup_fee_info && !isNaN(fee) && fee > 0) {
-                                                        // 参加費あり → 先にStripeへ（レコードはまだ作らない）
-                                                        const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-join-setup`, {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({
-                                                                userId: currentUserId,
-                                                                postId: post.id,
-                                                                categoryId: chatTargetId,
-                                                            }),
-                                                        });
-                                                        const { checkout_url } = await res.json();
-                                                        window.location.href = checkout_url;
-                                                    } else {
-                                                        // 参加費なし → 参加レコード作成
-                                                        await authApi.post(`/posts/${post.id}/responses`, {
-                                                            content: "Join!", is_participation: true
-                                                        });
-                                                        fetchPosts();
-                                                    }
-                                                }}
-                                                className="w-full py-2.5 bg-orange-600 text-white rounded-xl text-[11px] font-black hover:bg-orange-700 shadow-md"
-                                            >
-                                                JOIN THIS MEETUP / 参加を希望する
-                                            </button>
-                                                    ) : (
-                                                    <button
-                                                        onClick={async () => {
-                                                            const fee = Number(post.meetup_fee_info);
-                                                            if (post.meetup_fee_info && !isNaN(fee) && fee > 0) {
-                                                                // 参加費あり → カード登録してからWaitlist登録
-                                                                const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-join-setup`, {
-                                                                    method: 'POST',
-                                                                    headers: { 'Content-Type': 'application/json' },
-                                                                    body: JSON.stringify({
-                                                                        userId: currentUserId,
-                                                                        postId: post.id,
-                                                                        categoryId: chatTargetId,
-                                                                        isWaitlist: true,
-                                                                    }),
-                                                                });
-                                                                const { checkout_url } = await res.json();
-                                                                window.location.href = checkout_url;
-                                                            } else {
-                                                                // 参加費なし → 直接Waitlist登録
-                                                                await authApi.post(`/posts/${post.id}/responses`, {
-                                                                    content: "Waitlist", is_participation: true
-                                                                });
-                                                                fetchPosts();
-                                                            }
-                                                        }}
-                                                        className="w-full py-2.5 bg-gray-800 text-white rounded-xl text-[11px] font-black hover:bg-gray-900 shadow-md"
-                                                    >
-                                                        JOIN WAITLIST / キャンセル待ち
-                                                    </button>
-                                                    )
-                                                )}
-                                                
-                                                {(isJoined || isOwner) && (
-                                                <div className="space-y-2">
-                                                    {/* 参加者向け：キャンセルボタン */}
-                                                    {isJoined && !isOwner && (
-                                                        <button
-                                                            onClick={async () => {
-                                                                if (!window.confirm("キャンセルしますか？\n当日0時以降は参加費の50%が発生します。")) return;
-                                                                try {
-                                                                    const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-cancel`, {
-                                                                        method: 'POST',
-                                                                        headers: { 'Content-Type': 'application/json' },
-                                                                        body: JSON.stringify({
-                                                                            userId: currentUserId,
-                                                                            postId: post.id,
-                                                                        }),
-                                                                    });
-                                                                    const result = await res.json();
-                                                                    if (result.cancel_fee > 0) {
-                                                                        alert(`キャンセル料 ¥${result.cancel_fee} が発生しました。`);
-                                                                    } else {
-                                                                        alert("キャンセルしました。");
-                                                                    }
-                                                                    if (result.waitlist_notified > 0) {
-                                                                        alert(`キャンセル待ち${result.waitlist_notified}名に通知しました。`);
-                                                                    }
-                                                                    fetchPosts();
-                                                                } catch {
-                                                                    alert("キャンセルに失敗しました。");
-                                                                }
-                                                            }}
-                                                            className="w-full py-2 bg-gray-100 text-gray-500 rounded-xl text-[11px] font-black hover:bg-red-50 hover:text-red-400 transition-colors"
-                                                        >
-                                                            キャンセルする
-                                                        </button>
-                                                    )}
-
-                                                    {/* ステータス表示 */}
-                                                    <div className={`w-full py-2 rounded-xl text-[11px] font-black text-center ${
-                                                        isOwner ? 'bg-orange-100 text-orange-600' : 'bg-green-50 text-green-600'
-                                                    }`}>
-                                                        {isOwner ? "YOU ARE HOSTING THIS EVENT" :
-                                                        allParticipants.find(p => p.user_id === currentUserId)?.content === "Waitlist"
-                                                            ? "ON WAITLIST (キャンセル待ち中)" : "YOU ARE JOINED! ✅"}
-                                                    </div>
-
-                                                    {/* 主催者向けボタン群 */}
-                                                    {isOwner && (
-                                                        <div className="space-y-2 pt-2 border-t border-orange-100">
-                                                        {/* 開催決定 */}
-                                                        {!post.meetup_confirmed_at && (
-                                                            post.meetup_organizer_showed === false ? (
-                                                                <div className="w-full py-2 bg-red-50 text-red-400 rounded-xl text-[11px] font-black text-center">
-                                                                    ⚠️ No Show報告済み・開催不可
-                                                                </div>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        if (!window.confirm("開催を決定しますか？\n参加費ありの参加者に課金が発生します。")) return;
-                                                                        try {
-                                                                            const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-confirm`, {
-                                                                                method: 'POST',
-                                                                                headers: { 'Content-Type': 'application/json' },
-                                                                                body: JSON.stringify({
-                                                                                    postId: post.id,
-                                                                                    organizerId: currentUserId,
-                                                                                }),
-                                                                            });
-                                                                            const result = await res.json();
-                                                                            alert(`✅ 開催決定！${result.charged > 0 ? ` ${result.charged}名に課金しました。` : ' 参加費なし。'}`);
-                                                                            fetchPosts();
-                                                                        } catch {
-                                                                            alert("開催決定に失敗しました。");
-                                                                        }
-                                                                    }}
-                                                                    className="w-full py-2 bg-orange-500 text-white rounded-xl text-[11px] font-black hover:bg-orange-600 transition-colors"
-                                                                >
-                                                                    🎉 開催決定する
-                                                                </button>
-                                                            )
-                                                        )}
-
-                                                        {/* 開催済み表示 */}
-                                                        {post.meetup_confirmed_at && (
-                                                            <div className="w-full py-2 bg-green-500 text-white rounded-xl text-[11px] font-black text-center">
-                                                                ✅ 開催決定済み
-                                                            </div>
-                                                        )}
-                                                            {/* No Show報告（参加者個別）は MeetupChatModal側で対応 */}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
-                                /* --- 既存コードの 340行目付近（通常チャットの開始部分） --- */
-                               ) : (
-                                /* --- 通常チャット (ここからご提示のコードを統合) --- */
-                                <div className="flex flex-col mb-4">
-                                    <div className="flex items-start gap-2 max-w-[85%] group relative">
-                                        <div className={`${post.is_system ? 'bg-green-50 border-green-200 shadow-green-100' : 'bg-white border-gray-100'} p-4 rounded-3xl shadow-sm border min-w-[140px]`}>
+                            ) : (
+                                /* --- 通常チャット --- */
+                                <div className="flex flex-col mb-3">
+                                    <div className="flex items-start gap-2 max-w-[98%] mb-1 group relative">
+                                        <div className={`${post.is_system ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'} p-3 rounded-2xl shadow-sm border min-w-[140px] w-full`}>
                                             <div className="flex justify-between items-start mb-1">
                                                 {post.is_system ? (
                                                     <div className="flex items-center gap-1">
@@ -1013,12 +583,14 @@ const submitPost = async () => {
                                                     <span className="font-black text-[10px] text-pink-500 uppercase block">{post.author_nickname}</span>
                                                 )}
                                                 <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
-                                                    <button onClick={() => handleLocalHide(post.id)} className="p-1 hover:bg-gray-100 rounded-full text-gray-300 hover:text-gray-600 transition-colors" title="自分だけに非表示"><EyeOff size={12} /></button>
-                                                    <button onClick={() => handleReportPost(post.id)} className="p-1 hover:bg-red-50 rounded-full text-gray-300 hover:text-red-400 transition-colors" title="通報する"><AlertTriangle size={12} /></button>
+                                                    <button type="button" onClick={() => handleLocalHide(post.id)} className="p-1 text-gray-300 hover:text-gray-600"><EyeOff size={12} /></button>
+                                                    <button type="button" onClick={() => handleReportPost(post.id)} className="p-1 text-gray-300 hover:text-red-400"><AlertTriangle size={12} /></button>
                                                 </div>
                                             </div>
-                                            <p className="text-gray-700 text-[13px] leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                                            {/* 親投稿の文字を大きく */}
+                                            <p className="text-gray-800 text-[14px] leading-relaxed whitespace-pre-wrap">{post.content}</p>
                                             <button
+                                                type="button"
                                                 onClick={() => {
                                                     setReplyTo({ postId: post.id, nickname: post.author_nickname });
                                                     setNewPost(`@${post.author_nickname} #${post.id}\n`);
@@ -1029,10 +601,10 @@ const submitPost = async () => {
                                             </button>
                                         </div>
                                     </div>
-                                    {/* 返信一覧 */}
+
+                                    {/* 返信一覧（YouTube風に格納） */}
                                     {posts.filter(r => r.parent_id === post.id).length > 0 && (
-                                        <div className="ml-6 mt-1">
-                                            {/* 💡 返信を展開・格納するボタン */}
+                                        <div className="ml-4 mt-1">
                                             <button
                                                 type="button"
                                                 onClick={() => setExpandedThreads(prev => {
@@ -1044,19 +616,27 @@ const submitPost = async () => {
                                                 className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-pink-50 transition-colors text-[10px] font-black text-pink-500"
                                             >
                                                 <div className="w-4 h-4 rounded-full bg-pink-100 flex items-center justify-center text-[8px]">💬</div>
-                                                <span>
-                                                    {posts.filter(r => r.parent_id === post.id).length} 件の返信
-                                                </span>
+                                                <span>{posts.filter(r => r.parent_id === post.id).length} 件の返信</span>
                                                 {expandedThreads.has(post.id) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                                             </button>
 
-                                            {/* 💡 expandedThreads に ID が入っている時だけリストを表示 */}
                                             {expandedThreads.has(post.id) && (
-                                                <div className="mt-2 border-l-2 border-pink-100 pl-3 space-y-1 animate-in slide-in-from-top-1 duration-200">
+                                                <div className="mt-1 border-l border-pink-100 pl-3 space-y-1">
                                                     {posts.filter(r => r.parent_id === post.id).map(reply => (
-                                                        <div key={reply.id} className="bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm">
-                                                            <span className="font-black text-[10px] text-pink-400 block">{reply.author_nickname}</span>
+                                                        <div key={reply.id} className="bg-gray-50/50 border border-gray-100 rounded-xl px-3 py-2 shadow-sm">
+                                                            <span className="font-black text-[9px] text-pink-400 block">{reply.author_nickname}</span>
+                                                            {/* 返信の文字は少し小さく控えめに */}
                                                             <p className="text-gray-600 text-[12px] leading-relaxed whitespace-pre-wrap">{reply.content}</p>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setReplyTo({ postId: post.id, nickname: reply.author_nickname });
+                                                                    setNewPost(`@${reply.author_nickname} #${post.id}\n`);
+                                                                }}
+                                                                className="mt-1 text-[10px] text-gray-300 hover:text-pink-400 font-bold"
+                                                            >
+                                                                返信する
+                                                            </button>
                                                         </div>
                                                     ))}
                                                 </div>
