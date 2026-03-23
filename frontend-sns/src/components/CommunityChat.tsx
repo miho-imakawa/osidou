@@ -411,13 +411,14 @@ const submitPost = async () => {
         await createPost({
             content: newPost,
             hobby_category_id: parseInt(chatTargetId),
+            parent_id: replyTo?.postId ?? null,
             is_meetup: false,
             is_ad: postType === ('ad' as string),
             is_system: false,
         });
         setNewPost('');
         setPostType('normal');
-        setReplyTo(null); 
+        setReplyTo(null);
         fetchPosts();
     } catch (err) {
         console.error('送信エラー:', err);
@@ -997,49 +998,26 @@ const submitPost = async () => {
                                     )}
                                 </div>
                                 /* --- 既存コードの 340行目付近（通常チャットの開始部分） --- */
-                                ) : ( /* 通常チャット */
-                                    <div className="flex items-start gap-2 max-w-[85%] mb-4 group relative">
-                                        {/* 💡 is_system が true なら背景を green-50（薄いグリーン）にする */}
+                               ) : (
+                                /* --- 通常チャット (ここからご提示のコードを統合) --- */
+                                <div className="flex flex-col mb-4">
+                                    <div className="flex items-start gap-2 max-w-[85%] group relative">
                                         <div className={`${post.is_system ? 'bg-green-50 border-green-200 shadow-green-100' : 'bg-white border-gray-100'} p-4 rounded-3xl shadow-sm border min-w-[140px]`}>
-                                            
                                             <div className="flex justify-between items-start mb-1">
-                                                {/* 💡 システム投稿なら「OFFICIAL GUIDE」ラベルとピンを表示、そうでなければニックネーム */}
                                                 {post.is_system ? (
                                                     <div className="flex items-center gap-1">
                                                         <Pin size={12} className="text-amber-500 fill-amber-500" />
-                                                        <span className="font-black text-[10px] text-amber-600 uppercase block tracking-widest">
-                                                            Official Guide
-                                                        </span>
+                                                        <span className="font-black text-[10px] text-amber-600 uppercase block tracking-widest">Official Guide</span>
                                                     </div>
                                                 ) : (
-                                                    <span className="font-black text-[10px] text-pink-500 uppercase block">
-                                                        {post.author_nickname}
-                                                    </span>
+                                                    <span className="font-black text-[10px] text-pink-500 uppercase block">{post.author_nickname}</span>
                                                 )}
-
-                                                {/* 🛡️ 安全機能ボタン（ホバー時に現れる） */}
                                                 <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
-                                                    <button 
-                                                        onClick={() => handleLocalHide(post.id)}
-                                                        className="p-1 hover:bg-gray-100 rounded-full text-gray-300 hover:text-gray-600 transition-colors"
-                                                        title="自分だけに非表示"
-                                                    >
-                                                        <EyeOff size={12} />
-                                                    </button>
-                                                    
-                                                    <button 
-                                                        onClick={() => handleReportPost(post.id)}
-                                                        className="p-1 hover:bg-red-50 rounded-full text-gray-300 hover:text-red-400 transition-colors"
-                                                        title="通報する"
-                                                    >
-                                                        <AlertTriangle size={12} />
-                                                    </button>
+                                                    <button onClick={() => handleLocalHide(post.id)} className="p-1 hover:bg-gray-100 rounded-full text-gray-300 hover:text-gray-600 transition-colors" title="自分だけに非表示"><EyeOff size={12} /></button>
+                                                    <button onClick={() => handleReportPost(post.id)} className="p-1 hover:bg-red-50 rounded-full text-gray-300 hover:text-red-400 transition-colors" title="通報する"><AlertTriangle size={12} /></button>
                                                 </div>
                                             </div>
-                                            
                                             <p className="text-gray-700 text-[13px] leading-relaxed whitespace-pre-wrap">{post.content}</p>
-
-                                            {/* ↓ 返信ボタンを追加 */}
                                             <button
                                                 onClick={() => {
                                                     setReplyTo({ postId: post.id, nickname: post.author_nickname });
@@ -1051,8 +1029,7 @@ const submitPost = async () => {
                                             </button>
                                         </div>
                                     </div>
-                                )}
-                                    {/* 返信一覧 - Google Chat風 */}
+                                    {/* 返信一覧 */}
                                     {posts.filter(r => r.parent_id === post.id).length > 0 && (
                                         <div className="ml-6 mt-1 border-l-2 border-pink-100 pl-3 space-y-1">
                                             {posts.filter(r => r.parent_id === post.id).map(reply => (
@@ -1063,8 +1040,9 @@ const submitPost = async () => {
                                             ))}
                                         </div>
                                     )}
-                                    
-                                )</div>
+                                </div>
+                            )}
+                        </div>
                     );
                 })}
             </div>
@@ -1072,6 +1050,21 @@ const submitPost = async () => {
             {/* 3. Footer */}
             <div className="flex-shrink-0 max-h-[55%] overflow-y-auto bg-white border-t border-gray-100 z-20 shadow-2xl p-3">
                 <form onSubmit={handleSend}>
+                    {/* ↓ ここを追加 */}
+                    {replyTo && (
+                        <div className="flex items-center justify-between bg-pink-50 rounded-xl px-3 py-1.5 mb-2">
+                            <span className="text-[10px] text-pink-500 font-bold">
+                                ↩ @{replyTo.nickname} #{replyTo.postId} に返信中
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => { setReplyTo(null); setNewPost(''); }}
+                                className="text-gray-300 hover:text-gray-500 text-[10px]"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
                     {postType === 'meetup' && (
                         <div className="bg-orange-50 border-2 border-orange-200 rounded-[28px] p-3 space-y-2 mb-3">
                             <div className="grid grid-cols-[1fr,auto] gap-2 pb-2 border-b border-orange-200/30">
