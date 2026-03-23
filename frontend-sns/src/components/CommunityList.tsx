@@ -46,6 +46,11 @@ const CommunityList: React.FC = () => {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
+    useEffect(() => {
+        return () => {
+            setDuplicateInfo(null);
+        };
+    }, []);
     // 重複している本尊（master_id）を1つにまとめるロジック
     const filteredCategories = categories.filter((cat, index, self) => {
         const masterId = cat.master_id || cat.id;
