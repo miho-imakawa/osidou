@@ -253,7 +253,7 @@ useEffect(() => {
                         <Route path="/mypage" element={<UserProfile profile={profile} fetchProfile={fetchProfile} />} />
                         <Route path="/profile/:userId" element={<UserProfile profile={profile} fetchProfile={fetchProfile} />} />
                         <Route path="/community" element={<CommunityList />} />
-                        <Route path="/community/:categoryId" element={<CommunityDetail />} />
+                        <Route path="/community/:categoryId" element={<CommunityDetail currentUserId={profile.id} />} />
                         <Route path="/community/:categoryId/detail" element={<CategoryDetailPage />} />
                         <Route path="*" element={<HomeFeed profile={profile} />} />
                     </>

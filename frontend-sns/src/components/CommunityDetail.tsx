@@ -5,12 +5,15 @@ import { authApi, HobbyCategory } from '../api.ts';
 import { ArrowLeft, Users, Edit3 } from 'lucide-react'; 
 import CommunityChat from './CommunityChat.tsx';
 
-const CommunityDetail: React.FC = () => {
+interface CommunityDetailProps {
+    currentUserId: number;
+}
+
+const CommunityDetail: React.FC<CommunityDetailProps> = ({ currentUserId }) => {
     const { categoryId } = useParams<{ categoryId: string }>();
     const [category, setCategory] = useState<HobbyCategory | null>(null);
     const [loading, setLoading] = useState(true);
     const [isJoined, setIsJoined] = useState(false);
-    const [currentUserId, setCurrentUserId] = useState<number>(0);
     // 💡 ポイント2: detailデータの有無を管理するステートを追加
     const [detail, setDetail] = useState<any>(null);
 
@@ -36,8 +39,6 @@ const CommunityDetail: React.FC = () => {
             const joinStatus = await authApi.get(`/hobby-categories/check-join/${targetId}`);
             setIsJoined(joinStatus.data.is_joined || categoryData.is_public);
 
-            const me = await authApi.get('/users/me');
-            setCurrentUserId(me.data.id);
         } catch (err) {
             console.error("データの取得に失敗しました");
             setDetail(null);
