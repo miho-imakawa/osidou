@@ -352,9 +352,6 @@ class FriendLimitResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-# -------------------------------------------------------
-# ともだち解除（通知なし・静かに削除）
-# -------------------------------------------------------
 @router.delete("/friendships/{friendship_id}")
 def delete_friendship(
     friendship_id: int,
@@ -368,12 +365,18 @@ def delete_friendship(
     if not friendship:
         raise HTTPException(status_code=404, detail="見つかりません")
 
-    # 自分が関係者かチェック
     if friendship.user_id != current_user.id and friendship.friend_id != current_user.id:
         raise HTTPException(status_code=403, detail="権限がありません")
 
+    # 逆方向のレコードも取得して削除
+    reverse = db.query(models.Friendship).filter(
+        models.Friendship.user_id == friendship.friend_id,
+        models.Friendship.friend_id == friendship.user_id
+    ).first()
+
     db.delete(friendship)
+    if reverse:
+        db.delete(reverse)
     db.commit()
 
-    # 通知なし・相手には何も送らない
     return {"status": "deleted"}
