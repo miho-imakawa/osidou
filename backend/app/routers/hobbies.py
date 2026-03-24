@@ -207,33 +207,24 @@ def get_top_categories(db: Session = Depends(get_db)):
     return result
 
 
-@router.get("", response_model=List[HobbyCategoryResponse])
-def get_all_categories(db: Session = Depends(get_db)):
-    # 1. DBから「必要なカラムだけ」を直接持ってくる（これが最速）
-    # .all() で丸ごと取るのをやめて、IDと名前、親IDだけに絞ります
-    categories = db.query(
-        models.HobbyCategory.id,
-        models.HobbyCategory.name,
-        models.HobbyCategory.parent_id
+@router.get("/top-categories")
+def get_top_categories(db: Session = Depends(get_db)):
+    # 💡 キャッシュも再帰SQLもツリー構築も全部パス！
+    # ただの「名前のリスト」として返す
+    categories = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.parent_id == None,
+        models.HobbyCategory.master_id == None
     ).all()
-    
-    if not categories:
-        return []
 
-    # 2. 💡【超軽量化】Pydanticの複雑な変換を通さず、辞書で作る
-    # これで「佐藤健さんのリンクの先」を見に行くのを強制的に止めます
     res = []
     for cat in categories:
         res.append({
             "id": cat.id,
             "name": cat.name,
-            "parent_id": cat.parent_id,
-            "member_count": "-", # 人数計算は完全にパス
-            "children": []       # 子要素も探さない
+            "member_count": "-",
+            "children": []
         })
-        
-    return res # 平坦なリストで返却
-
+    return res
 # --------------------------------------------------
 # 💡 カテゴリ検索
 # --------------------------------------------------
