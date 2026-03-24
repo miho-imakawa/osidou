@@ -163,109 +163,74 @@ def get_total_member_count(db, category, all_categories=None) -> int:
     return count if count > 0 else "-"
 
 
-@router.get(
-    "",
-    response_model=List[HobbyCategoryResponse],
-    summary="全カテゴリーを「子孫も含めた合算人数」付きで取得"
-)
-def get_all_categories(db: Session = Depends(get_db)):
-    """
-    全カテゴリをツリー構造で返す。
-    SQLを1回に集約し、N+1問題を解消した爆速版。
-    """
-    # 1. 全カテゴリを一度だけ取得
-    categories = db.query(models.HobbyCategory).all()
-    if not categories:
-        return []
-
-    # 2. 💡【改善】全てのカテゴリの集計を「1回のSQL」で終わらせる
-    # これが「数学の一括足し算」方式です
+@router.get("/top-categories")
+def get_top_categories(db: Session = Depends(get_db)):
+    global _top_categories_cache, _top_categories_cache_time
+    # キャッシュチェック
+    if _top_categories_cache and (time.time() - _top_categories_cache_time) < CACHE_TTL:
+        return _top_categories_cache
+    
+    # トップカテゴリのみ取得
+    categories = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.parent_id == None,
+        models.HobbyCategory.master_id == None
+    ).all()
+    
+    if not categories: return []
+    top_ids = [cat.id for cat in categories]
+    
     from sqlalchemy import text
     rows = db.execute(text("""
         WITH RECURSIVE descendants AS (
-            -- すべてのカテゴリを起点とする
-            SELECT id, id AS top_id
-            FROM hobby_categories
-            
+            SELECT id, id AS top_id FROM hobby_categories WHERE id = ANY(:top_ids)
             UNION ALL
-            
-            -- 子孫を再帰的にたどる
-            SELECT hc.id, d.top_id
-            FROM hobby_categories hc
+            SELECT hc.id, d.top_id FROM hobby_categories hc
             JOIN descendants d ON hc.parent_id = d.id
         )
-        -- カテゴリごとのユニークユーザー数をまとめて集計
-        SELECT 
-            d.top_id, 
-            COUNT(DISTINCT uhl.user_id) AS cnt
+        SELECT d.top_id, COUNT(DISTINCT uhl.user_id) AS cnt
         FROM descendants d
         LEFT JOIN user_hobby_links uhl ON uhl.hobby_category_id = d.id
         GROUP BY d.top_id
-    """)).fetchall()
+    """), {"top_ids": top_ids}).fetchall()
     
-    # 3. 集計結果をマップ化
-    # 0人は "-" に変換するルールを適用
-    member_counts = {}
-    for row in rows:
-        member_counts[row.top_id] = row.cnt if row.cnt > 0 else "-"
-
-    # 4. 特殊ルール適用
+    count_map = {row.top_id: row.cnt for row in rows}
+    
+    result = []
     for cat in categories:
-        if cat.name == "PEOPLE (人物)":
-            member_counts[cat.id] = "-"
+        schema = HobbyCategoryResponse.model_validate(cat)
+        schema.member_count = count_map.get(cat.id, 0) if cat.name != "PEOPLE (人物)" else "-"
+        schema.children = []
+        result.append(schema)
+    
+    _top_categories_cache = result
+    _top_categories_cache_time = time.time()
+    return result
 
-    # 5. ツリー構造にして返す (既存のbuild_category_treeをそのまま利用)
-    return build_category_tree(categories, member_counts)
 
-# --------------------------------------------------
-# 💡 全カテゴリ取得エンドポイント
-# --------------------------------------------------
-
-@router.get(
-    "",
-    # 既存の response_model 等はそのままでOK
-    response_model=List[HobbyCategoryResponse],
-    summary="全カテゴリーを「子孫も含めた合算人数」付きで取得"
-)
+@router.get("", response_model=List[HobbyCategoryResponse])
 def get_all_categories(db: Session = Depends(get_db)):
-    # 1. 全カテゴリを一度だけ取得
     categories = db.query(models.HobbyCategory).all()
-    if not categories:
-        return []
+    if not categories: return []
 
-    # 2. 💡【ここを修正】全カテゴリの集計を1回の再帰SQLで実行
     from sqlalchemy import text
     rows = db.execute(text("""
         WITH RECURSIVE descendants AS (
-            -- 全てのカテゴリを起点とする
-            SELECT id, id AS top_id
-            FROM hobby_categories
-            
+            SELECT id, id AS top_id FROM hobby_categories
             UNION ALL
-            
-            -- 子孫を辿る
-            SELECT hc.id, d.top_id
-            FROM hobby_categories hc
+            SELECT hc.id, d.top_id FROM hobby_categories hc
             JOIN descendants d ON hc.parent_id = d.id
         )
-        -- 各起点カテゴリごとのユニークユーザー数を集計
-        SELECT 
-            d.top_id, 
-            COUNT(DISTINCT uhl.user_id) AS cnt
+        SELECT d.top_id, COUNT(DISTINCT uhl.user_id) AS cnt
         FROM descendants d
         LEFT JOIN user_hobby_links uhl ON uhl.hobby_category_id = d.id
         GROUP BY d.top_id
     """)).fetchall()
     
-    # SQLの結果を辞書形式にする（ {カテゴリID: 人数} ）
     member_counts = {row.top_id: (row.cnt if row.cnt > 0 else "-") for row in rows}
-    
-    # 「PEOPLE (人物)」などの特殊な表示ルールを適用
     for cat in categories:
         if cat.name == "PEOPLE (人物)":
             member_counts[cat.id] = "-"
 
-    # 3. ツリー構造にして返す（既存の関数を利用）
     return build_category_tree(categories, member_counts)
 
 # --------------------------------------------------
