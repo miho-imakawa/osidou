@@ -162,65 +162,45 @@ def get_total_member_count(db, category, all_categories=None) -> int:
     
     return count if count > 0 else "-"
 
+###==========================
+### TOP ### CATEGORIES
+###==========================
 
 @router.get("/top-categories")
 def get_top_categories(db: Session = Depends(get_db)):
-    global _top_categories_cache, _top_categories_cache_time
-    # キャッシュチェック
-    if _top_categories_cache and (time.time() - _top_categories_cache_time) < CACHE_TTL:
-        return _top_categories_cache
-    
-    # トップカテゴリのみ取得
+    # 💡 キャッシュも「複雑な再帰SQL」も一旦すべて削除！
+    # 1. 表面上のトップカテゴリー（親がいないもの）だけを取得
     categories = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.parent_id == None,
         models.HobbyCategory.master_id == None
     ).all()
     
-    if not categories: return []
-    top_ids = [cat.id for cat in categories]
-    
-    from sqlalchemy import text
-    rows = db.execute(text("""
-        WITH RECURSIVE descendants AS (
-            SELECT id, id AS top_id FROM hobby_categories WHERE id = ANY(:top_ids)
-            UNION ALL
-            SELECT hc.id, d.top_id FROM hobby_categories hc
-            JOIN descendants d ON hc.parent_id = d.id
-        )
-        SELECT d.top_id, COUNT(DISTINCT uhl.user_id) AS cnt
-        FROM descendants d
-        LEFT JOIN user_hobby_links uhl ON uhl.hobby_category_id = d.id
-        GROUP BY d.top_id
-    """), {"top_ids": top_ids}).fetchall()
-    
-    count_map = {row.top_id: row.cnt for row in rows}
-    
+    # 2. 💡 余計なことをせず、名前とIDだけをシンプルに返す
     result = []
     for cat in categories:
-        schema = HobbyCategoryResponse.model_validate(cat)
-        schema.member_count = count_map.get(cat.id, 0) if cat.name != "PEOPLE (人物)" else "-"
-        schema.children = []
-        result.append(schema)
-    
-    _top_categories_cache = result
-    _top_categories_cache_time = time.time()
+        # model_validateは関連データを深追いすることがあるので、辞書で直接作る
+        result.append({
+            "id": cat.id,
+            "name": cat.name,
+            "member_count": "-",
+            "children": []
+        })
     return result
 
+###==========================
+### ALL CATEGORIES
+###==========================
 
-@router.get("/top-categories")
-def get_top_categories(db: Session = Depends(get_db)):
-    # 💡 キャッシュも再帰SQLもツリー構築も全部パス！
-    # ただの「名前のリスト」として返す
-    categories = db.query(models.HobbyCategory).filter(
-        models.HobbyCategory.parent_id == None,
-        models.HobbyCategory.master_id == None
-    ).all()
-
+@router.get("", response_model=List[HobbyCategoryResponse])
+def get_all_categories(db: Session = Depends(get_db)):
+    # 💡 ALLも同様に「ただのリスト」として返す
+    categories = db.query(models.HobbyCategory).all()
     res = []
     for cat in categories:
         res.append({
             "id": cat.id,
             "name": cat.name,
+            "parent_id": cat.parent_id,
             "member_count": "-",
             "children": []
         })
