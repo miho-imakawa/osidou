@@ -174,18 +174,48 @@ def get_top_categories(db: Session = Depends(get_db)):
     if _top_categories_cache and (time.time() - _top_categories_cache_time) < CACHE_TTL:
         return _top_categories_cache
     
+    # トップカテゴリだけ取得
     categories = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.parent_id == None,
         models.HobbyCategory.master_id == None
     ).all()
     
-    # 全カテゴリIDを取得してget_total_member_countを使う
-    all_categories = db.query(models.HobbyCategory).all()
+    top_ids = [cat.id for cat in categories]
+    
+    # 💡 再帰CTEで何階層でも子孫を全部たどって1回のSQLでカウント
+    from sqlalchemy import text
+    rows = db.execute(text("""
+        WITH RECURSIVE descendants AS (
+            -- 起点：トップカテゴリ自身
+            SELECT id, id AS top_id
+            FROM hobby_categories
+            WHERE id = ANY(:top_ids)
+            
+            UNION ALL
+            
+            -- 再帰：子カテゴリを辿る
+            SELECT hc.id, d.top_id
+            FROM hobby_categories hc
+            JOIN descendants d ON hc.parent_id = d.id
+        )
+        SELECT
+            d.top_id,
+            COUNT(DISTINCT uhl.user_id) AS cnt
+        FROM descendants d
+        LEFT JOIN user_hobby_links uhl ON uhl.hobby_category_id = d.id
+        GROUP BY d.top_id
+    """), {"top_ids": top_ids}).fetchall()
+    
+    count_map = {row.top_id: row.cnt for row in rows}
     
     result = []
     for cat in categories:
         schema = HobbyCategoryResponse.model_validate(cat)
-        schema.member_count = get_total_member_count(db, cat, all_categories=all_categories)
+        if cat.name == "PEOPLE (人物)":
+            schema.member_count = "-"
+        else:
+            cnt = count_map.get(cat.id, 0)
+            schema.member_count = cnt if cnt > 0 else "-"
         schema.children = []
         result.append(schema)
     

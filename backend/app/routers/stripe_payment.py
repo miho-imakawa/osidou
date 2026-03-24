@@ -757,7 +757,7 @@ async def download_friends_feeling_log(user_id: int, db: Session = Depends(get_d
     MOOD_EMOJI = {
         "happy": "😊", "excited": "🤩", "calm": "😌",
         "tired": "😥", "sad": "😭", "anxious": "😟",
-        "angry": "😠", "neutral": "😐", "grateful": "🙏", "motivated": "🔥",
+        "angry": "😡", "neutral": "😐", "grateful": "🙏", "motivated": "🔥",
     }
 
     for log in logs:
@@ -814,7 +814,7 @@ async def download_feeling_log(session_id: str, db: Session = Depends(get_db)):
     MOOD_EMOJI = {
         "happy": "😊", "excited": "🤩", "calm": "😌",
         "tired": "😥", "sad": "😭", "anxious": "😟",
-        "angry": "😠", "neutral": "😐", "grateful": "🙏", "motivated": "🔥",
+        "angry": "😡", "neutral": "😐", "grateful": "🙏", "motivated": "🔥",
     }
 
     for log in logs:
