@@ -34,11 +34,11 @@ const MOOD_TYPES: Record<string, { label: string; emoji: string }> = {
   excited:   { label: 'Yay! 喜',    emoji: '🤩' },
   happy:     { label: 'Happy 幸',   emoji: '😊' },
   calm:      { label: 'Relax 穏',   emoji: '😌' },
-  neutral:   { label: 'Meh 凪',     emoji: '😐' },
+  neutral:   { label: 'Meh 凪',     emoji: '😶' },
   anxious:   { label: 'Hmm 憂',     emoji: '😟' },
   tired:     { label: 'Ugh 倦',     emoji: '😥' },
   sad:       { label: 'Sigh 悲',    emoji: '😭' },
-  angry:     { label: 'Grrr! 怒',   emoji: '😠' },
+  angry:     { label: 'Grrr! 怒',   emoji: '😡' },
   grateful:  { label: 'Aww 感謝',   emoji: '🙏' },
 };
 

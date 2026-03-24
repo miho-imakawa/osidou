@@ -1,21 +1,75 @@
 // frontend-sns/src/components/MoodInput.tsx
 
 import React, { useState } from 'react';
-import { postMoodLog } from '../api'; // ← authApi ではなく postMoodLog に変更
+import { postMoodLog } from '../api';
 import { Send, Smile } from 'lucide-react';
 
 const MOOD_TYPES = [
-    { type: 'on_fire',    label: 'On Fire! 熱',  emoji: '🔥' },
-    { type: 'excited',    label: 'Yay! 喜',   emoji: '🤩' },
-    { type: 'happy',      label: 'Happy 幸',     emoji: '😊' },
-    { type: 'calm',       label: 'Relax 穏',     emoji: '😌' },
-    { type: 'neutral',    label: 'Meh 凪',     emoji: '😶' },
-    { type: 'anxious',    label: 'Hmm 憂',       emoji: '😟' },
-    { type: 'tired',      label: 'Ugh 倦',  emoji: '😥' },
-    { type: 'sad',        label: 'Sigh 悲',       emoji: '😭' },
-    { type: 'angry',      label: 'Grrr! 怒',     emoji: '😠' },
-    { type: 'grateful',   label: 'Aww 感謝',     emoji: '🙏' },
+    { type: 'motivated',  label: 'On Fire! 熱', emoji: '🔥', group: 'green' },
+    { type: 'excited',  label: 'Yay! 喜',     emoji: '🤩', group: 'green' },
+    { type: 'happy',    label: 'Happy 幸',    emoji: '😊', group: 'green' },
+    { type: 'grateful', label: 'Aww 感謝',    emoji: '🙏', group: 'green' },
+    { type: 'calm',     label: 'Relax 穏',    emoji: '😌', group: 'yellow' },
+    { type: 'neutral',  label: 'Meh 凪',      emoji: '😶', group: 'yellow' },
+    { type: 'anxious',  label: 'Hmm 憂',      emoji: '😟', group: 'red' },
+    { type: 'tired',    label: 'Ugh 倦',      emoji: '😥', group: 'red' },
+    { type: 'sad',      label: 'Sigh 悲',     emoji: '😭', group: 'red' },
+    { type: 'angry',    label: 'Grrr! 怒',    emoji: '😡', group: 'red' },
 ];
+
+// グループごとの色定義
+const GROUP_STYLES: Record<string, {
+    selected: string;
+    hover: string;
+    bg: string;
+    border: string;
+    text: string;
+    ring: string;
+}> = {
+    green: {
+        selected: 'bg-emerald-500 text-white shadow-lg',
+        hover: 'hover:bg-emerald-50',
+        bg: 'bg-emerald-50',
+        border: 'border-emerald-200',
+        text: 'text-emerald-700',
+        ring: 'ring-emerald-300',
+    },
+    yellow: {
+        selected: 'bg-amber-400 text-white shadow-lg',
+        hover: 'hover:bg-amber-50',
+        bg: 'bg-amber-50',
+        border: 'border-amber-200',
+        text: 'text-amber-700',
+        ring: 'ring-amber-300',
+    },
+    red: {
+        selected: 'bg-rose-600 text-white shadow-lg',
+        hover: 'hover:bg-rose-50',
+        bg: 'bg-rose-50',
+        border: 'border-rose-200',
+        text: 'text-rose-700',
+        ring: 'ring-rose-300',
+    },
+};
+
+// 現在選択中のグループに応じて外枠・背景を変える
+const CONTAINER_STYLES: Record<string, string> = {
+    green:  'bg-emerald-50 border-emerald-200',
+    yellow: 'bg-amber-50 border-amber-200',
+    red:    'bg-rose-50 border-rose-200',
+};
+
+const TITLE_STYLES: Record<string, string> = {
+    green:  'text-emerald-800',
+    yellow: 'text-amber-800',
+    red:    'text-rose-800',
+};
+
+const SUBMIT_STYLES: Record<string, string> = {
+    green:  'bg-emerald-500 hover:bg-emerald-600 text-white',
+    yellow: 'bg-amber-400 hover:bg-amber-500 text-white',
+    red:    'bg-rose-600 hover:bg-rose-700 text-white',
+};
 
 interface MoodInputProps {
     onSuccess: () => void;
@@ -26,21 +80,24 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
     const [comment, setComment] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const currentMoodObj = MOOD_TYPES.find(m => m.type === selectedMood);
+    const currentGroup = currentMoodObj?.group || 'yellow';
+    const containerStyle = CONTAINER_STYLES[currentGroup];
+    const titleStyle = TITLE_STYLES[currentGroup];
+    const submitStyle = SUBMIT_STYLES[currentGroup];
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            // ★ postMoodLog 経由で呼ぶ（オフライン処理が効く）
-            const result = await postMoodLog({
+            await postMoodLog({
                 mood_type: selectedMood,
                 comment: comment,
                 is_visible: true,
             });
-
             onSuccess();
             setSelectedMood('neutral');
             setComment('');
-
         } catch (err) {
             console.error('Failed to submit mood:', err);
             alert('気分の投稿に失敗しました。');
@@ -50,38 +107,42 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
     };
 
     return (
-        <div className="p-6 bg-blue-50 rounded-xl border border-blue-200 shadow-md">
-            <h3 className="text-xl font-bold text-blue-800 flex items-center mb-4">
-                <Smile className="w-6 h-6 mr-2 text-blue-500" /> CURRENT FEELING
+        <div className={`p-6 rounded-xl border shadow-md transition-all duration-300 ${containerStyle}`}>
+            <h3 className={`text-xl font-bold flex items-center mb-4 transition-colors duration-300 ${titleStyle}`}>
+                <Smile className="w-6 h-6 mr-2" /> CURRENT FEELING
             </h3>
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="flex flex-wrap gap-2 justify-center p-2 bg-white rounded-lg shadow-inner">
-                    {MOOD_TYPES.map((mood) => (
-                        <button
-                            key={mood.type}
-                            type="button"
-                            onClick={() => setSelectedMood(mood.type)}
-                            className={`
-                                p-2 rounded-full text-sm font-medium transition duration-150 ease-in-out
-                                ${selectedMood === mood.type 
-                                    ? 'bg-blue-500 text-white shadow-lg ring-4 ring-blue-300' 
-                                    : 'bg-gray-100 text-gray-700 hover:bg-blue-100'
-                                }
-                            `}
-                        >
-                            {mood.emoji} {mood.label}
-                        </button>
-                    ))}
+                    {MOOD_TYPES.map((mood) => {
+                        const style = GROUP_STYLES[mood.group];
+                        const isSelected = selectedMood === mood.type;
+                        return (
+                            <button
+                                key={mood.type}
+                                type="button"
+                                onClick={() => setSelectedMood(mood.type)}
+                                className={`
+                                    p-2 rounded-full text-sm font-medium transition-all duration-150 ease-in-out
+                                    ${isSelected
+                                        ? `${style.selected} ring-4 ${style.ring}`
+                                        : `bg-gray-100 text-gray-600 ${style.hover}`
+                                    }
+                                `}
+                            >
+                                {mood.emoji} {mood.label}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder={`「${MOOD_TYPES.find(m => m.type === selectedMood)?.label || '普通'}」を選びました。一言コメントを残しましょう！`}
+                    placeholder={`「${currentMoodObj?.label || '普通'}」を選びました。一言コメントを残しましょう！`}
                     rows={2}
                     maxLength={200}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none transition bg-white"
                 />
                 <p className="text-xs text-gray-400 text-right">{comment.length}/200文字</p>
 
@@ -90,11 +151,8 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
                         type="submit"
                         disabled={isSubmitting}
                         className={`
-                            px-6 py-2 flex items-center font-semibold rounded-lg shadow-lg transition duration-150
-                            ${isSubmitting 
-                                ? 'bg-gray-400 cursor-not-allowed' 
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                            }
+                            px-6 py-2 flex items-center font-semibold rounded-lg shadow-lg transition-all duration-150
+                            ${isSubmitting ? 'bg-gray-400 cursor-not-allowed text-white' : submitStyle}
                         `}
                     >
                         {isSubmitting ? '投稿中...' : '気分を投稿 ✈'}
@@ -106,4 +164,4 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
     );
 };
 
-export default MoodInput;   
+export default MoodInput;
