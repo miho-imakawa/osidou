@@ -328,7 +328,7 @@ useEffect(() => {
                   <div className={`p-2 rounded-xl transition-all ${tempProfile.is_mood_visible ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-400'}`}>
                     {tempProfile.is_mood_visible ? <Eye size={18}/> : <EyeOff size={18}/>}
                   </div>
-                  <span className="text-xs font-bold text-gray-500">Feeling Logs を表示（up to 100）</span>
+                  <span className="text-xs font-bold text-gray-500">Feeling Logs を表示します</span>
                 </label>
               </div>
 
@@ -474,7 +474,7 @@ useEffect(() => {
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-2">
               <div className="flex justify-between items-center border-b border-gray-50 pb-2 mb-2">
                 <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
-                  <Heart className="text-pink-600" size={14}/> Feeling Logs
+                  <Heart className="text-pink-600" size={14}/> Feeling Logs shows up to 100
                 </h2>
                 <button 
                   // 1. ダウンロード中はボタンを押せなくする
