@@ -328,7 +328,7 @@ useEffect(() => {
                   <div className={`p-2 rounded-xl transition-all ${tempProfile.is_mood_visible ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-400'}`}>
                     {tempProfile.is_mood_visible ? <Eye size={18}/> : <EyeOff size={18}/>}
                   </div>
-                  <span className="text-xs font-bold text-gray-500">Feeling Logs を表示する</span>
+                  <span className="text-xs font-bold text-gray-500">Feeling Logs を表示（up to 100）</span>
                 </label>
               </div>
 
