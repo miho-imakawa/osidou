@@ -209,17 +209,21 @@ def get_top_categories(db: Session = Depends(get_db)):
 
 @router.get("", response_model=List[HobbyCategoryResponse])
 def get_all_categories(db: Session = Depends(get_db)):
-    # 💡 人数集計(再帰SQL)をあえて「やめる」
-    # まずは「住所と名前」だけを高速に返す
+    # 1. 全カテゴリを取得
     categories = db.query(models.HobbyCategory).all()
     if not categories:
         return []
 
-    # 人数は一旦すべて 0 (または "-") として扱う
-    # これで「2分の沈黙」の原因がSQL集計にあるのか切り分けられます
-    member_counts = {cat.id: "-" for cat in categories}
-
-    return build_category_tree(categories, member_counts)
+    # 2. 💡【実験】ツリー構造にせず、そのままリストで返す
+    # build_category_tree を通さないのがポイントです
+    res = []
+    for cat in categories:
+        schema = HobbyCategoryResponse.model_validate(cat)
+        schema.member_count = "-"
+        schema.children = [] # 子要素は空にする
+        res.append(schema)
+        
+    return res # 平坦なリストで返却
 
 # --------------------------------------------------
 # 💡 カテゴリ検索
