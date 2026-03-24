@@ -230,28 +230,49 @@ def get_top_categories(db: Session = Depends(get_db)):
 
 @router.get(
     "",
+    # 既存の response_model 等はそのままでOK
     response_model=List[HobbyCategoryResponse],
     summary="全カテゴリーを「子孫も含めた合算人数」付きで取得"
 )
 def get_all_categories(db: Session = Depends(get_db)):
-    """
-    全カテゴリをツリー構造で返す。
-    各カテゴリの member_count には、そのカテゴリとその子孫に参加している
-    ユニークなユーザー数が含まれる。
-    """
     # 1. 全カテゴリを一度だけ取得
     categories = db.query(models.HobbyCategory).all()
     if not categories:
         return []
 
-    # 2. 各カテゴリのメンバー数を計算（全カテゴリを渡して効率化）
-    member_counts = collections.defaultdict(int)
+    # 2. 💡【ここを修正】全カテゴリの集計を1回の再帰SQLで実行
+    from sqlalchemy import text
+    rows = db.execute(text("""
+        WITH RECURSIVE descendants AS (
+            -- 全てのカテゴリを起点とする
+            SELECT id, id AS top_id
+            FROM hobby_categories
+            
+            UNION ALL
+            
+            -- 子孫を辿る
+            SELECT hc.id, d.top_id
+            FROM hobby_categories hc
+            JOIN descendants d ON hc.parent_id = d.id
+        )
+        -- 各起点カテゴリごとのユニークユーザー数を集計
+        SELECT 
+            d.top_id, 
+            COUNT(DISTINCT uhl.user_id) AS cnt
+        FROM descendants d
+        LEFT JOIN user_hobby_links uhl ON uhl.hobby_category_id = d.id
+        GROUP BY d.top_id
+    """)).fetchall()
     
+    # SQLの結果を辞書形式にする（ {カテゴリID: 人数} ）
+    member_counts = {row.top_id: (row.cnt if row.cnt > 0 else "-") for row in rows}
+    
+    # 「PEOPLE (人物)」などの特殊な表示ルールを適用
     for cat in categories:
-        count = get_total_member_count(db, cat, all_categories=categories)
-        member_counts[cat.id] = count
-    
-    # 3. ツリー構造にして返す
+        if cat.name == "PEOPLE (人物)":
+            member_counts[cat.id] = "-"
+
+    # 3. ツリー構造にして返す（既存の関数を利用）
     return build_category_tree(categories, member_counts)
 
 # --------------------------------------------------

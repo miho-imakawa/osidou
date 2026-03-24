@@ -155,7 +155,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
                             ${isSubmitting ? 'bg-gray-400 cursor-not-allowed text-white' : submitStyle}
                         `}
                     >
-                        {isSubmitting ? '投稿中...' : '気分を投稿 ✈'}
+                        {isSubmitting ? '投稿中...' : '気分をPOST ✈'}
                         <Send className="w-4 h-4 ml-2" />
                     </button>
                 </div>
