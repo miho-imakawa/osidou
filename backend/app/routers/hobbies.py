@@ -209,27 +209,15 @@ def get_top_categories(db: Session = Depends(get_db)):
 
 @router.get("", response_model=List[HobbyCategoryResponse])
 def get_all_categories(db: Session = Depends(get_db)):
+    # 💡 人数集計(再帰SQL)をあえて「やめる」
+    # まずは「住所と名前」だけを高速に返す
     categories = db.query(models.HobbyCategory).all()
-    if not categories: return []
+    if not categories:
+        return []
 
-    from sqlalchemy import text
-    rows = db.execute(text("""
-        WITH RECURSIVE descendants AS (
-            SELECT id, id AS top_id FROM hobby_categories
-            UNION ALL
-            SELECT hc.id, d.top_id FROM hobby_categories hc
-            JOIN descendants d ON hc.parent_id = d.id
-        )
-        SELECT d.top_id, COUNT(DISTINCT uhl.user_id) AS cnt
-        FROM descendants d
-        LEFT JOIN user_hobby_links uhl ON uhl.hobby_category_id = d.id
-        GROUP BY d.top_id
-    """)).fetchall()
-    
-    member_counts = {row.top_id: (row.cnt if row.cnt > 0 else "-") for row in rows}
-    for cat in categories:
-        if cat.name == "PEOPLE (人物)":
-            member_counts[cat.id] = "-"
+    # 人数は一旦すべて 0 (または "-") として扱う
+    # これで「2分の沈黙」の原因がSQL集計にあるのか切り分けられます
+    member_counts = {cat.id: "-" for cat in categories}
 
     return build_category_tree(categories, member_counts)
 
