@@ -209,19 +209,28 @@ def get_top_categories(db: Session = Depends(get_db)):
 
 @router.get("", response_model=List[HobbyCategoryResponse])
 def get_all_categories(db: Session = Depends(get_db)):
-    # 1. 全カテゴリを取得
-    categories = db.query(models.HobbyCategory).all()
+    # 1. DBから「必要なカラムだけ」を直接持ってくる（これが最速）
+    # .all() で丸ごと取るのをやめて、IDと名前、親IDだけに絞ります
+    categories = db.query(
+        models.HobbyCategory.id,
+        models.HobbyCategory.name,
+        models.HobbyCategory.parent_id
+    ).all()
+    
     if not categories:
         return []
 
-    # 2. 💡【実験】ツリー構造にせず、そのままリストで返す
-    # build_category_tree を通さないのがポイントです
+    # 2. 💡【超軽量化】Pydanticの複雑な変換を通さず、辞書で作る
+    # これで「佐藤健さんのリンクの先」を見に行くのを強制的に止めます
     res = []
     for cat in categories:
-        schema = HobbyCategoryResponse.model_validate(cat)
-        schema.member_count = "-"
-        schema.children = [] # 子要素は空にする
-        res.append(schema)
+        res.append({
+            "id": cat.id,
+            "name": cat.name,
+            "parent_id": cat.parent_id,
+            "member_count": "-", # 人数計算は完全にパス
+            "children": []       # 子要素も探さない
+        })
         
     return res # 平坦なリストで返却
 
