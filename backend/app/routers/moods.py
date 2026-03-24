@@ -196,21 +196,21 @@ def cleanup_old_mood_logs(db: Session, user_id: int):
     3ヶ月以上前のログ、または1000件を超えるログを自動削除
     ※ DB負荷を抑えるための軽量化施策
     """
-    # 3ヶ月前の日時
-    three_months_ago = datetime.now() - timedelta(days=90)
+    # 3ヶ月弱前の日時
+    three_months_ago = datetime.now(timezone.utc) - timedelta(days=95)
     
-    # 3ヶ月以上前のログを削除
+    # 3ヶ月弱以上前のログを削除
     db.query(models.MoodLog).filter(
         models.MoodLog.user_id == user_id,
         models.MoodLog.created_at < three_months_ago
     ).delete()
     
-    # 1000件を超える古いログを削除
+    # 1200件を超える古いログを削除
     total_logs = db.query(func.count(models.MoodLog.id)).filter(
         models.MoodLog.user_id == user_id
     ).scalar()
     
-    if total_logs > 1000:
+    if total_logs > 1200:
         # 最新1000件を残して削除
         logs_to_keep = db.query(models.MoodLog.id).filter(
             models.MoodLog.user_id == user_id
