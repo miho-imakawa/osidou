@@ -149,18 +149,21 @@ def get_all_descendant_ids(
 # --- [ 💡 修正：集計ロジックのアップグレード ] ---
 
 def get_total_member_count(db, category, all_categories=None) -> int:
-    # PEOPLEトップカテゴリは人数表示しない
-    if category.name == "PEOPLE (人物)":
-        return "-"
+    # 💡 修正前: if category.name == "PEOPLE (人物)": return "-"
     
-    # 子孫IDも含めてカウント（波及させる）
+    # ✅ 修正後: 特定のカテゴリでも「データ」としては 0 を返す
+    if category.name == "PEOPLE (人物)":
+        return 0
+    
     target_ids = get_all_descendant_ids(category.id, all_categories) if all_categories else [category.id]
     
     count = db.query(func.count(distinct(models.UserHobbyLink.user_id))).filter(
         models.UserHobbyLink.hobby_category_id.in_(target_ids)
     ).scalar() or 0
     
-    return count if count > 0 else "-"
+    # 💡 修正前: return count if count > 0 else "-"
+    # ✅ 修正後: 0なら0をそのまま返す
+    return count
 
 ###==========================
 ### TOP ### CATEGORIES
@@ -168,25 +171,20 @@ def get_total_member_count(db, category, all_categories=None) -> int:
 
 @router.get("/top-categories")
 def get_top_categories(db: Session = Depends(get_db)):
-    # 💡 キャッシュも「複雑な再帰SQL」も一旦すべて削除！
-    # 1. 表面上のトップカテゴリー（親がいないもの）だけを取得
     categories = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.parent_id == None,
         models.HobbyCategory.master_id == None
     ).all()
     
-    # 2. 💡 余計なことをせず、名前とIDだけをシンプルに返す
     result = []
     for cat in categories:
-        # model_validateは関連データを深追いすることがあるので、辞書で直接作る
         result.append({
             "id": cat.id,
             "name": cat.name,
-            "member_count": "-",
+            "member_count": 0,  # ✅ "-" ではなく 0 に修正
             "children": []
         })
     return result
-
 ###==========================
 ### ALL CATEGORIES
 ###==========================
