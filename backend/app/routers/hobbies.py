@@ -168,23 +168,49 @@ def get_total_member_count(db, category, all_categories=None) -> int:
 
 @router.get("/top-categories")
 def get_top_categories(db: Session = Depends(get_db)):
-    # 💡 キャッシュも「複雑な再帰SQL」も一旦すべて削除！
-    # 1. 表面上のトップカテゴリー（親がいないもの）だけを取得
+    # 1. 表面に見えるトップカテゴリーだけを取得
     categories = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.parent_id == None,
         models.HobbyCategory.master_id == None
     ).all()
     
-    # 2. 💡 余計なことをせず、名前とIDだけをシンプルに返す
+    if not categories: return []
+    top_ids = [cat.id for cat in categories]
+    
+    # 2. 💡【ここが肝】TOPに見えている数分だけ「一括」で数える
+    # 800個全部ではなく、この10数個の子孫だけを数えるので、爆速のままいけます。
+    from sqlalchemy import text
+    rows = db.execute(text("""
+        WITH RECURSIVE descendants AS (
+            SELECT id, id AS top_id FROM hobby_categories WHERE id = ANY(:top_ids)
+            UNION ALL
+            SELECT hc.id, d.top_id FROM hobby_categories hc
+            JOIN descendants d ON hc.parent_id = d.id
+        )
+        SELECT d.top_id, COUNT(DISTINCT uhl.user_id) AS cnt
+        FROM descendants d
+        LEFT JOIN user_hobby_links uhl ON uhl.hobby_category_id = d.id
+        GROUP BY d.top_id
+    """), {"top_ids": top_ids}).fetchall()
+    
+    count_map = {row.top_id: row.cnt for row in rows}
+    
+    # 3. 組み立て
     result = []
     for cat in categories:
-        # model_validateは関連データを深追いすることがあるので、辞書で直接作る
-        result.append({
-            "id": cat.id,
-            "name": cat.name,
-            "member_count": "-",
-            "children": []
-        })
+        # Pydanticモデルに変換
+        schema = HobbyCategoryResponse.model_validate(cat)
+        
+        # 人数セット (PEOPLE以外)
+        if cat.name == "PEOPLE (人物)":
+            schema.member_count = "-"
+        else:
+            cnt = count_map.get(cat.id, 0)
+            schema.member_count = cnt if cnt > 0 else "-"
+            
+        schema.children = [] # TOP画面では子要素は送らない（これも軽量化の秘訣）
+        result.append(schema)
+        
     return result
 
 ###==========================
