@@ -169,22 +169,82 @@ def get_total_member_count(db, category, all_categories=None) -> int:
 ### TOP ### CATEGORIES
 ###==========================
 
+# ✅ get_top_categories：member_countを正しく集計
 @router.get("/top-categories")
 def get_top_categories(db: Session = Depends(get_db)):
     categories = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.parent_id == None,
         models.HobbyCategory.master_id == None
     ).all()
+
+    all_categories = db.query(models.HobbyCategory).all()
     
+    # 全カテゴリの人数を一括取得（N+1を避ける）
+    counts = dict(
+        db.query(
+            models.UserHobbyLink.master_id,
+            func.count(distinct(models.UserHobbyLink.user_id))
+        ).group_by(models.UserHobbyLink.master_id).all()
+    )
+
     result = []
     for cat in categories:
+        if cat.name == "PEOPLE（人物）":
+            member_count = "-"
+        else:
+            descendant_ids = get_all_descendant_ids(cat.id, all_categories)
+            member_count = sum(counts.get(id, 0) for id in descendant_ids)
+
         result.append({
             "id": cat.id,
             "name": cat.name,
-            "member_count": 0,  # ✅ "-" ではなく 0 に修正
+            "member_count": member_count,
             "children": []
         })
     return result
+
+# ✅ get_category_detail_info：逆引きをSQLのLIKEに絞る（全件ロードを避ける）
+@router.get("/categories/{category_id}/detail")
+def get_category_detail_info(category_id: int, db: Session = Depends(get_db)):
+    category = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.id == category_id
+    ).first()
+
+    detail = db.query(models.CategoryDetail).filter(
+        models.CategoryDetail.category_id == category_id
+    ).first()
+
+    target_id = category.master_id if category and category.master_id else category_id
+
+    # ✅ SQLのLIKEで絞ってから件数を限定（全件ロードしない）
+    matched_details = db.query(models.CategoryDetail).filter(
+        models.CategoryDetail.cast_json.like(f'%"master_id": {target_id}%'),
+        models.CategoryDetail.category_id != category_id
+    ).limit(50).all()  # 念のため上限を設定
+
+    appearances = []
+    for d in matched_details:
+        try:
+            cast_list = json.loads(d.cast_json or "[]")
+            if any(str(c.get('master_id')) == str(target_id) for c in cast_list):
+                work_cat = db.query(models.HobbyCategory).filter(
+                    models.HobbyCategory.id == d.category_id
+                ).first()
+                if work_cat:
+                    appearances.append({"id": work_cat.id, "name": work_cat.name})
+        except:
+            continue
+
+    response_data = {
+        "description": detail.description if detail else "",
+        "alias": category.alias_name or "" if category else "",
+        "cast": json.loads(detail.cast_json or "[]") if detail else [],
+        "sections": json.loads(detail.sections_json or "[]") if detail else [],
+        "appearances": appearances
+    }
+    return response_data
+    
+
 ###==========================
 ### ALL CATEGORIES
 ###==========================
@@ -428,54 +488,54 @@ def check_duplicate_category(
     
     return {"is_duplicate": False}
 
-@router.get("/categories/{category_id}/detail")
-def get_category_detail_info(category_id: int, db: Session = Depends(get_db)):
-    # 1. カテゴリ自体の情報を取得
-    category = db.query(models.HobbyCategory).filter(
-        models.HobbyCategory.id == category_id
-    ).first()
+# @router.get("/categories/{category_id}/detail")
+# def get_category_detail_info(category_id: int, db: Session = Depends(get_db)):
+#     # 1. カテゴリ自体の情報を取得
+#     category = db.query(models.HobbyCategory).filter(
+#         models.HobbyCategory.id == category_id
+#     ).first()
     
-    # 2. カテゴリのDETAIL情報を取得
-    detail = db.query(models.CategoryDetail).filter(
-        models.CategoryDetail.category_id == category_id
-    ).first()
+#     # 2. カテゴリのDETAIL情報を取得
+#     detail = db.query(models.CategoryDetail).filter(
+#         models.CategoryDetail.category_id == category_id
+#     ).first()
     
-    # --- 💡 出演作品の逆引きロジック ---
-    # 自分のID（または master_id）が cast_json に含まれている作品を探す
-    target_id = category.master_id if category and category.master_id else category_id
-    appearances = []
+#     # --- 💡 出演作品の逆引きロジック ---
+#     # 自分のID（または master_id）が cast_json に含まれている作品を探す
+#     target_id = category.master_id if category and category.master_id else category_id
+#     appearances = []
     
-    # 全ての作品のDetailをチェック（地道にスキャン）
-    # ※ 将来的にはSQLのJSON関数で高速化可能ですが、まずはこのロジックで確実に動かします
-    all_details = db.query(models.CategoryDetail).all()
-    for d in all_details:
-        if d.category_id == category_id:
-            continue  # 自分自身のDETAILはスキップ
+#     # 全ての作品のDetailをチェック（地道にスキャン）
+#     # ※ 将来的にはSQLのJSON関数で高速化可能ですが、まずはこのロジックで確実に動かします
+#     all_details = db.query(models.CategoryDetail).all()
+#     for d in all_details:
+#         if d.category_id == category_id:
+#             continue  # 自分自身のDETAILはスキップ
             
-        try:
-            cast_list = json.loads(d.cast_json or "[]")
-            # キャストの中に自分のIDを master_id として持っている人がいるか
-            if any(str(c.get('master_id')) == str(target_id) for c in cast_list):
-                work_cat = db.query(models.HobbyCategory).filter(models.HobbyCategory.id == d.category_id).first()
-                if work_cat:
-                    appearances.append({
-                        "id": work_cat.id,
-                        "name": work_cat.name
-                    })
-        except:
-            continue
-    # --- 逆引きここまで ---
+#         try:
+#             cast_list = json.loads(d.cast_json or "[]")
+#             # キャストの中に自分のIDを master_id として持っている人がいるか
+#             if any(str(c.get('master_id')) == str(target_id) for c in cast_list):
+#                 work_cat = db.query(models.HobbyCategory).filter(models.HobbyCategory.id == d.category_id).first()
+#                 if work_cat:
+#                     appearances.append({
+#                         "id": work_cat.id,
+#                         "name": work_cat.name
+#                     })
+#         except:
+#             continue
+#     # --- 逆引きここまで ---
 
-    # 基本データの構築
-    response_data = {
-        "description": detail.description if detail else "",
-        "alias": category.alias_name or "" if category else "",
-        "cast": json.loads(detail.cast_json or "[]") if detail else [],
-        "sections": json.loads(detail.sections_json or "[]") if detail else [],
-        "appearances": appearances  # 💡 これをフロントに渡す
-    }
+#     # 基本データの構築
+#     response_data = {
+#         "description": detail.description if detail else "",
+#         "alias": category.alias_name or "" if category else "",
+#         "cast": json.loads(detail.cast_json or "[]") if detail else [],
+#         "sections": json.loads(detail.sections_json or "[]") if detail else [],
+#         "appearances": appearances  # 💡 これをフロントに渡す
+#     }
     
-    return response_data
+#     return response_data
 
 @router.put("/categories/{category_id}/detail")
 def update_category_detail_info(
