@@ -36,10 +36,13 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
         is_closed: boolean,
         is_attended?: boolean // 👈 ここを追加（? を付けると「無い場合もある」という意味になります）
     }>>({});
+    // ADは「開いた状態」がデフォルト。ユーザーが閉じたものをlocalStorageに保存
     const [closedAds, setClosedAds] = useState<Set<number>>(() => {
         const saved = localStorage.getItem('closedAds');
         return saved ? new Set(JSON.parse(saved)) : new Set();
     });
+    // ADの本文展開（デフォルト閉じ＝コンパクト3行表示）
+    const [expandedAds, setExpandedAds] = useState<Set<number>>(new Set());
     const [meetupDetails, setMeetupDetails] = useState({
         title: '', date: '', pref: '', city_town: '', capacity: 5, fee: ''
     });
@@ -396,9 +399,21 @@ const submitPost = async () => {
             </div>
         );
     }
+    const AD_DURATION_DAYS = 45; // AD掲載期間：45日固定
+    const now = new Date();
     const allParentPosts = posts.filter(p => {
         if (p.parent_id) return false;
-        if (p.is_meetup && p.meetup_date && new Date(new Date(p.meetup_date).getTime() + 4 * 60 * 60 * 1000) < new Date()) return false;
+        // MEETUPは開催終了4時間後に非表示
+        if (p.is_meetup && p.meetup_date && new Date(new Date(p.meetup_date).getTime() + 4 * 60 * 60 * 1000) < now) return false;
+        // ADは45日固定。ad_end_dateがある場合はそれを、なければ投稿日から45日で計算
+        if (p.is_ad) {
+            const expiresAt = p.ad_end_date
+                ? new Date(p.ad_end_date)
+                : new Date(new Date(p.created_at || Date.now()).getTime() + AD_DURATION_DAYS * 86400000);
+            // 掲載終了日の翌日まで表示を維持（1日猶予）
+            const gracePeriod = new Date(expiresAt.getTime() + 1 * 86400000);
+            if (gracePeriod < now) return false;
+        }
         return true;
     });
     // 2. その中で「システム投稿(ガイド)」と「通常の投稿」に分けて並び替える
@@ -485,33 +500,101 @@ const submitPost = async () => {
                     const adBg = post.ad_color === 'red' ? 'bg-red-50' : post.ad_color === 'blue' ? 'bg-blue-50' : post.ad_color === 'purple' ? 'bg-purple-50' : post.ad_color === 'white' ? 'bg-slate-50' : 'bg-green-50';
                     const adBorder = post.ad_color === 'red' ? 'border-red-200 text-red-900' : post.ad_color === 'blue' ? 'border-blue-200 text-blue-900' : post.ad_color === 'purple' ? 'border-purple-200 text-purple-900' : post.ad_color === 'white' ? 'border-slate-200 text-slate-900' : 'border-green-200 text-green-900';
                     const adBorderL = post.ad_color === 'red' ? 'border-red-400' : post.ad_color === 'blue' ? 'border-blue-400' : post.ad_color === 'purple' ? 'border-purple-400' : post.ad_color === 'white' ? 'border-slate-300' : 'border-green-400';
+                    // AD用：掲示期間計算（IIFEを使わずreturn前に計算）
+                    const isAdExpanded = expandedAds.has(post.id);
+                    const adExpiry = post.ad_end_date
+                        ? new Date(post.ad_end_date)
+                        : new Date(new Date(post.created_at || Date.now()).getTime() + AD_DURATION_DAYS * 86400000);
+                    const adDaysLeft = Math.ceil((adExpiry.getTime() - Date.now()) / 86400000);
+                    const adExpiryStr = adExpiry.toISOString().slice(0, 10).replace(/-/g, '/');
+                    const adStartStr = post.ad_start_date
+                        ? post.ad_start_date.slice(0, 10).replace(/-/g, '/')
+                        : (post.created_at ? post.created_at.slice(0, 10).replace(/-/g, '/') : '');
                     return (
                         <div key={post.id} id={`post-${post.id}`} className="animate-in fade-in slide-in-from-bottom-2">
                             {post.is_ad ? (
                                 <div className="mb-4">
                                     {isClosed ? (
-                                        <div className={`p-3 border-l-4 rounded-r-2xl ${adBg} ${adBorderL}`}>
-                                            <div className="flex justify-between items-center">
-                                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                    <span className="text-[8px] font-black bg-gray-800 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
-                                                    <span className="text-[14px] font-bold text-gray-700 truncate">{post.content.split('\n')[0]}</span>
-                                                </div>
-                                                <button type="button" onClick={() => toggleAdCollapse(post.id)} className="px-3 py-1 bg-white border border-gray-200 rounded-full text-[10px] font-black text-gray-600 shadow-sm">RE-OPEN</button>
+                                        /* ── ユーザーが非表示にした状態（最小バー） ── */
+                                        <div className={`px-3 py-2 border-l-4 rounded-r-2xl ${adBg} ${adBorderL}`}>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[8px] font-black bg-gray-800 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
+                                                <span className="text-[12px] font-bold text-gray-600 truncate flex-1">{post.content.split('\n')[0]}</span>
+                                                <button type="button" onClick={() => toggleAdCollapse(post.id)}
+                                                    className="px-2 py-0.5 bg-white border border-gray-200 rounded-full text-[9px] font-black text-gray-500 shrink-0">
+                                                    表示する
+                                                </button>
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className={`p-4 rounded-[28px] border-2 shadow-sm ${adBg} ${adBorder}`}>
-                                            <div className="flex items-center gap-1.5 mb-2">
-                                                <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
-                                                <span className="text-[10px] font-bold opacity-60 truncate">{post.author_nickname}</span>
-                                                <button type="button" onClick={() => toggleAdCollapse(post.id)} className="px-3 py-1.5 bg-white/70 border border-gray-200 rounded-full text-[10px] font-black text-gray-500 ml-auto">✕</button>
+                                        /* ── 通常表示（コンパクト3行 + 展開） ── */
+                                        <div className={`rounded-[24px] border-2 shadow-sm overflow-hidden ${adBg} ${adBorder}`}>
+                                            {/* ▼ 常時表示：3行コンパクトヘッダー */}
+                                            <div className="px-4 pt-3 pb-2">
+                                                {/* 行1：ADバッジ + タイトル + 閉じるボタン */}
+                                                <div className="flex items-center gap-1.5 mb-1">
+                                                    <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
+                                                    <h3 className="font-black text-[13px] leading-tight flex-1 truncate">{post.content.split('\n')[0]}</h3>
+                                                    <button type="button" onClick={() => toggleAdCollapse(post.id)}
+                                                        className="p-1 text-gray-300 hover:text-gray-500 shrink-0" title="非表示にする">
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                                {/* 行2：掲示期間（45日固定・常に表示） */}
+                                                <div className="flex items-center gap-2 text-[10px] font-bold mb-1.5">
+                                                    <span className="opacity-60">
+                                                        📅 {adStartStr} 〜 {adExpiryStr}
+                                                        <span className="ml-1.5 font-black" style={{color: adDaysLeft <= 7 ? '#ef4444' : adDaysLeft <= 14 ? '#f97316' : 'inherit'}}>
+                                                            （残{adDaysLeft}日 / 45日掲載）
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                                {/* 行3：VIBE・PIN + 詳細ボタン */}
+                                                <div className="flex items-center gap-2">
+                                                    <button type="button" onClick={() => handleAdAction(post.id, 'like')}
+                                                        className={`px-2.5 py-1 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}>
+                                                        👍 Vibe
+                                                    </button>
+                                                    <button type="button" onClick={() => handleAdAction(post.id, 'pin')}
+                                                        className={`px-2.5 py-1 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}>
+                                                        📌 PIN
+                                                    </button>
+                                                    <button type="button"
+                                                        onClick={() => setExpandedAds(prev => {
+                                                            const s = new Set(prev);
+                                                            s.has(post.id) ? s.delete(post.id) : s.add(post.id);
+                                                            return s;
+                                                        })}
+                                                        className="ml-auto flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-white/70 border border-gray-200 text-gray-500">
+                                                        {isAdExpanded ? <><ChevronUp size={11}/> 閉じる</> : <><ChevronDown size={11}/> 詳細</>}
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <h3 className="font-black text-sm leading-tight mb-2">{post.content.split('\n')[0]}</h3>
-                                            <p className="text-[12px] opacity-90 whitespace-pre-wrap leading-relaxed mb-3">{post.content.split('\n').slice(1).join('\n')}</p>
-                                            <div className="flex gap-2">
-                                                <button type="button" onClick={() => handleAdAction(post.id, 'like')} className={`px-3 py-1.5 rounded-full text-[10px] font-black ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}>👍 Vibe</button>
-                                                <button type="button" onClick={() => handleAdAction(post.id, 'pin')} className={`px-3 py-1.5 rounded-full text-[10px] font-black ${interaction?.is_pinned ? 'bg-yellow-400 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}>📌 PIN</button>
-                                            </div>
+                                            {/* ▼ 展開時：本文 */}
+                                            {isAdExpanded && (
+                                                <div className="px-4 pb-4 pt-1 border-t border-black/5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                    <p className="text-[12px] opacity-90 whitespace-pre-wrap leading-relaxed mt-2">
+                                                        {post.content.split('\n').slice(1).join('\n')}
+                                                    </p>
+                                                    {post.user_id === currentUserId && (
+                                                        <button type="button"
+                                                            onClick={async () => {
+                                                                const addText = window.prompt("追記する内容を入力してください：");
+                                                                if (addText && addText.trim()) {
+                                                                    try {
+                                                                        await authApi.patch(`/posts/${post.id}`, {
+                                                                            content: `${post.content}\n\n📌 追記：${addText.trim()}`
+                                                                        });
+                                                                        fetchPosts();
+                                                                    } catch { alert("追記に失敗しました。"); }
+                                                                }
+                                                            }}
+                                                            className="mt-3 text-[9px] font-black text-blue-500 hover:text-blue-700 flex items-center gap-1">
+                                                            <CheckSquare size={12} /> 文章を追記する
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
