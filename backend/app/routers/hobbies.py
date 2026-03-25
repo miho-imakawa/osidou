@@ -1,4 +1,4 @@
-# backend/app/routers/hobbies.py (改善版)
+# backend/app/routers/hobbies.py (高速化版)
 
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -30,13 +30,8 @@ router = APIRouter(
 
 # 💡 実料金計算ロジック
 def calculate_ad_fee(unique_users: int) -> int:
-    """
-    599人まで500円。
-    600人以上は1人1円、かつ下2桁切り捨て。
-    """
     if unique_users <= 599:
         return 500
-    # 100単位で切り捨て (例: 1289 -> 1200)
     return (unique_users // 100) * 100
 
 class AdQuoteRequest(BaseModel):
@@ -65,13 +60,11 @@ async def get_ad_quote(request: AdQuoteRequest, db: Session = Depends(get_db)):
 
 @router.get("/categories/{category_id}/related")
 def get_related_categories(category_id: int, db: Session = Depends(get_db)):
-    """cast_jsonにこのcategory_idが含まれている作品を返す"""
     all_details = db.query(models.CategoryDetail).filter(
         models.CategoryDetail.cast_json.like(f'%"master_id": {category_id}%')
     ).all()
     
     result = []
-    # 現在のChatも含める
     current = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.id == category_id
     ).first()
@@ -88,16 +81,13 @@ def get_related_categories(category_id: int, db: Session = Depends(get_db)):
     return result
 
 # --------------------------------------------------
-# 💡 カテゴリツリーの構築ヘルパー関数
+# 💡 ヘルパー関数
 # --------------------------------------------------
 
 def build_category_tree(
     categories: List[models.HobbyCategory], 
     member_counts: Dict[int, int]
 ) -> List[HobbyCategoryResponse]:
-    """
-    フラットなカテゴリリストから入れ子構造のツリーを構築し、メンバー数を付与する。
-    """
     category_map: Dict[int, HobbyCategoryResponse] = {}
     for cat in categories:
         cat_schema = HobbyCategoryResponse.model_validate(cat)
@@ -128,10 +118,6 @@ def get_all_descendant_ids(
     all_categories: List[models.HobbyCategory],
     cache: Dict[int, List[int]] = None
 ) -> List[int]:
-    """
-    指定されたカテゴリIDの子孫（children, grandchildren, etc.）のIDをすべて取得
-    キャッシュを使って効率化
-    """
     if cache is None:
         cache = {}
     
@@ -146,12 +132,28 @@ def get_all_descendant_ids(
     cache[category_id] = descendants
     return descendants
 
-# --- [ 💡 修正：集計ロジックのアップグレード ] ---
+
+# ✅ 【高速化】member_count を一括取得するヘルパー
+# 子カテゴリのIDリストを受け取り、1回のSQLで全員数を返す
+def get_member_counts_bulk(db: Session, category_ids: List[int]) -> Dict[int, int]:
+    """
+    指定したカテゴリIDリストのmember_countを1回のSQLで一括取得。
+    N+1問題を完全に解消する。
+    """
+    if not category_ids:
+        return {}
+    rows = db.query(
+        models.UserHobbyLink.hobby_category_id,
+        func.count(distinct(models.UserHobbyLink.user_id))
+    ).filter(
+        models.UserHobbyLink.hobby_category_id.in_(category_ids)
+    ).group_by(
+        models.UserHobbyLink.hobby_category_id
+    ).all()
+    return {row[0]: row[1] for row in rows}
+
 
 def get_total_member_count(db, category, all_categories=None) -> int:
-    # 💡 修正前: if category.name == "PEOPLE (人物)": return "-"
-    
-    # ✅ 修正後: 特定のカテゴリでも「データ」としては 0 を返す
     if category.name == "PEOPLE (人物)":
         return 0
     
@@ -161,15 +163,12 @@ def get_total_member_count(db, category, all_categories=None) -> int:
         models.UserHobbyLink.hobby_category_id.in_(target_ids)
     ).scalar() or 0
     
-    # 💡 修正前: return count if count > 0 else "-"
-    # ✅ 修正後: 0なら0をそのまま返す
     return count
 
 ###==========================
-### TOP ### CATEGORIES
+### TOP CATEGORIES
 ###==========================
 
-# ✅ get_top_categories：member_countを正しく集計
 @router.get("/top-categories")
 def get_top_categories(db: Session = Depends(get_db)):
     categories = db.query(models.HobbyCategory).filter(
@@ -179,7 +178,6 @@ def get_top_categories(db: Session = Depends(get_db)):
 
     all_categories = db.query(models.HobbyCategory).all()
     
-    # 全カテゴリの人数を一括取得（N+1を避ける）
     counts = dict(
         db.query(
             models.UserHobbyLink.master_id,
@@ -203,7 +201,6 @@ def get_top_categories(db: Session = Depends(get_db)):
         })
     return result
 
-# ✅ get_category_detail_info：逆引きをSQLのLIKEに絞る（全件ロードを避ける）
 @router.get("/categories/{category_id}/detail")
 def get_category_detail_info(category_id: int, db: Session = Depends(get_db)):
     category = db.query(models.HobbyCategory).filter(
@@ -216,11 +213,10 @@ def get_category_detail_info(category_id: int, db: Session = Depends(get_db)):
 
     target_id = category.master_id if category and category.master_id else category_id
 
-    # ✅ SQLのLIKEで絞ってから件数を限定（全件ロードしない）
     matched_details = db.query(models.CategoryDetail).filter(
         models.CategoryDetail.cast_json.like(f'%"master_id": {target_id}%'),
         models.CategoryDetail.category_id != category_id
-    ).limit(50).all()  # 念のため上限を設定
+    ).limit(50).all()
 
     appearances = []
     for d in matched_details:
@@ -255,14 +251,11 @@ def get_all_categories(db: Session = Depends(get_db)):
     
     res = []
     for cat in categories:
-        # 💡 計算ロジック（後で人数集計を戻す際もここを数字にする）
-        count = 0 
-        
         res.append({
             "id": cat.id,
             "name": cat.name,
             "parent_id": cat.parent_id,
-            "member_count": count,  # ★ 常に int (整数) を返す
+            "member_count": 0,
             "children": []
         })
     return res
@@ -285,7 +278,7 @@ def search_hobby_categories(
                 models.HobbyCategory.alias_name.ilike(f"%{params.keyword}%")
             )
         ).filter(
-            models.HobbyCategory.master_id == None  # 本尊のみ
+            models.HobbyCategory.master_id == None
         )
 
     if params.genre_id is not None:
@@ -305,13 +298,11 @@ def search_hobby_categories(
         cat_schema.children = []
         response_categories.append(cat_schema)
 
-    # PEOPLE配下を上位に表示
     response_categories.sort(key=lambda x: 0 if _is_under_people(x, all_categories) else 1)
 
     return response_categories
 
 def _is_under_people(cat, all_categories, people_id=196):
-    """カテゴリがPEOPLE（id=196）配下かどうか判定"""
     current_id = cat.parent_id
     visited = set()
     while current_id and current_id not in visited:
@@ -323,7 +314,7 @@ def _is_under_people(cat, all_categories, people_id=196):
     return False
 
 # --------------------------------------------------
-# 💡 カテゴリ詳細取得
+# ✅ 【高速化】カテゴリ詳細取得
 # --------------------------------------------------
 
 @router.get(
@@ -332,7 +323,13 @@ def _is_under_people(cat, all_categories, people_id=196):
     summary="特定のカテゴリーIDの詳細と子ノード一覧を取得"
 )
 def get_category_detail(category_id: int, db: Session = Depends(get_db)):
-    """指定されたカテゴリIDの詳細情報を取得"""
+    """
+    【改善点】
+    旧: 子カテゴリの数だけ個別にSQLを実行（N+1問題）
+    新: 子カテゴリのmember_countを1回のSQLで一括取得
+    → 子が10件でも100件でもSQLは合計3回のみ
+    """
+    # 1. 対象カテゴリを取得
     category = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.id == category_id
     ).first()
@@ -340,23 +337,23 @@ def get_category_detail(category_id: int, db: Session = Depends(get_db)):
     if not category:
         raise HTTPException(status_code=404, detail="カテゴリが見つかりません")
 
-    # 直下の子カテゴリを取得
+    # 2. 直下の子カテゴリを取得（1回のSQL）
     children = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.parent_id == category_id
     ).order_by(models.HobbyCategory.name).all()
 
-    # 全カテゴリを取得（メンバー数計算用）
-    all_categories = db.query(models.HobbyCategory).all()
-    
-    # レスポンススキーマの構築
+    # 3. ✅ 親 + 全子のmember_countを1回のSQLで一括取得（N+1を解消）
+    all_target_ids = [category_id] + [c.id for c in children]
+    counts = get_member_counts_bulk(db, all_target_ids)
+
+    # 4. レスポンス構築（SQLは走らない）
     response_category = HobbyCategoryResponse.model_validate(category)
-    response_category.member_count = get_total_member_count(db, category, all_categories)
+    response_category.member_count = counts.get(category_id, 0)
     
-    # 子ノードをスキーマに変換
     response_category.children = []
     for child in children:
         child_schema = HobbyCategoryResponse.model_validate(child)
-        child_schema.member_count = get_total_member_count(db, child, all_categories)
+        child_schema.member_count = counts.get(child.id, 0)
         child_schema.children = []
         response_category.children.append(child_schema)
         
@@ -366,9 +363,6 @@ def get_category_detail(category_id: int, db: Session = Depends(get_db)):
 # 💡 コミュニティ参加/脱退
 # --------------------------------------------------
 
-# backend/app/routers/hobbies.py (join_hobby_category 修正案)
-
-# ✅ 正しいコード
 @router.post("/categories/{category_id}/join")
 def join_hobby_category(category_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     category = db.query(models.HobbyCategory).get(category_id)
@@ -381,8 +375,8 @@ def join_hobby_category(category_id: int, db: Session = Depends(get_db), current
     try:
         link = models.UserHobbyLink(
             user_id=current_user.id,
-            hobby_category_id=category_id,  # 入口を記録
-            master_id=master_id             # 本尊を記録
+            hobby_category_id=category_id,
+            master_id=master_id
         )
         db.add(link)
         db.commit()
@@ -402,7 +396,6 @@ def leave_hobby_category(
         models.HobbyCategory.id == category_id
     ).first()
     
-    # master_idで検索して削除
     master_id = category.master_id if category and category.master_id else category_id
     
     link = db.query(models.UserHobbyLink).filter(
@@ -423,7 +416,6 @@ def get_my_categories(
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(get_current_user)
 ):
-    """自分が参加しているカテゴリ一覧を取得"""
     links = db.query(models.UserHobbyLink).filter(
         models.UserHobbyLink.user_id == current_user.id
     ).all()
@@ -431,21 +423,19 @@ def get_my_categories(
     if not links:
         return []
 
-    # master_idで重複排除してからカテゴリ取得
     unique_master_ids = list({l.master_id for l in links})
 
     categories = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.id.in_(unique_master_ids)
     ).all()
 
-    # デバッグ用
-    for cat in categories:
-        print(f"id={cat.id}, name={cat.name}, master_id={cat.master_id}")
+    # ✅ 一括取得に変更
+    counts = get_member_counts_bulk(db, unique_master_ids)
 
     res = []
     for cat in categories:
         schema = HobbyCategoryResponse.model_validate(cat)
-        schema.member_count = get_total_member_count(db, cat, categories)
+        schema.member_count = counts.get(cat.id, 0)
         res.append(schema)
 
     return res
@@ -463,13 +453,11 @@ def check_duplicate_category(
     name: str = Query(..., description="チェックしたいカテゴリー名"),
     db: Session = Depends(get_db)
 ):
-    """既存の似た名前のカテゴリを検索"""
     existing = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.name.ilike(f"%{name}%")
     ).first()
 
     if existing:
-        # 親の情報を辿る
         path_elements = []
         current = existing
         while current.parent and len(path_elements) < 3:
@@ -488,54 +476,6 @@ def check_duplicate_category(
     
     return {"is_duplicate": False}
 
-# @router.get("/categories/{category_id}/detail")
-# def get_category_detail_info(category_id: int, db: Session = Depends(get_db)):
-#     # 1. カテゴリ自体の情報を取得
-#     category = db.query(models.HobbyCategory).filter(
-#         models.HobbyCategory.id == category_id
-#     ).first()
-    
-#     # 2. カテゴリのDETAIL情報を取得
-#     detail = db.query(models.CategoryDetail).filter(
-#         models.CategoryDetail.category_id == category_id
-#     ).first()
-    
-#     # --- 💡 出演作品の逆引きロジック ---
-#     # 自分のID（または master_id）が cast_json に含まれている作品を探す
-#     target_id = category.master_id if category and category.master_id else category_id
-#     appearances = []
-    
-#     # 全ての作品のDetailをチェック（地道にスキャン）
-#     # ※ 将来的にはSQLのJSON関数で高速化可能ですが、まずはこのロジックで確実に動かします
-#     all_details = db.query(models.CategoryDetail).all()
-#     for d in all_details:
-#         if d.category_id == category_id:
-#             continue  # 自分自身のDETAILはスキップ
-            
-#         try:
-#             cast_list = json.loads(d.cast_json or "[]")
-#             # キャストの中に自分のIDを master_id として持っている人がいるか
-#             if any(str(c.get('master_id')) == str(target_id) for c in cast_list):
-#                 work_cat = db.query(models.HobbyCategory).filter(models.HobbyCategory.id == d.category_id).first()
-#                 if work_cat:
-#                     appearances.append({
-#                         "id": work_cat.id,
-#                         "name": work_cat.name
-#                     })
-#         except:
-#             continue
-#     # --- 逆引きここまで ---
-
-#     # 基本データの構築
-#     response_data = {
-#         "description": detail.description if detail else "",
-#         "alias": category.alias_name or "" if category else "",
-#         "cast": json.loads(detail.cast_json or "[]") if detail else [],
-#         "sections": json.loads(detail.sections_json or "[]") if detail else [],
-#         "appearances": appearances  # 💡 これをフロントに渡す
-#     }
-    
-#     return response_data
 
 @router.put("/categories/{category_id}/detail")
 def update_category_detail_info(
@@ -570,7 +510,7 @@ class SubCategoryCreate(BaseModel):
     name: str
     parent_id: int
     master_id: Optional[int] = None
-    role_type: Optional[str] = None  # "doer" / "fan" / None
+    role_type: Optional[str] = None
 
 @router.post("/create-sub", tags=["hobbies"])
 def create_sub_category(
@@ -596,8 +536,8 @@ def create_sub_category(
         parent_id=data.parent_id,
         master_id=data.master_id,
         depth=(parent.depth or 0) + 1,
-        unique_code=str(uuid.uuid4())[:7],  # ★ 追加
-        role_type=data.role_type,  # ★追加
+        unique_code=str(uuid.uuid4())[:7],
+        role_type=data.role_type,
     )
     db.add(new_cat)
     db.commit()
