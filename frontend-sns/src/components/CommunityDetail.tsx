@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// 💡 ポイント1: Linkの宣言を1か所にまとめ、Edit3を追加
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { authApi, HobbyCategory } from '../api.ts';
 import { ArrowLeft, Users, Edit3 } from 'lucide-react'; 
@@ -14,7 +13,6 @@ const CommunityDetail: React.FC<CommunityDetailProps> = ({ currentUserId }) => {
     const [category, setCategory] = useState<HobbyCategory | null>(null);
     const [loading, setLoading] = useState(true);
     const [isJoined, setIsJoined] = useState(false);
-    // 💡 ポイント2: detailデータの有無を管理するステートを追加
     const [detail, setDetail] = useState<any>(null);
 
     const getHeatStyles = (count: number) => {
@@ -27,14 +25,20 @@ const CommunityDetail: React.FC<CommunityDetailProps> = ({ currentUserId }) => {
     const fetchDetail = useCallback(async () => {
         if (!categoryId) return;
         try {
-            const response = await authApi.get(`/hobby-categories/categories/${categoryId}`);
-            const categoryData = response.data;
+            // ✅ 【高速化】3本のAPIを並列で同時に叩く
+            // 旧：直列（A終了→B開始→C開始）合計 = A + B + C 秒
+            // 新：並列（A・B・Cを同時開始）合計 = max(A, B, C) 秒
+            const [categoryRes, detailRes] = await Promise.all([
+                authApi.get(`/hobby-categories/categories/${categoryId}`),
+                authApi.get(`/hobby-categories/categories/${categoryId}/detail`),
+            ]);
+
+            const categoryData = categoryRes.data;
             setCategory(categoryData);
-            
-            // 💡 ポイント3: detailを取得してステートに入れる
-            const detailRes = await authApi.get(`/hobby-categories/categories/${categoryId}/detail`);
             setDetail(detailRes.data);
 
+            // check-joinはmaster_idが必要なので、上記取得後に実行
+            // （master_idが不要な場合は上のPromise.allに含めてさらに高速化可能）
             const targetId = categoryData.master_id || categoryId;
             const joinStatus = await authApi.get(`/hobby-categories/check-join/${targetId}`);
             setIsJoined(joinStatus.data.is_joined || categoryData.is_public);
@@ -97,7 +101,7 @@ const CommunityDetail: React.FC<CommunityDetailProps> = ({ currentUserId }) => {
                 )}
             </div>
 
-            {/* 💡 ポイント4: DETAIL、子要素、そして【出演作品】をチップとして並べる */}
+            {/* DETAIL、子要素、出演作品チップ */}
             <div className="mb-2 flex flex-wrap gap-2">
                 {/* 1. DETAILボタン */}
                 <Link 
@@ -111,7 +115,7 @@ const CommunityDetail: React.FC<CommunityDetailProps> = ({ currentUserId }) => {
                     </span>
                 </Link>
 
-                {/* 2. 子カテゴリ（映画作品など） */}
+                {/* 2. 子カテゴリ */}
                 {category.children?.map(child => (
                     <Link 
                         key={child.id} 
@@ -123,7 +127,7 @@ const CommunityDetail: React.FC<CommunityDetailProps> = ({ currentUserId }) => {
                     </Link>
                 ))}
 
-                {/* 3. 💡 新規：【出演作品】のチップを表示 */}
+                {/* 3. 出演作品チップ */}
                 {detail?.appearances?.map((work: any) => (
                     <Link 
                         key={work.id} 
@@ -145,7 +149,6 @@ const CommunityDetail: React.FC<CommunityDetailProps> = ({ currentUserId }) => {
                     </div>
                 ) : (
                     <div className="relative">
-                        {/* 右上はLEAVEのみにしてスッキリ */}
                         <div className="absolute -top-10 right-0">
                             <button onClick={handleLeave} className="text-[9px] font-bold text-gray-300 hover:text-red-400 uppercase tracking-widest">
                                 Leave
