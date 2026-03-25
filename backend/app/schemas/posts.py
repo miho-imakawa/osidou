@@ -45,6 +45,7 @@ class HobbyPostBase(BaseModel):
     meetup_status: Optional[str] = Field("open", description="募集状況 (open/closed)")
     parent_id: Optional[int] = Field(None, description="親投稿のID（返信の場合）")
     is_ad: bool = Field(False, description="有料広告投稿であるか")
+    ad_start_date: Optional[datetime] = Field(None, description="広告掲載開始日")  
     ad_end_date: Optional[datetime] = Field(None, description="広告掲載終了日")
     original_post_id: Optional[int] = Field(None, description="リポスト元の投稿ID")
     ad_color: Optional[str] = Field("green", description="広告カラー")

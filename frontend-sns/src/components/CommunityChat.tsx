@@ -559,15 +559,7 @@ const submitPost = async () => {
                                         </div>
                                     )}
                                 </div>
-                            ) : post.is_meetup ? (
-                                <div className="space-y-2 mb-4">
-                                    <div className="p-3 rounded-[24px] border-2 shadow-sm bg-orange-50 border-orange-200 text-left">
-                                        <div className="flex justify-between items-center mb-1.5 px-1">
-                                            <h3 className="text-[13px] font-black text-orange-800 truncate flex-1 leading-tight">{post.content.split('\n')[0]}</h3>
-                                            <button type="button" onClick={() => setExpandedThreads(p => { const n = new Set(p); n.has(post.id) ? n.delete(post.id) : n.add(post.id); return n; })} className="px-3 py-1 bg-orange-600 text-white rounded-full text-[9px] font-black ml-2">DETAILS</button>
-                                        </div>
-                                    </div>
-                                </div>
+
                             ) : (
                                 /* --- 通常チャット --- */
                                 <div className="flex flex-col mb-3">
