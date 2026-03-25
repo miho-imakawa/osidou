@@ -51,7 +51,7 @@ def build_hierarchy():
             # 千川エリア（豊島区）の個別ロジックを維持
             if "豊島区" in city:
                 city_item["children"].append({
-                    "name": "千川エリア (Senkawa Area)", 
+                    "name": "千川 (Senkawa)", 
                     "prefix": "R", 
                     "alias": "千川"
                 })
