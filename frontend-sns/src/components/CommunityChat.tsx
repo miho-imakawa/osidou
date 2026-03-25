@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import MeetupChatModal from './MeetupChatModal';
 import AdPostModal from './AdPostModal';
-
 interface CommunityChatProps {
     categoryId: string;
     masterId?: number | null;
@@ -14,9 +13,7 @@ interface CommunityChatProps {
     currentCategoryName?: string;
     isPublic?: boolean;
 }
-
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
 const CommunityChat: React.FC<CommunityChatProps> = ({
     categoryId: propCategoryId, masterId, currentUserId, currentCategoryName, isPublic }) => {
     const chatTargetId = masterId ? String(masterId) : propCategoryId;
@@ -73,25 +70,18 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
             alert(err.response?.data?.detail || "通報に失敗しました。");
         }
     };
-
     // 2. ローカル非表示 (とりあえず今の画面から消す)
     const handleLocalHide = (postId: number) => {
         if (!window.confirm("この投稿を非表示にしますか？\n(リロードするまで表示されなくなります)")) return;
         setPosts(prev => prev.filter(p => p.id !== postId));
     };
-
     const MEETUP_TEMPLATE = `📍 集合場所：
-
 📍 開催場所： 住所・ZOOM開催
-
 🗺️ 開催場所 MapURL 又はURL：
-
 💰【支払い方法】： 当日現金 / アプリ（Stripe）決済 / お茶代のみ各自
 ※カフェ開催のためお茶代が必要です。
-
 ❌【キャンセルポリシー】： アプリ（Stripe）決済の場合
     当日0時以降のキャンセル50%、NoShow100%`;
-
     const toggleAdCollapse = (postId: number) => {
         setClosedAds(prev => {
             const newSet = new Set(prev);
@@ -101,7 +91,6 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
             return newSet;
         });
     };
-
     const fetchPosts = useCallback(async () => {
         if (!chatTargetId) return;
         try {
@@ -113,12 +102,10 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
             setLoading(false);
         }
     }, [chatTargetId]);
-
     useEffect(() => {
         fetchPosts();
         let interval = setInterval(fetchPosts, 5000);
         let idleTimer: ReturnType<typeof setTimeout>;
-
         const resetIdleTimer = () => {
             clearTimeout(idleTimer);
             clearInterval(interval);
@@ -127,11 +114,9 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
                 clearInterval(interval);
             }, 10 * 60 * 1000);
         };
-
         const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
         events.forEach(e => document.addEventListener(e, resetIdleTimer));
         resetIdleTimer();
-
         const handleVisibilityChange = () => {
             if (document.hidden) {
                 clearInterval(interval);
@@ -141,7 +126,6 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
-
         return () => {
             clearInterval(interval);
             clearTimeout(idleTimer);
@@ -149,7 +133,6 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [fetchPosts]);
-
     useEffect(() => {
         const loadInteractions = async () => {
             try {
@@ -179,14 +162,12 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
         setPinnedAds(pinned);
     }
 }, [posts, adInteractions]);
-
 useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const meetupSessionId = params.get('meetup_session_id');
     const meetupCancelled = params.get('meetup_cancelled');
     const adSessionId = params.get('ad_session_id');
     const adCancelled = params.get('ad_cancelled');
-
     if (meetupSessionId) {
         fetch(`${BACKEND_URL}/api/stripe/meetup-activate`, {
             method: 'POST',
@@ -201,12 +182,10 @@ useEffect(() => {
         })
         .catch(() => alert('アクティベートに失敗しました'));
     }
-
     if (meetupCancelled) {
         alert('決済がキャンセルされました。投稿は保存されていません。');
         window.history.replaceState({}, '', window.location.pathname);
     }
-
     const meetupJoinDone = params.get('meetup_join_done');
     const joinPostId = params.get('post_id');
     const setupSessionId = params.get('setup_session_id');
@@ -233,7 +212,6 @@ useEffect(() => {
         })
         .catch(() => alert('参加登録に失敗しました。'));
     }
-
     const meetupWaitlistDone = params.get('meetup_waitlist_done');
     const waitlistPostId = params.get('post_id');
     const waitlistSessionId = params.get('setup_session_id');
@@ -255,7 +233,6 @@ useEffect(() => {
         });
     }
 
-
     if (adSessionId) {
         fetch(`${BACKEND_URL}/api/stripe/ad-activate`, {
             method: 'POST',
@@ -270,20 +247,17 @@ useEffect(() => {
         })
         .catch(() => alert('ADのアクティベートに失敗しました'));
     }
-
     if (adCancelled) {
         alert('決済がキャンセルされました。');
         window.history.replaceState({}, '', window.location.pathname);
     }
 }, []);
-
     const handleAdAction = async (postId: number, action: 'like' | 'pin' | 'close') => {
         try {
             const result = await adInteraction(postId, action);
             
             // 1. まず全体のインタラクション状態を更新（ボタンの色が変わる）
             setAdInteractions(prev => ({ ...prev, [postId]: result }));
-
             // 2. PINアクションの場合、ヘッダーに表示するリスト(pinnedAds)を更新
             if (action === 'pin') {
                 if (result.is_pinned) {
@@ -305,7 +279,6 @@ useEffect(() => {
             console.error('Action Error:', err);
         }
     };
-
     const switchPostType = (type: 'normal' | 'meetup') => {
         setPostType(type);
         if (type === 'meetup') {
@@ -314,7 +287,6 @@ useEffect(() => {
             setNewPost('');
         }
     };
-
     const handleSubChatNameChange = async (val: string) => {
         setSubChatName(val);
         setSelectedMasterId(null);
@@ -330,13 +302,11 @@ useEffect(() => {
             setSearchResults([]);
         }
     };
-
     const handleSelectMaster = (id: number, name: string) => {
         setSelectedMasterId(id);
         setSelectedMasterName(name);
         setSearchResults([]);
     };
-
 const handleCreateSubChat = async () => {
     if (!subChatName.trim()) return;
     setIsCreating(true);
@@ -360,25 +330,20 @@ const handleCreateSubChat = async () => {
         setIsCreating(false);
     }
 };
-
 const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const isMeetup = postType === 'meetup';
     if (isMeetup ? !meetupDetails.title?.trim() : !newPost?.trim()) return;
     if (!chatTargetId) return;
-
     // ★ MEETUPの場合は確認画面を出す
     if (isMeetup) {
         setShowPaymentConfirm(true);
         return;
     }
-
     await submitPost();
 };
-
 const submitPost = async () => {
     const isMeetup = postType === 'meetup';
-
     if (isMeetup) {
         // MEETUPはStripe経由
         try {
@@ -405,7 +370,6 @@ const submitPost = async () => {
         }
         return;
     }
-
     // 通常投稿・AD投稿はそのまま
     try {
         await createPost({
@@ -425,7 +389,6 @@ const submitPost = async () => {
         alert("送信に失敗しました");
     }
 };
-
     if (loading) {
         return (
             <div className="h-[650px] bg-white rounded-3xl flex items-center justify-center">
@@ -433,19 +396,16 @@ const submitPost = async () => {
             </div>
         );
     }
-
     const allParentPosts = posts.filter(p => {
         if (p.parent_id) return false;
         if (p.is_meetup && p.meetup_date && new Date(new Date(p.meetup_date).getTime() + 4 * 60 * 60 * 1000) < new Date()) return false;
         return true;
     });
-
     // 2. その中で「システム投稿(ガイド)」と「通常の投稿」に分けて並び替える
     const parentPosts = [
         ...allParentPosts.filter(p => p.is_system), // 💡 ガイドを一番上へ
         ...allParentPosts.filter(p => !p.is_system) // 💡 通常の投稿をその下へ
     ];
-
     return (
         <div className="flex flex-col h-[650px] bg-white border rounded-3xl shadow-xl overflow-hidden text-left font-sans relative">
             {/* 1. Header */}
@@ -461,7 +421,6 @@ const submitPost = async () => {
                     <span>＋</span> Sub Chat
                 </button>
             </div>
-
         {/* 📌 新設：PIN済み広告 ＆ 参加予定ミートアップのお知らせバー */}
         {(pinnedAds.length > 0 || posts.some(p => p.is_meetup && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended))) && (
             <div className="bg-rose-50/50 border-b border-rose-100 px-4 py-2 flex flex-col gap-2 shrink-0">
@@ -481,7 +440,6 @@ const submitPost = async () => {
                         </button>
                     ))}
                 </div>
-
                 {/* 既存のPIN済み広告エリア */}
                 {pinnedAds.length > 0 && (
                     <div className="flex flex-wrap gap-2 border-t border-amber-100 pt-1">
@@ -499,7 +457,6 @@ const submitPost = async () => {
                 )}
             </div>
         )}
-
         {/* 2. Chat Timeline */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
                 {parentPosts.map((post) => {
@@ -522,13 +479,12 @@ const submitPost = async () => {
                     const allParticipants = [organizer, ...dbParticipants];
                     const isExpanded = expandedThreads.has(post.id);
                     const isOwner = currentUserId === post.user_id;
+                    const isJoined = allParticipants.some(p => p.user_id === currentUserId);
                     const interaction = adInteractions[post.id];
                     const isClosed = closedAds.has(post.id);
-
                     const adBg = post.ad_color === 'red' ? 'bg-red-50' : post.ad_color === 'blue' ? 'bg-blue-50' : post.ad_color === 'purple' ? 'bg-purple-50' : post.ad_color === 'white' ? 'bg-slate-50' : 'bg-green-50';
                     const adBorder = post.ad_color === 'red' ? 'border-red-200 text-red-900' : post.ad_color === 'blue' ? 'border-blue-200 text-blue-900' : post.ad_color === 'purple' ? 'border-purple-200 text-purple-900' : post.ad_color === 'white' ? 'border-slate-200 text-slate-900' : 'border-green-200 text-green-900';
                     const adBorderL = post.ad_color === 'red' ? 'border-red-400' : post.ad_color === 'blue' ? 'border-blue-400' : post.ad_color === 'purple' ? 'border-purple-400' : post.ad_color === 'white' ? 'border-slate-300' : 'border-green-400';
-
                     return (
                         <div key={post.id} id={`post-${post.id}`} className="animate-in fade-in slide-in-from-bottom-2">
                             {post.is_ad ? (
@@ -559,7 +515,327 @@ const submitPost = async () => {
                                         </div>
                                     )}
                                 </div>
-
+                            ) : post.is_meetup ? (
+                                /* 🎪 MEETUP カード（完全復元版） */
+                                <div className="space-y-2 mb-4">
+                                    <div className={`p-3 rounded-[24px] border-2 shadow-sm bg-orange-50 border-orange-200 text-left`}>
+                                        {/* 💡 1行目：開催名 & 日時 */}
+                                        <div className="flex justify-between items-center mb-1.5 px-1">
+                                            <h3 className="text-[13px] font-black text-orange-800 truncate flex-1 leading-tight">
+                                                {post.content.split('\n')[0]}
+                                            </h3>
+                                            <div className="flex items-center gap-1 text-orange-700 font-black text-[11px] shrink-0 leading-none">
+                                                <Clock size={12} className="text-orange-500" />
+                                                <span>
+                                                    {post.meetup_date 
+                                                        ? `${post.meetup_date.slice(5, 10).replace('-', '/')} ${post.meetup_date.slice(11, 16)}` 
+                                                        : '日時未定'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {/* 💡 2行目：場所 & 人数 & 費用 & ボタン */}
+                                        <div className="flex items-center justify-between px-1">
+                                            <div className="flex flex-col gap-1">
+                                                {/* 場所 */}
+                                                <div className="flex items-center gap-1 text-[10px] text-gray-600 font-bold">
+                                                    <MapPin size={11} className="text-orange-500" />
+                                                    <span className="truncate max-w-[180px]">{post.meetup_location || '場所未定'}</span>
+                                                </div>
+                                                {/* 人数 & 費用 */}
+                                                <div className="flex items-center gap-2 text-[10px] text-gray-600 font-bold">
+                                                    <Users size={11} className="text-orange-400" />
+                                                    <span>{dbParticipants.length}/{post.meetup_capacity}人</span>
+                                                    <Coins size={11} className="text-orange-400" />
+                                                    <span className="text-orange-600 font-black text-[10px]">
+                                                        {post.meetup_fee_info && !isNaN(Number(post.meetup_fee_info)) && Number(post.meetup_fee_info) > 0 
+                                                            ? `¥${post.meetup_fee_info}` 
+                                                            : (post.meetup_fee_info || 'お茶代')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {/* ボタン群 */}
+                                            <div className="flex flex-col gap-1 items-end">
+                                                {(isJoined || isOwner) && (
+                                                    <button 
+                                                        onClick={() => setActiveChat({ id: post.id, title: post.content.split('\n')[0] })}
+                                                        className="px-3 py-1 bg-blue-600 text-white rounded-full text-[9px] font-black shadow-sm flex items-center gap-1 hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        <MessageSquare size={10} /> CHAT
+                                                    </button>
+                                                )}
+                                                <button 
+                                                    onClick={() => setExpandedThreads(p => { const n = new Set(p); n.has(post.id) ? n.delete(post.id) : n.add(post.id); return n; })} 
+                                                    className="px-3 py-1 bg-orange-600 text-white rounded-full text-[9px] font-black shadow-sm hover:bg-orange-700 transition-colors"
+                                                >
+                                                    {isExpanded ? "CLOSE" : "DETAILS"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* 詳細展開エリア（参加ボタン・参加者リストを含む） */}
+                                    {isExpanded && (
+                                        <div className="p-4 bg-white rounded-3xl border border-orange-100 shadow-inner animate-in fade-in slide-in-from-top-1 text-left">
+                                            <p className="text-[12px] text-gray-700 whitespace-pre-wrap mb-4 leading-relaxed">
+                                                {post.content}
+                                            </p>
+                                            {/* 主催者のみ：文章追記 */}
+                                            {isOwner && (
+                                                <div className="mb-3 pb-3 border-b border-dashed border-orange-200">
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            const addText = window.prompt("追記する内容を入力してください：");
+                                                            if (addText && addText.trim()) {
+                                                                try {
+                                                                    const updatedContent = `${post.content}\n\n📌 追記：${addText.trim()}`;
+                                                                    await authApi.patch(`/posts/${post.id}`, { content: updatedContent });
+                                                                    fetchPosts();
+                                                                } catch {
+                                                                    alert("追記に失敗しました。");
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="text-[8px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                                    >
+                                                        <CheckSquare size={14} /> 文章を追記する
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <div className="border-t border-orange-50 pt-3">
+                                                {/* 参加者 */}
+                                                <p className="text-[9px] font-black text-orange-400 mb-2 uppercase tracking-widest">Participants</p>
+                                                <div className="flex flex-wrap gap-2 mb-3">
+                                                    {allParticipants.filter(p => p.id === -1 || p.content !== 'Waitlist').map(p => (
+                                                        <div key={p.id} className="flex items-center gap-1.5 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
+                                                            {isOwner && p.id !== -1 && (
+                                                                <button onClick={() => toggleAttendance(p.id).then(fetchPosts)} className="text-orange-500 hover:scale-110 transition-transform">
+                                                                    {p.is_attended ? <CheckSquare size={14} /> : <Square size={14} />}
+                                                                </button>
+                                                            )}
+                                                            <span className={`text-[11px] font-bold ${p.is_attended ? 'text-gray-400 line-through' : 'text-orange-900'}`}>
+                                                                {p.author_nickname}
+                                                                {p.id === -1 && <span className="ml-1 text-[8px] bg-orange-200 px-1 rounded text-orange-700">HOST</span>}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {/* Waitlistセクション */}
+                                                {dbParticipants.filter(p => p.content === 'Waitlist').length > 0 && (
+                                                    <div className="mb-3">
+                                                        <p className="text-[9px] font-black text-gray-400 mb-2 uppercase tracking-widest">Waitlist</p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {dbParticipants.filter(p => p.content === 'Waitlist').map(p => (
+                                                                <div key={p.id} className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
+                                                                    <span className="text-[11px] font-bold text-gray-500">
+                                                                        {p.author_nickname}
+                                                                    </span>
+                                                                    {/* 自分がWaitlistの場合：参加ボタン（50%オフ） */}
+                                                                    {p.user_id === currentUserId && (
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                if (!window.confirm('50%オフで参加しますか？\n参加費がある場合は決済が発生します。')) return;
+                                                                                try {
+                                                                                    const fee = Number(post.meetup_fee_info);
+                                                                                    if (fee > 0) {
+                                                                                        const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-waitlist-join`, {
+                                                                                            method: 'POST',
+                                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                                            body: JSON.stringify({
+                                                                                                userId: currentUserId,
+                                                                                                postId: post.id,
+                                                                                                categoryId: chatTargetId,
+                                                                                            }),
+                                                                                        });
+                                                                                        const result = await res.json();
+                                                                                        if (result.checkout_url) {
+                                                                                            window.location.href = result.checkout_url;
+                                                                                        } else if (result.status === 'joined') {
+                                                                                            alert('✅ 参加が確定しました！');
+                                                                                            fetchPosts();
+                                                                                        }
+                                                                                    } else {
+                                                                                        // 参加費なし → 直接参加
+                                                                                        await fetch(`${BACKEND_URL}/api/stripe/meetup-waitlist-join`, {
+                                                                                            method: 'POST',
+                                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                                            body: JSON.stringify({
+                                                                                                userId: currentUserId,
+                                                                                                postId: post.id,
+                                                                                                categoryId: chatTargetId,
+                                                                                            }),
+                                                                                        });
+                                                                                        alert('✅ 参加が確定しました！');
+                                                                                        fetchPosts();
+                                                                                    }
+                                                                                } catch {
+                                                                                    alert('エラーが発生しました。');
+                                                                                }
+                                                                            }}
+                                                                            className="text-[9px] font-black bg-orange-500 text-white px-2 py-0.5 rounded-full hover:bg-orange-600"
+                                                                        >
+                                                                            参加する
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {/* 参加・キャンセル待ちボタン */}
+                                                {!isJoined && !isOwner && (
+                                                    dbParticipants.length < (post.meetup_capacity || 0) ? (
+                                                        <button
+                                                            onClick={async () => {
+                                                                const fee = Number(post.meetup_fee_info);
+                                                                if (post.meetup_fee_info && !isNaN(fee) && fee > 0) {
+                                                                    // 参加費あり → 先にStripeへ（レコードはまだ作らない）
+                                                                    const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-join-setup`, {
+                                                                        method: 'POST',
+                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                        body: JSON.stringify({
+                                                                            userId: currentUserId,
+                                                                            postId: post.id,
+                                                                            categoryId: chatTargetId,
+                                                                        }),
+                                                                    });
+                                                                    const { checkout_url } = await res.json();
+                                                                    window.location.href = checkout_url;
+                                                                } else {
+                                                                    // 参加費なし → 参加レコード作成
+                                                                    await authApi.post(`/posts/${post.id}/responses`, {
+                                                                        content: "Join!", is_participation: true
+                                                                    });
+                                                                    fetchPosts();
+                                                                }
+                                                            }}
+                                                            className="w-full py-2.5 bg-orange-600 text-white rounded-xl text-[11px] font-black hover:bg-orange-700 shadow-md"
+                                                        >
+                                                            JOIN THIS MEETUP / 参加を申請する
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={async () => {
+                                                                const fee = Number(post.meetup_fee_info);
+                                                                if (post.meetup_fee_info && !isNaN(fee) && fee > 0) {
+                                                                    // 参加費あり → カード登録してからWaitlist登録
+                                                                    const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-join-setup`, {
+                                                                        method: 'POST',
+                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                        body: JSON.stringify({
+                                                                            userId: currentUserId,
+                                                                            postId: post.id,
+                                                                            categoryId: chatTargetId,
+                                                                            isWaitlist: true,
+                                                                        }),
+                                                                    });
+                                                                    const { checkout_url } = await res.json();
+                                                                    window.location.href = checkout_url;
+                                                                } else {
+                                                                    // 参加費なし → 直接Waitlist登録
+                                                                    await authApi.post(`/posts/${post.id}/responses`, {
+                                                                        content: "Waitlist", is_participation: true
+                                                                    });
+                                                                    fetchPosts();
+                                                                }
+                                                            }}
+                                                            className="w-full py-2.5 bg-gray-800 text-white rounded-xl text-[11px] font-black hover:bg-gray-900 shadow-md"
+                                                        >
+                                                            JOIN WAITLIST / キャンセル待ち
+                                                        </button>
+                                                    )
+                                                )}
+                                                {(isJoined || isOwner) && (
+                                                    <div className="space-y-2">
+                                                        {/* 参加者向け：キャンセルボタン */}
+                                                        {isJoined && !isOwner && (
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (!window.confirm("キャンセルしますか？\n当日0時以降は参加費の50%が発生します。")) return;
+                                                                    try {
+                                                                        const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-cancel`, {
+                                                                            method: 'POST',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({
+                                                                                userId: currentUserId,
+                                                                                postId: post.id,
+                                                                            }),
+                                                                        });
+                                                                        const result = await res.json();
+                                                                        if (result.cancel_fee > 0) {
+                                                                            alert(`キャンセル料 ¥${result.cancel_fee} が発生しました。`);
+                                                                        } else {
+                                                                            alert("キャンセルしました。");
+                                                                        }
+                                                                        if (result.waitlist_notified > 0) {
+                                                                            alert(`キャンセル待ち${result.waitlist_notified}名に連絡しました。`);
+                                                                        }
+                                                                        fetchPosts();
+                                                                    } catch {
+                                                                        alert("キャンセルに失敗しました。");
+                                                                    }
+                                                                }}
+                                                                className="w-full py-2 bg-gray-100 text-gray-500 rounded-xl text-[11px] font-black hover:bg-red-50 hover:text-red-400 transition-colors"
+                                                            >
+                                                                キャンセルする
+                                                            </button>
+                                                        )}
+                                                        {/* ステータス表示 */}
+                                                        <div className={`w-full py-2 rounded-xl text-[11px] font-black text-center ${
+                                                            isOwner ? 'bg-orange-100 text-orange-600' : 'bg-green-50 text-green-600'
+                                                        }`}>
+                                                            {isOwner ? "YOU ARE HOSTING THIS EVENT" :
+                                                            allParticipants.find(p => p.user_id === currentUserId)?.content === "Waitlist"
+                                                                ? "ON WAITLIST (キャンセル待ち中)" : "YOU ARE JOINED! ✅"}
+                                                        </div>
+                                                        {/* 主催者だけのタン群 */}
+                                                        {isOwner && (
+                                                            <div className="space-y-2 pt-2 border-t border-orange-100">
+                                                                {/* 開催確定 */}
+                                                                {!post.meetup_confirmed_at && (
+                                                                    post.meetup_organizer_showed === false ? (
+                                                                        <div className="w-full py-2 bg-red-50 text-red-400 rounded-xl text-[11px] font-black text-center">
+                                                                            ⚠️ No Show報告済み・開催不可
+                                                                        </div>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                if (!window.confirm("開催を確定しますか？\n参加費ありの参加者に課金が発生します。")) return;
+                                                                                try {
+                                                                                    const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-confirm`, {
+                                                                                        method: 'POST',
+                                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                                        body: JSON.stringify({
+                                                                                            postId: post.id,
+                                                                                            organizerId: currentUserId,
+                                                                                        }),
+                                                                                    });
+                                                                                    const result = await res.json();
+                                                                                    alert(`✅ 開催確定！${result.charged > 0 ? ` ${result.charged}名に課金しました。` : ' 参加費なし。'}`);
+                                                                                    fetchPosts();
+                                                                                } catch {
+                                                                                    alert("開催確定に失敗しました。");
+                                                                                }
+                                                                            }}
+                                                                            className="w-full py-2 bg-orange-500 text-white rounded-xl text-[11px] font-black hover:bg-orange-600 transition-colors"
+                                                                        >
+                                                                            🎉 開催確定する
+                                                                        </button>
+                                                                    )
+                                                                )}
+                                                                {/* 開催済み表示 */}
+                                                                {post.meetup_confirmed_at && (
+                                                                    <div className="w-full py-2 bg-green-500 text-white rounded-xl text-[11px] font-black text-center">
+                                                                        ✅ 開催確定済み
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
                                 /* --- 通常チャット --- */
                                 <div className="flex flex-col mb-3">
@@ -593,7 +869,6 @@ const submitPost = async () => {
                                             </button>
                                         </div>
                                     </div>
-
                                     {/* 返信一覧（YouTube風に格納） */}
                                     {posts.filter(r => r.parent_id === post.id).length > 0 && (
                                         <div className="ml-4 mt-1">
@@ -611,7 +886,6 @@ const submitPost = async () => {
                                                 <span>{posts.filter(r => r.parent_id === post.id).length} 件の返信</span>
                                                 {expandedThreads.has(post.id) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                                             </button>
-
                                             {expandedThreads.has(post.id) && (
                                                 <div className="mt-1 border-l border-pink-100 pl-3 space-y-1">
                                                     {posts.filter(r => r.parent_id === post.id).map(reply => (
@@ -641,11 +915,9 @@ const submitPost = async () => {
                     );
                 })}
             </div>
-
             {/* 3. Footer */}
             <div className="flex-shrink-0 max-h-[55%] overflow-y-auto bg-white border-t border-gray-100 z-20 shadow-2xl p-3">
                 <form onSubmit={handleSend}>
-                    {/* ↓ ここを追加 */}
                     {replyTo && (
                         <div className="flex items-center justify-between bg-pink-50 rounded-xl px-3 py-1.5 mb-2">
                             <span className="text-[10px] text-pink-500 font-bold">
@@ -673,16 +945,16 @@ const submitPost = async () => {
                             <div className="grid grid-cols-2 gap-2 pb-2 border-b border-orange-200/30">
                                 <div className="flex flex-col"><label className="text-[9px] font-bold text-orange-800">MAX定員</label><input type="number" value={meetupDetails.capacity} onChange={e => setMeetupDetails({...meetupDetails, capacity: parseInt(e.target.value) || 0})} className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" /></div>
                                 <div className="flex flex-col">
-        <label className="text-[9px] font-bold text-orange-800 flex items-center gap-1">
-            参加費用（アプリ決済）{meetupDetails.fee && <span className="bg-blue-500 text-white px-1 rounded-[4px] text-[7px] italic font-black">STRIPE</span>}
-        </label>
-        <input 
-            value={meetupDetails.fee} 
-            onChange={e => setMeetupDetails({...meetupDetails, fee: e.target.value})} 
-            placeholder="金額入力でアプリ決済 / 空欄で詳細に記載"
-            className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" 
-        />
-    </div>
+                                    <label className="text-[9px] font-bold text-orange-800 flex items-center gap-1">
+                                        参加費用（アプリ決済）{meetupDetails.fee && <span className="bg-blue-500 text-white px-1 rounded-[4px] text-[7px] italic font-black">STRIPE</span>}
+                                    </label>
+                                    <input 
+                                        value={meetupDetails.fee} 
+                                        onChange={e => setMeetupDetails({...meetupDetails, fee: e.target.value})} 
+                                        placeholder="金額入力でアプリ決済 / 空欄で詳細に記載"
+                                        className="px-2 py-1.5 rounded-xl border-2 border-orange-200 bg-white text-[13px] outline-none" 
+                                    />
+                                </div>
                             </div>
                             <div className="flex flex-col gap-1">
                                 <label className="text-[9px] font-bold text-orange-800">詳細</label>
@@ -712,7 +984,6 @@ const submitPost = async () => {
                     </div>
                 </form>
             </div>
-
             {activeChat && (
                 <MeetupChatModal
                     postId={activeChat.id}
@@ -724,7 +995,7 @@ const submitPost = async () => {
             )}
             {showAdModal && (
             <AdPostModal
-                profile={{ id: currentUserId }}  // ← これを追加
+                profile={{ id: currentUserId }}
                 currentCategoryId={parseInt(chatTargetId)}
                 currentCategoryName={currentCategoryName || ''}
                 onClose={() => setShowAdModal(false)}
@@ -738,14 +1009,12 @@ const submitPost = async () => {
                 <MessageSquare size={16} className="text-pink-500" />
                 Sub Chat を作成
             </h3>
-
             {/* GUIDEへの案内 */}
             <p className="text-[11px] text-gray-400 leading-relaxed">
                 新しいカテゴリーの追加をご希望の場合は、
                 <Link to="/community/6" className="text-pink-500 font-bold underline">GUIDE</Link>
                 のお問い合わせからご申請ください。
             </p>
-
             {/* 名前入力 */}
             <div className="space-y-1">
                 <p className="text-[10px] font-black text-gray-400 uppercase">推しの正式名で入力ください</p>
@@ -758,7 +1027,6 @@ const submitPost = async () => {
                     autoFocus
                 />
             </div>
-
             {/* 本尊の候補リスト */}
             {searchResults.length > 0 && (
                 <div className="space-y-2">
@@ -779,7 +1047,6 @@ const submitPost = async () => {
                     </p>
                 </div>
             )}
-
             {/* 本尊が選択された場合 */}
             {selectedMasterId && (
                 <div className="flex items-center gap-2 p-3 bg-green-50 rounded-2xl border border-green-200">
@@ -793,7 +1060,6 @@ const submitPost = async () => {
                     </button>
                 </div>
             )}
-
             {/* タイプ選択 */}
             <div className="space-y-2">
                 <p className="text-[10px] font-black text-gray-400 uppercase">タイプ（任意）</p>
@@ -818,11 +1084,9 @@ const submitPost = async () => {
                     ))}
                 </div>
             </div>
-
             {/* 質問フォーム */}
             <div className="bg-pink-50 rounded-2xl p-4 space-y-3 border border-pink-100">
                 <p className="text-[10px] font-black text-pink-600 uppercase tracking-widest">作成前の確認</p>
-                
                 <div className="space-y-1">
                     <label className="text-[11px] font-bold text-gray-700">ファン歴 / Fan Period</label>
                     <select
@@ -837,7 +1101,6 @@ const submitPost = async () => {
                         <option value="5年以上"> More than 5yrs</option>
                     </select>
                 </div>
-
                 <div className="space-y-1">
                     <label className="text-[11px] font-bold text-gray-700">活動拠点 / Base Country</label>
                     <input
@@ -848,7 +1111,6 @@ const submitPost = async () => {
                         className="w-full p-2 rounded-xl border border-pink-200 bg-white text-[12px] outline-none"
                     />
                 </div>
-
                 <div className="space-y-2 pt-1">
                     {[
                         { key: 'noHarm', label: '誰も傷つけない / No one will be hurt' },
@@ -867,7 +1129,6 @@ const submitPost = async () => {
                     ))}
                 </div>
             </div>
-
             {/* ボタン */}
             <div className="flex gap-2">
                 <button
@@ -884,6 +1145,8 @@ const submitPost = async () => {
                     キャンセル
                 </button>
                 <button
+                    onClick={handleCreateSubChat}
+                    disabled={isCreating}
                     className="flex-1 py-3 bg-pink-600 text-white rounded-2xl text-[12px] font-black disabled:opacity-40 hover:bg-pink-700 transition-colors"
                 >
                     {isCreating ? '作成中...' : '作成する'}
@@ -896,13 +1159,11 @@ const submitPost = async () => {
         {showPaymentConfirm && (
             <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
                 <div className="bg-white rounded-[32px] shadow-2xl p-6 w-full max-w-sm space-y-4">
-                    
                     {/* タイトル */}
                     <h3 className="text-sm font-black text-gray-800 flex items-center gap-2">
                         <Coins size={16} className="text-orange-500" />
                         MEETUP投稿の確認
                     </h3>
-
                     {/* 投稿内容サマリー */}
                     <div className="bg-orange-50 rounded-2xl p-4 space-y-1">
                         <p className="text-[11px] font-black text-orange-800">{meetupDetails.title}</p>
@@ -917,7 +1178,6 @@ const submitPost = async () => {
                             </p>
                         )}
                     </div>
-
                     {/* 料金説明 */}
                     <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
                         <div className="flex justify-between items-center">
@@ -929,12 +1189,10 @@ const submitPost = async () => {
                             <span className="text-base font-black text-orange-600">¥500</span>
                         </div>
                     </div>
-
                     {/* Stripe説明 */}
                     <p className="text-[10px] text-gray-400 text-center">
                         Stripeの安全な決済画面に移動します。
                     </p>
-
                     {/* ボタン */}
                     <div className="flex gap-2">
                         <button
@@ -956,5 +1214,4 @@ const submitPost = async () => {
         </div>
     ); 
 };
-
 export default CommunityChat;
