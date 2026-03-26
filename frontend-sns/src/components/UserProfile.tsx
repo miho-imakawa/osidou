@@ -156,17 +156,21 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
           authApi.get('/posts/my-hosted-meetups')
         ]);
 
-        if (isMe) {
-          const adsRes = await authApi.get('/posts/my-ads-stats'); 
-          setMyAdsStats(adsRes.data || []);
+      if (isMe) {
+        const adsRes = await authApi.get('/posts/my-ads-stats'); 
+        setMyAdsStats(adsRes.data || []);
 
-          const pendingRes = await authApi.get('/friends/pending/count');
-          setPendingCount(pendingRes.data.pending_count || 0);
+        const pendingRes = await authApi.get('/friends/pending/count');
+        setPendingCount(pendingRes.data.pending_count || 0);
+
+        try {
           const unconfirmedRes = await authApi.get('/hobby-categories/my-unconfirmed-meetups');
           setUnconfirmedMeetups(unconfirmedRes.data || []);
-        }
+        } catch {}
+      }
 
         const joined = joinedRes.data || [];
+
         const hosted = hostedRes.data || [];
 
         const allMeetups = [...hosted];
