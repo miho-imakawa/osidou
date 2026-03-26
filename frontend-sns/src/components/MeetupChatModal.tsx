@@ -44,32 +44,42 @@ interface MeetupChatModalProps {
 }
 
 // ==========================================
-// 💡 スタンプピッカーコンポーネント
+// 💡 スタンプピッカー（モーダル中央固定）
 // ==========================================
 const StampPicker: React.FC<{
   onSelect: (stamp: string) => void;
   onClose: () => void;
 }> = ({ onSelect, onClose }) => {
   return (
-    <div className="absolute bottom-full mb-2 right-0 z-10 bg-white rounded-2xl shadow-xl border border-orange-100 p-3 w-[220px]">
-      {STAMP_CATEGORIES.map((cat) => (
-        <div key={cat.label} className="mb-2 last:mb-0">
-          <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1">
-            {cat.label}
-          </p>
-          <div className="flex gap-1">
-            {cat.stamps.map((s) => (
-              <button
-                key={s}
-                onClick={() => { onSelect(s); onClose(); }}
-                className="text-xl hover:scale-125 transition-transform active:scale-95"
-              >
-                {s}
-              </button>
-            ))}
+    // モーダル内オーバーレイ（z-20 でメッセージ一覧の上に重ねる）
+    <div
+      className="absolute inset-0 z-20 flex items-end justify-center pb-20"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl border border-orange-100 p-4 w-[90%] max-w-sm"
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-3 text-center">
+          スタンプを選ぶ
+        </p>
+        {STAMP_CATEGORIES.map((cat) => (
+          <div key={cat.label} className="mb-3 last:mb-0">
+            <p className="text-[9px] font-bold text-gray-400 mb-1.5">{cat.label}</p>
+            <div className="flex gap-2">
+              {cat.stamps.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => { onSelect(s); onClose(); }}
+                  className="text-2xl hover:scale-125 active:scale-95 transition-transform"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 };
@@ -228,7 +238,7 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
       onClick={() => setStampPickerFor(null)} // ピッカー外クリックで閉じる
     >
       <div
-        className="bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl flex flex-col h-[80vh]"
+        className="relative bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl flex flex-col h-[80vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -302,24 +312,16 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
                   <p className="text-sm text-gray-700">{m.content}</p>
                 </div>
 
-                {/* スタンプボタン（ホバーで表示） */}
-                <div className="relative opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() =>
-                      setStampPickerFor(stampPickerFor === m.id ? null : m.id)
-                    }
-                    className="text-base hover:scale-110 transition-transform leading-none"
-                    title="スタンプ"
-                  >
-                    😊
-                  </button>
-                  {stampPickerFor === m.id && (
-                    <StampPicker
-                      onSelect={(stamp) => handleReaction(m.id, stamp)}
-                      onClose={() => setStampPickerFor(null)}
-                    />
-                  )}
-                </div>
+                {/* スタンプボタン（常時表示・PC/モバイル共通） */}
+                <button
+                  onClick={() =>
+                    setStampPickerFor(stampPickerFor === m.id ? null : m.id)
+                  }
+                  className="text-base opacity-40 hover:opacity-100 active:scale-95 transition-all leading-none shrink-0"
+                  title="スタンプ"
+                >
+                  😊
+                </button>
               </div>
 
               {/* リアクション表示 */}
@@ -346,6 +348,14 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
             </div>
           ))}
         </div>
+
+        {/* スタンプピッカー（モーダル中央固定・PC/モバイル共通） */}
+        {stampPickerFor !== null && (
+          <StampPicker
+            onSelect={(stamp) => handleReaction(stampPickerFor, stamp)}
+            onClose={() => setStampPickerFor(null)}
+          />
+        )}
 
         {/* Input */}
         <form onSubmit={handleSend} className="p-4 border-t flex gap-2 shrink-0">
