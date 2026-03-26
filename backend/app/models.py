@@ -43,8 +43,6 @@ class FriendRequestStatus(str, enum.Enum):
 # 💡 2. SNS・コミュニティ機能モデル
 # ==========================================
 
-# backend/app/models.py
-
 class Community(Base):
     __tablename__ = "communities"
 
@@ -55,17 +53,16 @@ class Community(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
 
-    # リレーションシップ（必要であれば）
     owner = relationship("User", back_populates="communities")
 
 class HobbyCategory(Base):
     __tablename__ = "hobby_categories"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(200), index=True, nullable=False)  # 💡 nullable=False追加
+    name = Column(String(200), index=True, nullable=False)
     alias_name = Column(String, nullable=True)
     parent_id = Column(Integer, ForeignKey('hobby_categories.id'), nullable=True)
-    depth = Column(Integer, nullable=False, default=0)  # 💡 default追加
+    depth = Column(Integer, nullable=False, default=0)
     master_id = Column(Integer, ForeignKey('hobby_categories.id'), nullable=True)
     unique_code = Column(String(7), unique=True, index=True, nullable=False) 
     role_type = Column(SQLEnum(HobbyRoleType), nullable=True)
@@ -92,40 +89,27 @@ class HobbyCategory(Base):
         "UserHobbyLink", 
         back_populates="hobby_category", 
         cascade="all, delete-orphan",
-        foreign_keys="[UserHobbyLink.hobby_category_id]" # ⬅️ これを追加！
+        foreign_keys="[UserHobbyLink.hobby_category_id]"
     )
     posts = relationship("HobbyPost", back_populates="hobby_category")
-
-# app/models.py 最終版（今夜の作業用）
 
 class UserHobbyLink(Base):
     __tablename__ = "user_hobby_links"
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    
-    # 💡 1. ここがカラムの定義です。名前が hobby_category_id であることを確認してください。
     hobby_category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"), nullable=False)
-    
-    # 💡 2. 本尊（マスター）IDのカラム定義です。
-    master_id = Column(Integer, ForeignKey("hobby_categories.id"), nullable=False, index=True) # 💡 nullable=Falseに強制
-    
+    master_id = Column(Integer, ForeignKey("hobby_categories.id"), nullable=False, index=True)
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="hobby_categories")
-
-    # 💡 3. リレーションシップの定義。
-    # さっきの「ナミナミ」対策として、クラス名.カラム名 で指定します。
     hobby_category = relationship(
         "HobbyCategory", 
         back_populates="members",
         foreign_keys=[hobby_category_id]
     )
     
-    # 💡 4. ユニーク制約。
-    # 1.で定義したカラム名と完全に一致させる必要があります。
     __table_args__ = (
-        # 💡 ここを master_id に変更！
         UniqueConstraint('user_id', 'master_id', name='unique_user_master_entry'),
     )
 
@@ -135,8 +119,8 @@ class CategoryDetail(Base):
     id = Column(Integer, primary_key=True, index=True)
     category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"), unique=True)
     description = Column(Text, nullable=True)
-    cast_json = Column(Text, nullable=True)      # JSON文字列で保存
-    sections_json = Column(Text, nullable=True)  # JSON文字列で保存
+    cast_json = Column(Text, nullable=True)
+    sections_json = Column(Text, nullable=True)
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
@@ -146,24 +130,23 @@ class CategoryDetail(Base):
 class Follow(Base):
     __tablename__ = "follows"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 ondelete追加
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     target_id = Column(Integer, nullable=False)
-    target_type = Column(String(50), nullable=False)  # 💡 長さ指定追加
+    target_type = Column(String(50), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     user = relationship("User")
     
-    # 💡 同じユーザーが同じ対象を重複フォローしないように
     __table_args__ = (UniqueConstraint('user_id', 'target_id', 'target_type', name='unique_follow'),)
 
 class Friendship(Base):
     __tablename__ = "friendships"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 ondelete追加
-    friend_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 ondelete追加
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    friend_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     friend_note = Column(String(100), nullable=True)
-    is_muted = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
-    is_hidden = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
-    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
+    is_muted = Column(Boolean, default=False, nullable=False)
+    is_hidden = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", foreign_keys=[user_id])
     friend = relationship("User", foreign_keys=[friend_id])
@@ -209,10 +192,10 @@ class HobbyPost(Base):
     meetup_fee_info = Column(Text, nullable=True)
     meetup_status = Column(String(20), default="open", nullable=False)
     
-    # --- 広告・リポスト関連 (ここをスッキリ整理しました) ---
+    # --- 広告・リポスト関連 ---
     is_ad = Column(Boolean, default=False, nullable=False)
     is_hidden = Column(Boolean, default=False, nullable=False)  
-    ad_color = Column(String(20), nullable=True, default="green")  # ★メンカラ用
+    ad_color = Column(String(20), nullable=True, default="green")
     ad_start_date = Column(DateTime, nullable=True)
     ad_end_date = Column(DateTime, nullable=True)
     original_post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="SET NULL"), nullable=True)
@@ -246,33 +229,68 @@ class PostResponse(Base):
     __tablename__ = "post_responses"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
-    post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=False)
     
     content = Column(Text, nullable=True)
-    is_participation = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
-    is_attended = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
+    is_participation = Column(Boolean, default=False, nullable=False)
+    is_attended = Column(Boolean, default=False, nullable=False)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="post_responses")
     post = relationship("HobbyPost", back_populates="responses")
     
-    # 💡 同じユーザーが同じ投稿に重複参加しないように
     __table_args__ = (UniqueConstraint('user_id', 'post_id', name='unique_user_post_response'),)
 
 class MeetupMessage(Base):
     __tablename__ = "meetup_messages"
     
     id = Column(Integer, primary_key=True, index=True)
-    post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
-    author_nickname = Column(String(100), nullable=False)  # 💡 nullable=False追加
-    content = Column(Text, nullable=False)  # 💡 nullable=False追加
+    post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    author_nickname = Column(String(100), nullable=False)
+    content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     post = relationship("HobbyPost", back_populates="meetup_messages")
     user = relationship("User")
+    # ✅ 追加：リアクションとのリレーション
+    reactions = relationship(
+        "MeetupMessageReaction",
+        back_populates="message",
+        cascade="all, delete-orphan"
+    )
+
+# ==========================================
+# 💡 3-b. MeetupMessageReaction（新規追加）
+# ==========================================
+
+class MeetupMessageReaction(Base):
+    __tablename__ = "meetup_message_reactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(
+        Integer,
+        ForeignKey("meetup_messages.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False
+    )
+    reaction = Column(String(10), nullable=False)   # 絵文字文字列（例: "✅"）
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    message = relationship("MeetupMessage", back_populates="reactions")
+    user = relationship("User")
+
+    __table_args__ = (
+        # 同じユーザーが同じメッセージに同じ絵文字を重複登録しない
+        UniqueConstraint("message_id", "user_id", "reaction", name="uq_meetup_reaction"),
+    )
 
 # ==========================================
 # 💡 4. 通知・感情・その他
@@ -283,11 +301,11 @@ class Notification(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     recipient_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False) 
-    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 ondelete追加
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     hobby_category_id = Column(Integer, ForeignKey("hobby_categories.id", ondelete="CASCADE"), nullable=False)
     message = Column(Text, nullable=False)
-    event_post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="SET NULL"), nullable=True)  # 💡 ondelete追加
-    is_read = Column(Boolean, default=False, nullable=False)  # 💡 既読フラグ追加
+    event_post_id = Column(Integer, ForeignKey("hobby_posts.id", ondelete="SET NULL"), nullable=True)
+    is_read = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     recipient = relationship("User", foreign_keys=[recipient_id], back_populates="notifications_received") 
@@ -299,10 +317,10 @@ class MoodLog(Base):
     __tablename__ = "mood_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     mood_type = Column(SQLEnum(MoodType), nullable=False)
     comment = Column(String(200), nullable=True)
-    is_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    is_visible = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="mood_logs")
@@ -315,12 +333,12 @@ class UserSubscription(Base):
     __tablename__ = "user_subscriptions"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     plan_type = Column(SQLEnum(SubscriptionPlan), nullable=False)
-    stripe_subscription_id = Column(String(255), unique=True, nullable=True)  # 💡 長さ指定追加
-    status = Column(String(50), default="active", nullable=False)  # 💡 nullable=False追加
+    stripe_subscription_id = Column(String(255), unique=True, nullable=True)
+    status = Column(String(50), default="active", nullable=False)
     next_billing_date = Column(Date, nullable=True) 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="subscriptions")
 
@@ -328,8 +346,8 @@ class Branch(Base):
     __tablename__ = "branches"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), unique=True, nullable=False)  # 💡 長さ指定追加
-    address = Column(String(200), nullable=True)  # 💡 長さ指定追加
+    name = Column(String(100), unique=True, nullable=False)
+    address = Column(String(200), nullable=True)
     max_capacity = Column(Integer, nullable=False, default=50) 
     hourly_base_fee = Column(Float, nullable=False, default=300.0)
     
@@ -340,7 +358,7 @@ class EventRegistration(Base):
     
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True) 
     event_id = Column(Integer, ForeignKey("events.id", ondelete="CASCADE"), primary_key=True)
-    registered_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 server_default使用
+    registered_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="event_registrations")
     event = relationship("Event", back_populates="registrations")
@@ -349,15 +367,15 @@ class Event(Base):
     __tablename__ = "events"
     
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(200), index=True, nullable=False)  # 💡 長さ指定追加
+    title = Column(String(200), index=True, nullable=False)
     description = Column(Text, nullable=True)
     branch_id = Column(Integer, ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
     capacity = Column(Integer, nullable=False, default=12) 
     creator_price = Column(Integer, nullable=False, default=0)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
-    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
-    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     owner = relationship("User", back_populates="owned_events")
     branch = relationship("Branch", back_populates="events") 
@@ -367,10 +385,10 @@ class Seat(Base):
     __tablename__ = "seats"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
+    name = Column(String(50), unique=True, index=True, nullable=False)
     location = Column(String(100), nullable=True) 
-    seat_type = Column(String(50), default="flexible", nullable=False)  # 💡 nullable=False追加
-    price_per_hour = Column(Float, default=500.0, nullable=False)  # 💡 nullable=False追加
+    seat_type = Column(String(50), default="flexible", nullable=False)
+    price_per_hour = Column(Float, default=500.0, nullable=False)
     
     reservations = relationship("Reservation", back_populates="seat")
 
@@ -378,7 +396,7 @@ class AccessLog(Base):
     __tablename__ = "access_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     entry_time = Column(DateTime, nullable=False)
     exit_time = Column(DateTime, nullable=True)
     
@@ -388,12 +406,12 @@ class Reservation(Base):
     __tablename__ = "reservations"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
-    seat_id = Column(Integer, ForeignKey("seats.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    seat_id = Column(Integer, ForeignKey("seats.id", ondelete="CASCADE"), nullable=False)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
-    status = Column(String(20), default="active", nullable=False)  # 💡 nullable=False追加
-    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
+    status = Column(String(20), default="active", nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="reservations")
     seat = relationship("Seat", back_populates="reservations")
@@ -402,13 +420,13 @@ class Invoice(Base):
     __tablename__ = "invoices"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # 💡 nullable=False追加
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     billing_start_date = Column(Date, nullable=False)
     billing_end_date = Column(Date, nullable=False)
-    total_amount = Column(Float, default=0.0, nullable=False)  # 💡 nullable=False追加
-    status = Column(String(50), default="pending", nullable=False)  # 💡 nullable=False追加
+    total_amount = Column(Float, default=0.0, nullable=False)
+    status = Column(String(50), default="pending", nullable=False)
     payment_date = Column(DateTime, nullable=True) 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="invoices")
 
@@ -421,14 +439,14 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     public_code = Column(String(8), unique=True, index=True, nullable=False)
-    username = Column(String(50), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
-    email = Column(String(120), unique=True, index=True, nullable=False)  # 💡 nullable=False追加
-    hashed_password = Column(String(255), nullable=False)  # 💡 nullable=False追加
-    is_company = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
-    is_active = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    username = Column(String(50), unique=True, index=True, nullable=False)
+    email = Column(String(120), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    is_company = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
     birth_year_month = Column(String(7), nullable=True)
     gender = Column(String(20), nullable=True)
-    is_stats_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    is_stats_visible = Column(Boolean, default=True, nullable=False)
     nickname = Column(String(100), unique=True, index=True, nullable=True) 
     prefecture = Column(String(50), index=True, nullable=True)
     city = Column(String(100), index=True, nullable=True)
@@ -441,23 +459,23 @@ class User(Base):
     instagram_url = Column(String(255), nullable=True)
     note_url = Column(String(255), nullable=True)
 
-    is_member_count_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
-    is_pref_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
-    is_city_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
-    is_town_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
-    is_notification_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    is_member_count_visible = Column(Boolean, default=True, nullable=False)
+    is_pref_visible = Column(Boolean, default=True, nullable=False)
+    is_city_visible = Column(Boolean, default=True, nullable=False)
+    is_town_visible = Column(Boolean, default=True, nullable=False)
+    is_notification_visible = Column(Boolean, default=True, nullable=False)
     
-    is_restricted = Column(Boolean, default=False, nullable=False)  # 💡 nullable=False追加
-    report_count = Column(Integer, default=0, nullable=False)  # 💡 nullable=False追加
+    is_restricted = Column(Boolean, default=False, nullable=False)
+    report_count = Column(Integer, default=0, nullable=False)
 
-    current_mood = Column(SQLEnum(MoodType), default=MoodType.NEUTRAL, nullable=False)  # 💡 nullable=False追加
+    current_mood = Column(SQLEnum(MoodType), default=MoodType.NEUTRAL, nullable=False)
     current_mood_comment = Column(String(200), nullable=True)
     mood_updated_at = Column(DateTime, nullable=True)
     is_mood_comment_visible = Column(Boolean, default=True, nullable=False)
-    is_mood_visible = Column(Boolean, default=True, nullable=False)  # 💡 nullable=False追加
+    is_mood_visible = Column(Boolean, default=True, nullable=False)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 💡 作成日時追加
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())  # 💡 更新日時追加
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     subscriptions = relationship("UserSubscription", back_populates="user")
     access_logs = relationship("AccessLog", back_populates="user")
@@ -473,8 +491,7 @@ class User(Base):
     
     requests_sent = relationship("FriendRequest", foreign_keys="FriendRequest.requester_id", back_populates="requester", cascade="all, delete-orphan")
     requests_received = relationship("FriendRequest", foreign_keys="FriendRequest.receiver_id", back_populates="receiver", cascade="all, delete-orphan")
-    friendships = relationship("Friendship", foreign_keys="Friendship.user_id")
-    follows = relationship("Follow", overlaps="user") #
+    follows = relationship("Follow", overlaps="user")
 
     paid_friend_slots = Column(Integer, default=0)
     is_premium = Column(Boolean, default=False)

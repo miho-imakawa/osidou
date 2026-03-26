@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
@@ -17,6 +17,11 @@ router = APIRouter(prefix="/meetup-chat", tags=["meetup-chat"])
 class MeetupMessageCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=2000)
 
+class ReactionSummary(BaseModel):
+    reaction: str
+    count: int
+    reacted_by_me: bool
+
 class MeetupMessageResponse(BaseModel):
     id: int
     content: str
@@ -24,9 +29,13 @@ class MeetupMessageResponse(BaseModel):
     user_id: int
     post_id: int
     author_nickname: Optional[str] = None
+    reactions: List[ReactionSummary] = []
 
     class Config:
         from_attributes = True
+
+class ReactionCreate(BaseModel):
+    reaction: str = Field(..., min_length=1, max_length=10)
 
 # ==========================================
 # 💡 共通バリデーション関数
@@ -58,35 +67,70 @@ def check_chat_permission(post_id: int, user_id: int, db: Session):
         )
     return post
 
+
+def build_reactions(message_id: int, current_user_id: int, db: Session) -> List[ReactionSummary]:
+    """メッセージのリアクション集計（絵文字ごとのcount + 自分が押したか）"""
+    rows = db.query(models.MeetupMessageReaction).filter(
+        models.MeetupMessageReaction.message_id == message_id
+    ).all()
+
+    counts: Dict[str, int] = {}
+    mine: set = set()
+    for r in rows:
+        counts[r.reaction] = counts.get(r.reaction, 0) + 1
+        if r.user_id == current_user_id:
+            mine.add(r.reaction)
+
+    return [
+        ReactionSummary(reaction=emoji, count=cnt, reacted_by_me=(emoji in mine))
+        for emoji, cnt in counts.items()
+    ]
+
+
 # ==========================================
 # 💡 APIエンドポイント
 # ==========================================
 
 @router.get("/{post_id}", response_model=List[MeetupMessageResponse])
 def get_meetup_messages(
-    post_id: int, 
+    post_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user) # 💡 閲覧時も認証を追加
+    current_user: models.User = Depends(get_current_user)
 ):
     """過去ログ取得（HOSTまたは参加者のみ）"""
     check_chat_permission(post_id, current_user.id, db)
-    
+
     messages = db.query(models.MeetupMessage)\
         .filter(models.MeetupMessage.post_id == post_id)\
         .order_by(models.MeetupMessage.created_at.asc())\
         .all()
-    return messages
+
+    # リアクションを各メッセージに付与
+    result = []
+    for m in messages:
+        reactions = build_reactions(m.id, current_user.id, db)
+        result.append(MeetupMessageResponse(
+            id=m.id,
+            content=m.content,
+            created_at=m.created_at,
+            user_id=m.user_id,
+            post_id=m.post_id,
+            author_nickname=m.author_nickname,
+            reactions=reactions,
+        ))
+    return result
+
 
 @router.post("/{post_id}", response_model=MeetupMessageResponse, status_code=status.HTTP_201_CREATED)
 def send_meetup_message(
-    post_id: int, 
-    message_in: MeetupMessageCreate, 
-    db: Session = Depends(get_db), 
+    post_id: int,
+    message_in: MeetupMessageCreate,
+    db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     """メッセージ送信（HOSTまたは参加者のみ）"""
     check_chat_permission(post_id, current_user.id, db)
-    
+
     db_message = models.MeetupMessage(
         post_id=post_id,
         user_id=current_user.id,
@@ -96,4 +140,63 @@ def send_meetup_message(
     db.add(db_message)
     db.commit()
     db.refresh(db_message)
-    return db_message
+
+    return MeetupMessageResponse(
+        id=db_message.id,
+        content=db_message.content,
+        created_at=db_message.created_at,
+        user_id=db_message.user_id,
+        post_id=db_message.post_id,
+        author_nickname=db_message.author_nickname,
+        reactions=[],
+    )
+
+
+@router.post("/{post_id}/messages/{message_id}/reaction", status_code=status.HTTP_200_OK)
+def toggle_reaction(
+    post_id: int,
+    message_id: int,
+    reaction_in: ReactionCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    リアクションのトグル（押す／外す）
+    - 同じ絵文字を再度押すと削除（トグル）
+    - 返り値: { "action": "added" | "removed", "reactions": [...] }
+    """
+    check_chat_permission(post_id, current_user.id, db)
+
+    # メッセージ存在確認
+    message = db.query(models.MeetupMessage).filter(
+        models.MeetupMessage.id == message_id,
+        models.MeetupMessage.post_id == post_id
+    ).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="メッセージが見つかりません")
+
+    # 既存リアクション確認
+    existing = db.query(models.MeetupMessageReaction).filter(
+        models.MeetupMessageReaction.message_id == message_id,
+        models.MeetupMessageReaction.user_id == current_user.id,
+        models.MeetupMessageReaction.reaction == reaction_in.reaction
+    ).first()
+
+    if existing:
+        # 既に押している → 削除（トグルOFF）
+        db.delete(existing)
+        db.commit()
+        action = "removed"
+    else:
+        # 未押し → 追加（トグルON）
+        new_reaction = models.MeetupMessageReaction(
+            message_id=message_id,
+            user_id=current_user.id,
+            reaction=reaction_in.reaction
+        )
+        db.add(new_reaction)
+        db.commit()
+        action = "added"
+
+    reactions = build_reactions(message_id, current_user.id, db)
+    return {"action": action, "reactions": reactions}

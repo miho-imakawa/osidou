@@ -1,8 +1,39 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { authApi } from '../api';
-import { Send, X, MessageCircle, AlertTriangle, Link } from 'lucide-react';
+import { Send, X, MessageCircle, AlertTriangle } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// ==========================================
+// 💡 スタンプ定義
+// ==========================================
+const STAMP_CATEGORIES = [
+  { label: 'お返事', stamps: ['✅', '👀', '🙋'] },
+  { label: 'お食事', stamps: ['🥩', '🐟', '🥗'] },
+  { label: '飲み物', stamps: ['🍷', '🍺', '☕'] },
+  { label: 'その他', stamps: ['❓', '🆘', '✨'] },
+];
+const ALL_STAMPS = STAMP_CATEGORIES.flatMap((c) => c.stamps);
+
+// ==========================================
+// 💡 型定義
+// ==========================================
+interface ReactionSummary {
+  reaction: string;
+  count: number;
+  reacted_by_me: boolean;
+}
+
+interface Message {
+  id: number;
+  content: string;
+  created_at: string;
+  user_id: number;
+  post_id: number;
+  author_nickname?: string;
+  reactions: ReactionSummary[];
+}
 
 interface MeetupChatModalProps {
   postId: number;
@@ -12,12 +43,48 @@ interface MeetupChatModalProps {
   isOrganizer: boolean;
 }
 
+// ==========================================
+// 💡 スタンプピッカーコンポーネント
+// ==========================================
+const StampPicker: React.FC<{
+  onSelect: (stamp: string) => void;
+  onClose: () => void;
+}> = ({ onSelect, onClose }) => {
+  return (
+    <div className="absolute bottom-full mb-2 right-0 z-10 bg-white rounded-2xl shadow-xl border border-orange-100 p-3 w-[220px]">
+      {STAMP_CATEGORIES.map((cat) => (
+        <div key={cat.label} className="mb-2 last:mb-0">
+          <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1">
+            {cat.label}
+          </p>
+          <div className="flex gap-1">
+            {cat.stamps.map((s) => (
+              <button
+                key={s}
+                onClick={() => { onSelect(s); onClose(); }}
+                className="text-xl hover:scale-125 transition-transform active:scale-95"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ==========================================
+// 💡 メインコンポーネント
+// ==========================================
 const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
   postId, onClose, meetupTitle, currentUserId, isOrganizer
 }) => {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
   const [newMsg, setNewMsg] = useState('');
+  // スタンプピッカーを開いているメッセージID（nullなら閉じ）
+  const [stampPickerFor, setStampPickerFor] = useState<number | null>(null);
 
   const fetchMessages = async () => {
     try {
@@ -36,40 +103,40 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
   };
 
   useEffect(() => {
-      fetchMessages();
-      fetchParticipants();
-      let interval = setInterval(fetchMessages, 3000);
-      let idleTimer: ReturnType<typeof setTimeout>;
+    fetchMessages();
+    fetchParticipants();
+    let interval = setInterval(fetchMessages, 3000);
+    let idleTimer: ReturnType<typeof setTimeout>;
 
-      const resetIdleTimer = () => {
-          clearTimeout(idleTimer);
-          clearInterval(interval);
-          interval = setInterval(fetchMessages, 3000);
-          idleTimer = setTimeout(() => {
-              clearInterval(interval);
-          }, 10 * 60 * 1000);
-      };
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer);
+      clearInterval(interval);
+      interval = setInterval(fetchMessages, 3000);
+      idleTimer = setTimeout(() => {
+        clearInterval(interval);
+      }, 10 * 60 * 1000);
+    };
 
-      const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
-      events.forEach(e => document.addEventListener(e, resetIdleTimer));
-      resetIdleTimer();
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(e => document.addEventListener(e, resetIdleTimer));
+    resetIdleTimer();
 
-      const handleVisibilityChange = () => {
-          if (document.hidden) {
-              clearInterval(interval);
-              clearTimeout(idleTimer);
-          } else {
-              resetIdleTimer();
-          }
-      };
-      document.addEventListener('visibilitychange', handleVisibilityChange);
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+        clearTimeout(idleTimer);
+      } else {
+        resetIdleTimer();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-      return () => {
-          clearInterval(interval);
-          clearTimeout(idleTimer);
-          events.forEach(e => document.removeEventListener(e, resetIdleTimer));
-          document.removeEventListener('visibilitychange', handleVisibilityChange);
-      };
+    return () => {
+      clearInterval(interval);
+      clearTimeout(idleTimer);
+      events.forEach(e => document.removeEventListener(e, resetIdleTimer));
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [postId]);
 
   const handleSend = async (e: React.FormEvent) => {
@@ -84,7 +151,29 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
     }
   };
 
-  // 主催者：参加者をNo Showマーク
+  // ==========================================
+  // 💡 リアクション送信（トグル）
+  // ==========================================
+  const handleReaction = async (messageId: number, stamp: string) => {
+    try {
+      const res = await authApi.post(
+        `/meetup-chat/${postId}/messages/${messageId}/reaction`,
+        { reaction: stamp }
+      );
+      // レスポンスの reactions で該当メッセージを楽観的更新
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === messageId ? { ...m, reactions: res.data.reactions } : m
+        )
+      );
+    } catch {
+      console.error("リアクション送信に失敗しました");
+    }
+  };
+
+  // ==========================================
+  // 💡 No Show 処理（変更なし）
+  // ==========================================
   const handleNoShow = async (targetUserId: number, nickname: string) => {
     if (!window.confirm(`${nickname} さんをNo Showとしてマークしますか？\n参加費100%が課金されます。`)) return;
     try {
@@ -110,7 +199,6 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
     }
   };
 
-  // 参加者：主催者No Showを報告
   const handleOrganizerNoShow = async () => {
     if (!window.confirm('主催者が来ていないことを報告しますか？\n課金済みの場合は返金されます。')) return;
     try {
@@ -131,9 +219,14 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl flex flex-col h-[80vh]">
-
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+      onClick={() => setStampPickerFor(null)} // ピッカー外クリックで閉じる
+    >
+      <div
+        className="bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl flex flex-col h-[80vh]"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-4 border-b flex justify-between items-center bg-orange-50 shrink-0">
           <div className="flex items-center gap-2">
@@ -188,11 +281,62 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
           {messages.map((m) => (
-            <div key={m.id} className="flex flex-col">
-              <Link to={`/profile/${m.user_id}`} className="text-[10px] font-bold text-gray-400 ml-2 hover:text-pink-500 hover:underline transition-colors">{m.author_nickname}</Link>
-              <div className="bg-white p-3 rounded-2xl shadow-sm border border-orange-100 max-w-[85%]">
-                <p className="text-sm text-gray-700">{m.content}</p>
+            <div key={m.id} className="flex flex-col group">
+              {/* 投稿者名（react-router-dom の Link に修正済み） */}
+              <Link
+                to={`/profile/${m.user_id}`}
+                className="text-[10px] font-bold text-gray-400 ml-2 hover:text-pink-500 hover:underline transition-colors"
+              >
+                {m.author_nickname}
+              </Link>
+
+              {/* メッセージ本体 + スタンプボタン */}
+              <div className="flex items-end gap-1">
+                <div className="bg-white p-3 rounded-2xl shadow-sm border border-orange-100 max-w-[80%]">
+                  <p className="text-sm text-gray-700">{m.content}</p>
+                </div>
+
+                {/* スタンプボタン（ホバーで表示） */}
+                <div className="relative opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() =>
+                      setStampPickerFor(stampPickerFor === m.id ? null : m.id)
+                    }
+                    className="text-base hover:scale-110 transition-transform leading-none"
+                    title="スタンプ"
+                  >
+                    😊
+                  </button>
+                  {stampPickerFor === m.id && (
+                    <StampPicker
+                      onSelect={(stamp) => handleReaction(m.id, stamp)}
+                      onClose={() => setStampPickerFor(null)}
+                    />
+                  )}
+                </div>
               </div>
+
+              {/* リアクション表示 */}
+              {m.reactions && m.reactions.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1 ml-1">
+                  {m.reactions.map((r) => (
+                    <button
+                      key={r.reaction}
+                      onClick={() => handleReaction(m.id, r.reaction)}
+                      className={`
+                        flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-bold
+                        border transition-all active:scale-95
+                        ${r.reacted_by_me
+                          ? 'bg-orange-100 border-orange-300 text-orange-700'
+                          : 'bg-white border-gray-200 text-gray-600 hover:border-orange-200'}
+                      `}
+                    >
+                      <span>{r.reaction}</span>
+                      <span className="text-[10px]">{r.count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
