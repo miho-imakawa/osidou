@@ -145,6 +145,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
 
   useEffect(() => {
     const loadData = async () => {
+      if (!isMe) return;
       try {
         const categories = await fetchMyCommunities();
         setMyCategories(categories);
@@ -315,21 +316,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                 <textarea className="w-full p-5 bg-gray-50 rounded-[32px] border-none text-sm h-32 focus:ring-2 focus:ring-pink-500" value={tempProfile.bio || ''} onChange={e => setTempProfile({...tempProfile, bio: e.target.value})} />
               </div>
 
-              {/* ▼ 変更箇所: is_mood_visible の意味を「全セクション公開」に変更 */}
-              <div className="pt-4 border-t border-gray-50">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input type="checkbox" className="hidden" checked={tempProfile.is_mood_visible} onChange={e => setTempProfile({...tempProfile, is_mood_visible: e.target.checked})} />
-                  <div className={`p-2 rounded-xl transition-all ${tempProfile.is_mood_visible ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-400'}`}>
-                    {tempProfile.is_mood_visible ? <Eye size={18}/> : <EyeOff size={18}/>}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-gray-500">プロフィール詳細を公開する</span>
-                    <span className="text-[10px] text-gray-400">Communities・Meetups・Ads・Feeling Logs を他の人に表示します</span>
-                  </div>
-                </label>
-              </div>
-              {/* ▲ 変更箇所ここまで */}
-
               <div className="pt-4 border-t border-gray-50">
                 <label className="flex items-center gap-3 cursor-pointer group">
                   <input type="checkbox" className="hidden" checked={tempProfile.is_mood_comment_visible} onChange={e => setTempProfile({...tempProfile, is_mood_comment_visible: e.target.checked})} />
@@ -389,7 +375,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
           )}
 
           {/* 🔒 非公開バナー — 自分のページかつ is_mood_visible=false のときのみ表示 */}
-          {isMe && displayProfile.is_mood_visible === false && (
+          {isMe && (
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-gray-200"></div>
               <p className="text-[11px] font-bold text-gray-300 tracking-wide shrink-0">
@@ -542,10 +528,10 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
           )}
 
           {/* 非公開時に他のユーザーへ表示するメッセージ */}
-          {!showDetailSections && !isMe && (
+          {!isMe && (
             <div className="bg-gray-50 rounded-[32px] p-8 text-center text-gray-400 text-sm">
               <EyeOff size={32} className="mx-auto mb-3 opacity-30" />
-              <p className="font-bold">このユーザーはプロフィール詳細を非公開にしています</p>
+              <p className="font-bold">プロフィールのみ公開にしています</p>
             </div>
           )}
         </div>
