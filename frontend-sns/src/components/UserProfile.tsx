@@ -223,11 +223,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
     }
   };
 
-  // 他人から見たときに詳細セクションを表示するか
-  // is_mood_visible を「自己紹介以外の全セクション」の公開フラグとして使用
-  // 自分のページは常に全表示、他人のページはフラグに従う
-  const showDetailSections = isMe || displayProfile?.is_mood_visible !== false;
-
   if (loading) return <div className="text-center py-10">読み込み中...</div>;
   if (!displayProfile) return <div className="text-center py-10 text-gray-400">ユーザーが見つかりません。</div>;
 
@@ -386,7 +381,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
           )}
 
           {/* ▼ showDetailSections で一括制御 */}
-          {showDetailSections && (
+          {isMe && (
             <>
               {/* Communities */}
               <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
