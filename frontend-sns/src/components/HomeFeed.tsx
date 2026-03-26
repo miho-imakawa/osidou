@@ -383,9 +383,9 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                 className="flex items-center gap-4 py-3 border-b border-gray-50"
               >
                 <div className="w-28 flex-shrink-0">
-                  <span className="text-xs font-black text-gray-800">
-                    {friendMood.nickname || friendMood.username}
-                  </span>
+                <Link to={`/profile/${friendMood.user_id}`} className="text-xs font-black text-gray-800 hover:text-pink-500 hover:underline transition-colors">
+                  {friendMood.nickname || friendMood.username}
+                </Link>
                   {friendMood.friend_note && (
                     <span className="text-[9px] text-gray-400 font-medium ml-1">
                       ({friendMood.friend_note})
