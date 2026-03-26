@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { authApi } from '../api';
-import { Send, X, MessageCircle, AlertTriangle } from 'lucide-react';
+import { Send, X, MessageCircle, AlertTriangle, Link } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -189,7 +189,7 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
           {messages.map((m) => (
             <div key={m.id} className="flex flex-col">
-              <span className="text-[10px] font-bold text-gray-400 ml-2">{m.author_nickname}</span>
+              <Link to={`/users/${m.user_id}`} className="text-[10px] font-bold text-gray-400 ml-2 hover:text-pink-500 hover:underline transition-colors">{m.author_nickname}</Link>
               <div className="bg-white p-3 rounded-2xl shadow-sm border border-orange-100 max-w-[85%]">
                 <p className="text-sm text-gray-700">{m.content}</p>
               </div>

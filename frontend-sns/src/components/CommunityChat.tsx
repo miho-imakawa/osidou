@@ -535,7 +535,9 @@ const submitPost = async () => {
                                                 <div className="flex items-center gap-1.5 mb-1">
                                                     <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
                                                     <h3 className="font-black text-[13px] leading-tight flex-1 truncate">{post.content.split('\n')[0]}</h3>
+                                                    <Link to={`/users/${post.user_id}`} className="text-[9px] font-bold text-gray-400 hover:text-pink-500 shrink-0 transition-colors">@{post.author_nickname}</Link>
                                                     <button type="button" onClick={() => toggleAdCollapse(post.id)}
+
                                                         className="p-1 text-gray-300 hover:text-gray-500 shrink-0" title="非表示にする">
                                                         ✕
                                                     </button>
@@ -931,7 +933,7 @@ const submitPost = async () => {
                                                         <span className="font-black text-[10px] text-amber-600 uppercase block tracking-widest">Official Guide</span>
                                                     </div>
                                                 ) : (
-                                                    <span className="font-black text-[10px] text-pink-500 uppercase block">{post.author_nickname}</span>
+                                                    <Link to={`/users/${post.user_id}`} className="font-black text-[10px] text-pink-500 uppercase block hover:underline">{post.author_nickname}</Link>
                                                 )}
                                                 <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
                                                     <button type="button" onClick={() => handleLocalHide(post.id)} className="p-1 text-gray-300 hover:text-gray-600"><EyeOff size={12} /></button>
@@ -973,7 +975,7 @@ const submitPost = async () => {
                                                 <div className="mt-1 border-l border-pink-100 pl-3 space-y-1">
                                                     {posts.filter(r => r.parent_id === post.id).map(reply => (
                                                         <div key={reply.id} className="bg-gray-50/50 border border-gray-100 rounded-xl px-3 py-2 shadow-sm">
-                                                            <span className="font-black text-[9px] text-pink-400 block">{reply.author_nickname}</span>
+                                                            <Link to={`/users/${reply.user_id}`} className="font-black text-[9px] text-pink-400 block hover:underline">{reply.author_nickname}</Link>
                                                             {/* 返信の文字は少し小さく控えめに */}
                                                             <p className="text-gray-600 text-[12px] leading-relaxed whitespace-pre-wrap">{reply.content}</p>
                                                             <button
