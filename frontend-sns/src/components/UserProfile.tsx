@@ -390,11 +390,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
 
           {/* 🔒 非公開バナー — 自分のページかつ is_mood_visible=false のときのみ表示 */}
           {isMe && displayProfile.is_mood_visible === false && (
-            <div className="flex items-center gap-3 px-5 py-3 bg-gray-100 rounded-2xl border border-dashed border-gray-300">
-              <EyeOff size={14} className="text-gray-400 shrink-0" />
-              <p className="text-[11px] font-bold text-gray-400 tracking-wide">
-                ⭐ Only Visible to You ⭐
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200"></div>
+              <p className="text-[11px] font-bold text-gray-300 tracking-wide shrink-0">
+                🙈 Under sections --- Only Visible to You 🙈
               </p>
+              <div className="flex-1 h-px bg-gray-200"></div>
             </div>
           )}
 
