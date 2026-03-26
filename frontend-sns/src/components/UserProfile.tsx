@@ -26,7 +26,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   
   const [displayProfile, setDisplayProfile] = useState<any>(null);
   const [isMe, setIsMe] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [tempProfile, setTempProfile] = useState<any>(null);
   const [myCategories, setMyCategories] = useState<HobbyCategory[]>([]);
@@ -39,10 +39,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   const [isDownloading, setIsDownloading] = useState(false);
   const [friendsLogExpires, setFriendsLogExpires] = useState<string | null>(null);
 
-  // 💡 State を追加
-const [pendingCount, setPendingCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
 
-const getRankClasses = (count: number) => {
+  const getRankClasses = (count: number) => {
     if (count >= 10000) return "bg-yellow-50 text-yellow-700 border-yellow-300 shadow-sm";
     if (count >= 500) return "bg-pink-50 text-pink-700 border-pink-200";
     return "bg-gray-50 text-gray-500 border-gray-100";
@@ -59,71 +58,67 @@ const getRankClasses = (count: number) => {
     };
   };
 
-// handleFeelingLogDownload の実装例
-const executeDownload = async (sessionId: string) => {
-  try {
-    setIsDownloading(true);
-    const response = await fetch(
-      `${BACKEND_URL}/api/download/feeling-log?session_id=${sessionId}`
-    );
+  const executeDownload = async (sessionId: string) => {
+    try {
+      setIsDownloading(true);
+      const response = await fetch(
+        `${BACKEND_URL}/api/download/feeling-log?session_id=${sessionId}`
+      );
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.detail || 'ダウンロードに失敗しました');
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'ダウンロードに失敗しました');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `my_feeling_log_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      window.history.replaceState({}, '', window.location.pathname);
+      alert("ダウンロードが完了しました！");
+    } catch (error: any) {
+      console.error("Download error:", error);
+      alert(error.message || "ダウンロード中にエラーが発生しました。");
+    } finally {
+      setIsDownloading(false);
     }
+  };
 
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `my_feeling_log_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    window.history.replaceState({}, '', window.location.pathname);
-    alert("ダウンロードが完了しました！");
-  } catch (error: any) {
-    console.error("Download error:", error);
-    alert(error.message || "ダウンロード中にエラーが発生しました。");
-  } finally {
-    setIsDownloading(false);
-  }
-};
+  const handleFeelingLogDownload = async (profileId: string | number) => {
+    try {
+      setIsDownloading(true);
+      const successUrl = `${window.location.origin}${window.location.pathname}?session_id={CHECKOUT_SESSION_ID}`;
 
-const handleFeelingLogDownload = async (profileId: string | number) => {
-  try {
-    setIsDownloading(true);
-    const successUrl = `${window.location.origin}${window.location.pathname}?session_id={CHECKOUT_SESSION_ID}`;
+      const response = await fetch(`${BACKEND_URL}/api/stripe/feeling-log-checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          userId: profileId,
+          successUrl: successUrl,
+          cancelUrl: window.location.href,
+        })
+      });
 
-    const response = await fetch(`${BACKEND_URL}/api/stripe/feeling-log-checkout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        userId: profileId,
-        successUrl: successUrl,
-        cancelUrl: window.location.href,
-      })
-    });
-
-    const data = await response.json();
-    if (data.url) {
-      window.location.href = data.url;
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error("Checkout error:", error);
+      alert("決済の準備に失敗しました。");
+    } finally {
+      setIsDownloading(false);
     }
-  } catch (error) {
-    console.error("Checkout error:", error);
-    alert("決済の準備に失敗しました。");
-  } finally {
-    setIsDownloading(false);
-  }
-};
+  };
 
-  // 2. URLを監視して自動実行する useEffect
   useEffect(() => {
     const query = new URLSearchParams(location.search);
     const sessionId = query.get('session_id');
-
-    // URLに session_id が含まれていて、かつ現在ダウンロード中でなければ実行
     if (sessionId && !isDownloading) {
       executeDownload(sessionId);
     }
@@ -148,22 +143,18 @@ const handleFeelingLogDownload = async (profileId: string | number) => {
     }
   }, [userId, myProfile]);
 
-useEffect(() => {
+  useEffect(() => {
     const loadData = async () => {
       try {
-        // 1. カテゴリ取得
         const categories = await fetchMyCommunities();
         setMyCategories(categories);
 
-        // 2. ミートアップ取得（並列実行）
         const [joinedRes, hostedRes] = await Promise.all([
           authApi.get('/posts/my-meetups'),
           authApi.get('/posts/my-hosted-meetups')
         ]);
 
-        // 3. 自分の広告統計を取得（isMeの場合のみ）
         if (isMe) {
-          // ここを先ほどバックエンドで確認したパスに合わせて修正します
           const adsRes = await authApi.get('/posts/my-ads-stats'); 
           setMyAdsStats(adsRes.data || []);
 
@@ -181,14 +172,11 @@ useEffect(() => {
           }
         });
 
-        console.log("主催:", hosted.length, "参加:", joined.length, "合計:", allMeetups.length);
-        
         const futureMeetups = allMeetups.filter((m: any) =>
           !m.meetup_date || new Date(m.meetup_date) > new Date()
         );
         setMyMeetups(futureMeetups);
 
-        // 4. 気分ログ取得
         const logs = await fetchMyMoodHistory();
         setMoodLogs(logs);
 
@@ -234,6 +222,11 @@ useEffect(() => {
     }
   };
 
+  // 他人から見たときに詳細セクションを表示するか
+  // is_mood_visible を「自己紹介以外の全セクション」の公開フラグとして使用
+  // 自分のページは常に全表示、他人のページはフラグに従う
+  const showDetailSections = isMe || displayProfile?.is_mood_visible !== false;
+
   if (loading) return <div className="text-center py-10">読み込み中...</div>;
   if (!displayProfile) return <div className="text-center py-10 text-gray-400">ユーザーが見つかりません。</div>;
 
@@ -242,17 +235,17 @@ useEffect(() => {
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <User className="text-pink-600" size={24} />
-            <span>
-                {displayProfile.nickname || displayProfile.username}'s PAGE
-            </span>
+          <User className="text-pink-600" size={24} />
+          <span>
+            {displayProfile.nickname || displayProfile.username}'s PAGE
+          </span>
         </h1>
         {isMe && (
-            <button onClick={toggleEdit} className="ml-4 px-3 py-2 bg-pink-600 text-white rounded-2xl flex items-center gap-1.5 text-sm font-bold shrink-0 transition-all hover:bg-pink-700 shadow-md active:scale-95">
-                {isEditing ? <><X size={16}/> 戻る</> : <><Edit size={16}/> 編集</>}
-            </button>
+          <button onClick={toggleEdit} className="ml-4 px-3 py-2 bg-pink-600 text-white rounded-2xl flex items-center gap-1.5 text-sm font-bold shrink-0 transition-all hover:bg-pink-700 shadow-md active:scale-95">
+            {isEditing ? <><X size={16}/> 戻る</> : <><Edit size={16}/> 編集</>}
+          </button>
         )}
-    </div>
+      </div>
 
       {isEditing && tempProfile ? (
         /* EDIT MODE */
@@ -322,15 +315,20 @@ useEffect(() => {
                 <textarea className="w-full p-5 bg-gray-50 rounded-[32px] border-none text-sm h-32 focus:ring-2 focus:ring-pink-500" value={tempProfile.bio || ''} onChange={e => setTempProfile({...tempProfile, bio: e.target.value})} />
               </div>
 
+              {/* ▼ 変更箇所: is_mood_visible の意味を「全セクション公開」に変更 */}
               <div className="pt-4 border-t border-gray-50">
                 <label className="flex items-center gap-3 cursor-pointer group">
                   <input type="checkbox" className="hidden" checked={tempProfile.is_mood_visible} onChange={e => setTempProfile({...tempProfile, is_mood_visible: e.target.checked})} />
                   <div className={`p-2 rounded-xl transition-all ${tempProfile.is_mood_visible ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-400'}`}>
                     {tempProfile.is_mood_visible ? <Eye size={18}/> : <EyeOff size={18}/>}
                   </div>
-                  <span className="text-xs font-bold text-gray-500">Feeling Logs を表示します</span>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-gray-500">プロフィール詳細を公開する</span>
+                    <span className="text-[10px] text-gray-400">Communities・Meetups・Ads・Feeling Logs を他の人に表示します</span>
+                  </div>
                 </label>
               </div>
+              {/* ▲ 変更箇所ここまで */}
 
               <div className="pt-4 border-t border-gray-50">
                 <label className="flex items-center gap-3 cursor-pointer group">
@@ -353,7 +351,7 @@ useEffect(() => {
       ) : (
         /* VIEW MODE */
         <div className="space-y-6">
-          {/* SNS Links & Bio */}
+          {/* SNS Links & Bio — 常に表示 */}
           <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
             <div className="flex flex-wrap gap-4 mb-6">
               {displayProfile.x_url && displayProfile.is_x_visible !== false && (
@@ -378,6 +376,8 @@ useEffect(() => {
               )}
             </div>
           </div>
+
+          {/* 自分のみ: フレンド申請通知 */}
           {isMe && pendingCount > 0 && (
             <Link
               to="/friends"
@@ -388,134 +388,153 @@ useEffect(() => {
             </Link>
           )}
 
-          {/* Communities */}
-          <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
-            <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
-              <MessageSquare className="text-pink-600" size={14}/> Communities
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {myCategories.length > 0 ? myCategories.map(cat => {
-                const totalCount = cat.member_count || 0; 
-                return (
-                  <Link 
-                    key={cat.id} 
-                    to={`/community/${cat.id}`} 
-                    className={`px-4 py-1.5 rounded-full text-xs border flex items-center gap-3 font-black shadow-sm transition-all hover:scale-105 ${getRankClasses(totalCount)}`}
-                  >
-                    <span>{cat.name.split(' (')[0]}</span> 
-                    <div className="flex items-center gap-1 opacity-60 text-[10px] tabular-nums">
-                      <User size={10} strokeWidth={3} />
-                      <span>{totalCount.toLocaleString()}</span>
-                      {totalCount >= 500 && <Flame size={10} className="text-orange-500" />}
-                    </div>
-                  </Link>
-                );
-              }) : <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Feeling posts</p>}
-            </div>
-          </div>
-
-          {/* JOINING & MY MEETUPS */}
-          {isMe && (
-            <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
-              <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
-                <Calendar className="text-orange-500" size={12}/> Joining & My Meetups
-              </h2>
-              {myMeetups.length > 0 ? (
+          {/* ▼ showDetailSections で一括制御 */}
+          {showDetailSections && (
+            <>
+              {/* Communities */}
+              <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
+                <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
+                  <MessageSquare className="text-pink-600" size={14}/> Communities
+                </h2>
                 <div className="flex flex-wrap gap-2">
-                  {myMeetups.map(meetup => (
-                    <Link
-                      key={meetup.id}
-                      to={`/community/${meetup.hobby_category_id}`}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 transition-all"
-                    >
-                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${meetup.user_id === displayProfile.id ? 'bg-orange-500 text-white' : 'bg-orange-200 text-orange-700'}`}>
-                        {meetup.user_id === displayProfile.id ? "主催" : "参加"}
-                      </span>
-                      <span className="font-bold text-gray-700 text-[11px] max-w-[120px] truncate">
-                        {meetup.content.split('\n')[0]}
-                      </span>
-                      {meetup.meetup_date && (
-                        <span className="text-[9px] text-gray-400 shrink-0">
-                          {meetup.meetup_date.slice(5, 10).replace('-', '/')}
+                  {myCategories.length > 0 ? myCategories.map(cat => {
+                    const totalCount = cat.member_count || 0; 
+                    return (
+                      <Link 
+                        key={cat.id} 
+                        to={`/community/${cat.id}`} 
+                        className={`px-4 py-1.5 rounded-full text-xs border flex items-center gap-3 font-black shadow-sm transition-all hover:scale-105 ${getRankClasses(totalCount)}`}
+                      >
+                        <span>{cat.name.split(' (')[0]}</span> 
+                        <div className="flex items-center gap-1 opacity-60 text-[10px] tabular-nums">
+                          <User size={10} strokeWidth={3} />
+                          <span>{totalCount.toLocaleString()}</span>
+                          {totalCount >= 500 && <Flame size={10} className="text-orange-500" />}
+                        </div>
+                      </Link>
+                    );
+                  }) : <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Feeling posts</p>}
+                </div>
+              </div>
+
+              {/* JOINING & MY MEETUPS — 自分のページのみ表示（他人には不要な情報） */}
+              {isMe && (
+                <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
+                  <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
+                    <Calendar className="text-orange-500" size={12}/> Joining & My Meetups
+                  </h2>
+                  {myMeetups.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {myMeetups.map(meetup => (
+                        <Link
+                          key={meetup.id}
+                          to={`/community/${meetup.hobby_category_id}`}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 transition-all"
+                        >
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${meetup.user_id === displayProfile.id ? 'bg-orange-500 text-white' : 'bg-orange-200 text-orange-700'}`}>
+                            {meetup.user_id === displayProfile.id ? "主催" : "参加"}
+                          </span>
+                          <span className="font-bold text-gray-700 text-[11px] max-w-[120px] truncate">
+                            {meetup.content.split('\n')[0]}
+                          </span>
+                          {meetup.meetup_date && (
+                            <span className="text-[9px] text-gray-400 shrink-0">
+                              {meetup.meetup_date.slice(5, 10).replace('-', '/')}
+                            </span>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] font-bold text-gray-300 uppercase text-center py-2">予定はありません</p>
+                  )}
+                </div>
+              )}
+
+              {/* MY ADS STATS */}
+              {myAdsStats.length > 0 && (
+                <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
+                  <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
+                    My Ads
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {myAdsStats.map(ad => (
+                      <Link
+                        key={ad.id}
+                        to={`/community/${ad.hobby_category_id}`}
+                        className="flex items-center gap-3 px-4 py-1.5 bg-green-50 border border-green-200 rounded-full hover:bg-green-100 transition-all"
+                      >
+                        <span className="text-[11px] font-bold text-green-800 truncate max-w-[120px]">
+                          {ad.title}
                         </span>
-                      )}
-                    </Link>
+                        <div className="flex items-center gap-2 shrink-0 border-l border-green-200 pl-2">
+                          <span className="text-[11px] font-black text-pink-500">👍 {ad.like_count}</span>
+                          <span className="text-[11px] font-black text-yellow-500">📌 {ad.pin_count}</span>
+                          {ad.ad_end_date && (
+                            <span className="text-[9px] text-green-400">
+                              〜{ad.ad_end_date.slice(0, 10)}
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Feeling Logs */}
+              <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-2">
+                <div className="flex justify-between items-center border-b border-gray-50 pb-2 mb-2">
+                  <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
+                    <Heart className="text-pink-600" size={14}/> Feeling Logs shows up to 100
+                  </h2>
+                  <button 
+                    disabled={isDownloading} 
+                    className={`flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm ${
+                      isDownloading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                    onClick={() => handleFeelingLogDownload(displayProfile.id)}
+                  >
+                    <Download size={14} /> <span>🤝DL¥200</span>
+                  </button>
+                </div>
+                <div className="space-y-10">
+                  {Object.keys(groupedLogs).sort().reverse().map(month => (
+                    <div key={month} className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <div className="px-4 py-1.5 bg-gray-900 text-white text-[12px] font-black rounded-xl border border-gray-900 tracking-tight shadow-sm">{month}</div>
+                        <div className="flex-1 h-px bg-gray-100"></div>
+                      </div>
+                      <div className="space-y-4 pl-1">
+                        {groupedLogs[month].map((log: any) => {
+                          const date = new Date(log.created_at.endsWith('Z') ? log.created_at : log.created_at + 'Z');
+                          const moodMap: any = { motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌', neutral: '😶', anxious: '😟', tired: '😥', sad: '😭', angry: '😡', grateful: '🙏' };
+                          return (
+                            <div key={log.id} className="flex items-center gap-5 text-sm">
+                              <div className="flex items-center gap-1 w-24 flex-shrink-0">
+                                <span className="text-[12px] font-black text-gray-800 tabular-nums">{String(date.getDate()).padStart(2, '0')}</span>
+                                <span className="text-[10px] font-bold text-gray-400 tabular-nums flex items-center gap-1 opacity-80"><Clock size={10} strokeWidth={3} />{date.getHours()}:{String(date.getMinutes()).padStart(2, '0')}</span>
+                              </div>
+                              <span className="text-xl transform hover:scale-125 transition-transform cursor-default">
+                                {moodMap[log.mood_type] || '✨'}
+                              </span>
+                              <p className="text-gray-500 font-semibold flex-1">{log.comment}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-[10px] font-bold text-gray-300 uppercase text-center py-2">予定はありません</p>
-              )}
-            </div>
+              </div>
+            </>
           )}
 
-          {/* MY ADS STATS */}
-          {myAdsStats.map(ad => (
-              <Link
-                  key={ad.id}
-                  to={`/community/${ad.hobby_category_id}`}
-                  className="flex items-center gap-3 px-4 py-1.5 bg-green-50 border border-green-200 rounded-full hover:bg-green-100 transition-all"
-              >
-                  <span className="text-[11px] font-bold text-green-800 truncate max-w-[120px]">
-                      {ad.title}
-                  </span>
-                  <div className="flex items-center gap-2 shrink-0 border-l border-green-200 pl-2">
-                      <span className="text-[11px] font-black text-pink-500">👍 {ad.like_count}</span>
-                      <span className="text-[11px] font-black text-yellow-500">📌 {ad.pin_count}</span>
-                      {ad.ad_end_date && (
-                          <span className="text-[9px] text-green-400">
-                              〜{ad.ad_end_date.slice(0, 10)}
-                          </span>
-                      )}
-                  </div>
-              </Link>
-          ))}
-          {/* Feeling Logs */}
-          {displayProfile.is_mood_visible && (
-            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-2">
-              <div className="flex justify-between items-center border-b border-gray-50 pb-2 mb-2">
-                <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
-                  <Heart className="text-pink-600" size={14}/> Feeling Logs shows up to 100
-                </h2>
-                <button 
-                  // 1. ダウンロード中はボタンを押せなくする
-                  disabled={isDownloading} 
-                  // 2. ダウンロード中のスタイル（半透明・禁止マーク）を適用
-                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm ${
-                    isDownloading ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                  onClick={() => handleFeelingLogDownload(displayProfile.id)}
-                >
-                  <Download size={14} /> <span>🤝DL¥200</span>
-                </button>
-              </div>
-              <div className="space-y-10">
-                {Object.keys(groupedLogs).sort().reverse().map(month => (
-                  <div key={month} className="space-y-4">
-                    <div className="flex items-center gap-4">
-                      <div className="px-4 py-1.5 bg-gray-900 text-white text-[12px] font-black rounded-xl border border-gray-900 tracking-tight shadow-sm">{month}</div>
-                      <div className="flex-1 h-px bg-gray-100"></div>
-                    </div>
-                    <div className="space-y-4 pl-1">
-                      {groupedLogs[month].map((log: any) => {
-                        const date = new Date(log.created_at.endsWith('Z') ? log.created_at : log.created_at + 'Z');
-                        const moodMap: any = { motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌', neutral: '😶', anxious: '😟', tired: '😥', sad: '😭', angry: '😡', grateful: '🙏' };
-                        return (
-                          <div key={log.id} className="flex items-center gap-5 text-sm">
-                            <div className="flex items-center gap-1 w-24 flex-shrink-0">
-                              <span className="text-[12px] font-black text-gray-800 tabular-nums">{String(date.getDate()).padStart(2, '0')}</span>
-                              <span className="text-[10px] font-bold text-gray-400 tabular-nums flex items-center gap-1 opacity-80"><Clock size={10} strokeWidth={3} />{date.getHours()}:{String(date.getMinutes()).padStart(2, '0')}</span>
-                            </div>
-                            <span className="text-xl transform hover:scale-125 transition-transform cursor-default">
-                              {moodMap[log.mood_type] || '✨'}
-                            </span>
-                            <p className="text-gray-500 font-semibold flex-1">{log.comment}</p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* 非公開時に他のユーザーへ表示するメッセージ */}
+          {!showDetailSections && !isMe && (
+            <div className="bg-gray-50 rounded-[32px] p-8 text-center text-gray-400 text-sm">
+              <EyeOff size={32} className="mx-auto mb-3 opacity-30" />
+              <p className="font-bold">このユーザーはプロフィール詳細を非公開にしています</p>
             </div>
           )}
         </div>
