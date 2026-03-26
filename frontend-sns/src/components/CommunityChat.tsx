@@ -839,7 +839,7 @@ const submitPost = async () => {
                                                         {isJoined && !isOwner && (
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (!window.confirm("キャンセルしますか？\n当日0時以降は参加費の50%が発生します。")) return;
+                                                                    if (!window.confirm("キャンセルしますか？\n開催24時間前以降は参加費の50%が発生します。")) return;
                                                                     try {
                                                                         const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-cancel`, {
                                                                             method: 'POST',

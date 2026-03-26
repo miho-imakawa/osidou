@@ -57,21 +57,21 @@ const StampPicker: React.FC<{
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl border border-orange-100 p-4 w-[90%] max-w-sm"
+        className="bg-white rounded-2xl shadow-2xl border border-orange-100 p-3 inline-flex flex-col gap-2"
         onClick={e => e.stopPropagation()}
       >
-        <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-3 text-center">
+        <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest text-center">
           スタンプを選ぶ
         </p>
         {STAMP_CATEGORIES.map((cat) => (
-          <div key={cat.label} className="mb-3 last:mb-0">
-            <p className="text-[9px] font-bold text-gray-400 mb-1.5">{cat.label}</p>
-            <div className="flex gap-2">
+          <div key={cat.label} className="flex items-center gap-2">
+            <span className="text-[9px] font-bold text-gray-300 w-10 shrink-0 text-right">{cat.label}</span>
+            <div className="flex gap-1">
               {cat.stamps.map((s) => (
                 <button
                   key={s}
                   onClick={() => { onSelect(s); onClose(); }}
-                  className="text-2xl hover:scale-125 active:scale-95 transition-transform"
+                  className="text-xl w-9 h-9 flex items-center justify-center hover:scale-125 active:scale-95 transition-transform rounded-xl hover:bg-orange-50"
                 >
                   {s}
                 </button>

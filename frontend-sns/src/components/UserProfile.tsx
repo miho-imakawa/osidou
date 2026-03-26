@@ -40,6 +40,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   const [friendsLogExpires, setFriendsLogExpires] = useState<string | null>(null);
 
   const [pendingCount, setPendingCount] = useState(0);
+  const [unconfirmedMeetups, setUnconfirmedMeetups] = useState<any[]>([]);
 
   const getRankClasses = (count: number) => {
     if (count >= 10000) return "bg-yellow-50 text-yellow-700 border-yellow-300 shadow-sm";
@@ -161,6 +162,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
 
           const pendingRes = await authApi.get('/friends/pending/count');
           setPendingCount(pendingRes.data.pending_count || 0);
+          const unconfirmedRes = await authApi.get('/hobby-categories/my-unconfirmed-meetups');
+          setUnconfirmedMeetups(unconfirmedRes.data || []);
         }
 
         const joined = joinedRes.data || [];
@@ -368,6 +371,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               🔔 ともだち申請が{pendingCount}件あります
             </Link>
           )}
+          {unconfirmedMeetups.map(meetup => (
+              <Link
+                  key={meetup.id}
+                  to={`/community/${meetup.hobby_category_id}`}
+                  className="block text-xs font-black text-orange-500 hover:text-orange-600 mb-4"
+              >
+                  🎪 「{meetup.title}」の開催確定を押してください
+              </Link>
+          ))}
 
           {/* 🔒 非公開バナー — 自分のページかつ is_mood_visible=false のときのみ表示 */}
           {isMe && (

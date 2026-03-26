@@ -52,6 +52,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   const [friendMoods, setFriendMoods] = useState<UserMoodResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unconfirmedMeetups, setUnconfirmedMeetups] = useState<any[]>([]);
 
   // Friends' Feeling Log 関連
   const [friendsLogStatus, setFriendsLogStatus] = useState<FriendsLogStatus | null>(null);
@@ -77,6 +78,13 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
             const res = await authApi.get('/notifications/unread-count');
             setUnreadNotifCount(res.data.unread_count || 0);
         } catch {}
+    }, []);
+
+    const loadUnconfirmedMeetups = useCallback(async () => {
+      try {
+        const res = await authApi.get('/hobby-categories/my-unconfirmed-meetups');
+        setUnconfirmedMeetups(res.data || []);
+      } catch {}
     }, []);
 
   // -------------------------------------------------------
@@ -122,9 +130,10 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     loadMoods();
     loadFriendsLogStatus();
     loadFriendCount();
-    loadPendingCount(); 
-    loadUnreadNotifCount(); // ← 追加
-}, [loadFriendsLogStatus, loadFriendCount, loadPendingCount, loadUnreadNotifCount]);
+    loadPendingCount();
+    loadUnreadNotifCount();
+    loadUnconfirmedMeetups();
+  }, [loadFriendsLogStatus, loadFriendCount, loadPendingCount, loadUnreadNotifCount, loadUnconfirmedMeetups]);
 
   // -------------------------------------------------------
   // Stripe 成功後のアクティベート処理
@@ -323,7 +332,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
         </Link>
         )}
 
-        {unreadNotifCount > 0 && (
+        {unreadNotifCount > 0 && (            
             <Link
                 to="/community/832"
                 onClick={async () => {
@@ -337,6 +346,16 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                 🔔 MEETUPの通知が{unreadNotifCount}件あります
             </Link>
         )}
+        {unconfirmedMeetups.map(meetup => (
+            <Link
+                key={meetup.id}
+                to={`/community/${meetup.hobby_category_id}`}
+                className="block text-xs font-black text-orange-500 hover:text-orange-600 mb-4"
+            >
+                🎪 「{meetup.title}」の開催確定を押してください
+            </Link>
+        ))}
+
 
       {/* 気分入力 */}
       <MoodInput onSuccess={loadMoods} />
