@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 from typing import List, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -102,7 +103,7 @@ def get_meetup_messages(
 
     messages = db.query(models.MeetupMessage)\
         .filter(models.MeetupMessage.post_id == post_id)\
-        .order_by(models.MeetupMessage.created_at.asc())\
+        .order_by(desc(models.MeetupMessage.created_at))\
         .all()
 
     # リアクションを各メッセージに付与

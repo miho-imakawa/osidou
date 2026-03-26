@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { authApi } from '../api';
 import { Send, X, MessageCircle, AlertTriangle } from 'lucide-react';
@@ -85,6 +85,8 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
   const [newMsg, setNewMsg] = useState('');
   // スタンプピッカーを開いているメッセージID（nullなら閉じ）
   const [stampPickerFor, setStampPickerFor] = useState<number | null>(null);
+  // 新着メッセージ送信後にスクロールをトップへ戻すためのref
+  const messagesTopRef = useRef<HTMLDivElement>(null);
 
   const fetchMessages = async () => {
     try {
@@ -145,7 +147,9 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
     try {
       await authApi.post(`/meetup-chat/${postId}`, { content: newMsg });
       setNewMsg('');
-      fetchMessages();
+      await fetchMessages();
+      // 新着が上に来るので、送信後はスクロールをトップへ
+      messagesTopRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch {
       alert("送信に失敗しました。");
     }
@@ -278,8 +282,10 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
           </div>
         )}
 
-        {/* Messages */}
+        {/* Messages（新しい順＝上から追加） */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+          {/* 送信後のスクロール先（最上部） */}
+          <div ref={messagesTopRef} />
           {messages.map((m) => (
             <div key={m.id} className="flex flex-col group">
               {/* 投稿者名（react-router-dom の Link に修正済み） */}
