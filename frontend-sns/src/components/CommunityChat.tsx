@@ -34,14 +34,12 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
         is_liked: boolean, 
         is_pinned: boolean, 
         is_closed: boolean,
-        is_attended?: boolean // 👈 ここを追加（? を付けると「無い場合もある」という意味になります）
+        is_attended?: boolean
     }>>({});
-    // ADは「開いた状態」がデフォルト。ユーザーが閉じたものをlocalStorageに保存
     const [closedAds, setClosedAds] = useState<Set<number>>(() => {
         const saved = localStorage.getItem('closedAds');
         return saved ? new Set(JSON.parse(saved)) : new Set();
     });
-    // ADの本文展開（デフォルト閉じ＝コンパクト3行表示）
     const [expandedAds, setExpandedAds] = useState<Set<number>>(new Set());
     const [meetupDetails, setMeetupDetails] = useState({
         title: '', date: '', pref: '', city_town: '', capacity: 5, fee: ''
@@ -56,24 +54,22 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
     const [selectedRoleType, setSelectedRoleType] = useState<string | null>(null);
     const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
     const [subChatAnswers, setSubChatAnswers] = useState({
-        period: '',      // 推し活動期間
-        baseCountry: '', // 推しのベースの国
-        noHarm: false,   // 傷つく人はいないか
-        noHarassment: false, // ハラスメント等に関わっていないか
-        correctParent: false, // 親との関係は正しいか
+        period: '',
+        baseCountry: '',
+        noHarm: false,
+        noHarassment: false,
+        correctParent: false,
     });
-    // 1. 通報 (バックエンドの段階的制限を叩く)
     const handleReportPost = async (postId: number) => {
         if (!window.confirm("この投稿を不適切として通報しますか？\n(通報が重なると自動的に非表示になります)")) return;
         try {
             await authApi.post(`/posts/${postId}/report`, { reason: "User reported" });
             alert("通報を受け付けました。ご協力ありがとうございます。");
-            fetchPosts(); // 非表示が発動したかもしれないので再取得
+            fetchPosts();
         } catch (err: any) {
             alert(err.response?.data?.detail || "通報に失敗しました。");
         }
     };
-    // 2. ローカル非表示 (とりあえず今の画面から消す)
     const handleLocalHide = (postId: number) => {
         if (!window.confirm("この投稿を非表示にしますか？\n(リロードするまで表示されなくなります)")) return;
         setPosts(prev => prev.filter(p => p.id !== postId));
@@ -149,15 +145,12 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
         const res = await authApi.get(`/communities/${id}`);
         return res.data;
     };
- 
-    // 🔄 リロード時やデータ更新時に、PIN済みのものをリストに復元する
     useEffect(() => {
         if (posts.length > 0) {
-            // 全投稿の中から、interactionデータで is_pinned が true のものを抽出
             const pinned = posts.filter(post => adInteractions[post.id]?.is_pinned);
             setPinnedAds(pinned);
         }
-    }, [posts, adInteractions]); // posts か adInteractions が変わるたびに実行
+    }, [posts, adInteractions]);
    
     useEffect(() => {
     if (posts.length > 0) {
@@ -219,7 +212,6 @@ useEffect(() => {
     const waitlistPostId = params.get('post_id');
     const waitlistSessionId = params.get('setup_session_id');
     if (meetupWaitlistDone && waitlistPostId && waitlistSessionId) {
-        // 先にURLパラメータをクリアして2重実行を防ぐ
         window.history.replaceState({}, '', window.location.pathname);
         fetch(`${BACKEND_URL}/api/stripe/meetup-waitlist-join`, {
             body: JSON.stringify({
@@ -258,23 +250,17 @@ useEffect(() => {
     const handleAdAction = async (postId: number, action: 'like' | 'pin' | 'close') => {
         try {
             const result = await adInteraction(postId, action);
-            
-            // 1. まず全体のインタラクション状態を更新（ボタンの色が変わる）
             setAdInteractions(prev => ({ ...prev, [postId]: result }));
-            // 2. PINアクションの場合、ヘッダーに表示するリスト(pinnedAds)を更新
             if (action === 'pin') {
                 if (result.is_pinned) {
-                    // PINされた場合：リストに追加
                     const targetedPost = posts.find(p => p.id === postId);
                     if (targetedPost) {
                         setPinnedAds(prev => {
-                            // 重複を防ぎつつ追加
                             if (prev.find(p => p.id === postId)) return prev;
                             return [...prev, targetedPost];
                         });
                     }
                 } else {
-                    // PIN解除された場合：リストから削除
                     setPinnedAds(prev => prev.filter(p => p.id !== postId));
                 }
             }
@@ -338,7 +324,6 @@ const handleSend = async (e: React.FormEvent) => {
     const isMeetup = postType === 'meetup';
     if (isMeetup ? !meetupDetails.title?.trim() : !newPost?.trim()) return;
     if (!chatTargetId) return;
-    // ★ MEETUPの場合は確認画面を出す
     if (isMeetup) {
         setShowPaymentConfirm(true);
         return;
@@ -348,7 +333,6 @@ const handleSend = async (e: React.FormEvent) => {
 const submitPost = async () => {
     const isMeetup = postType === 'meetup';
     if (isMeetup) {
-        // MEETUPはStripe経由
         try {
             const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-checkout`, {
                 method: 'POST',
@@ -366,14 +350,13 @@ const submitPost = async () => {
                 }),
             });
             const { url } = await res.json();
-            window.location.href = url; // Stripeへリダイレクト
+            window.location.href = url;
         } catch (err) {
             console.error('Stripe エラー:', err);
             alert("決済の開始に失敗しました");
         }
         return;
     }
-    // 通常投稿・AD投稿はそのまま
     try {
         await createPost({
             content: newPost,
@@ -399,18 +382,25 @@ const submitPost = async () => {
             </div>
         );
     }
-    const AD_DURATION_DAYS = 45; // AD掲載期間：45日固定
+    const AD_DURATION_DAYS = 45;
     const now = new Date();
     const allParentPosts = posts.filter(p => {
         if (p.parent_id) return false;
-        // MEETUPは開催終了4時間後に非表示
-        if (p.is_meetup && p.meetup_date && new Date(new Date(p.meetup_date).getTime() + 4 * 60 * 60 * 1000) < now) return false;
-        // ADは45日固定。ad_end_dateがある場合はそれを、なければ投稿日から45日で計算
+        // ✅ MEETUPフィルター：キャンセル済みは開催後4時間フィルターを適用しない（掲示板に残す）
+        if (p.is_meetup) {
+            if (p.meetup_status === 'cancelled') {
+                // キャンセル済みは１日後に非表示（古すぎるものは消す）
+                const canceledExpiry = new Date(new Date(p.created_at || p.created_at || Date.now()).getTime() + 1 * 86400000);
+                if (canceledExpiry < now) return false;
+            } else {
+                // 通常MEETUPは開催終了4時間後に非表示
+                if (p.meetup_date && new Date(new Date(p.meetup_date).getTime() + 4 * 60 * 60 * 1000) < now) return false;
+            }
+        }
         if (p.is_ad) {
             const expiresAt = p.ad_end_date
                 ? new Date(p.ad_end_date)
                 : new Date(new Date(p.created_at || Date.now()).getTime() + AD_DURATION_DAYS * 86400000);
-            // 掲載終了日の翌日まで表示を維持（1日猶予）
             const gracePeriod = new Date(expiresAt.getTime() + 1 * 86400000);
             if (gracePeriod < now) return false;
         }
@@ -420,10 +410,9 @@ const submitPost = async () => {
         }
         return true;
     });
-    // 2. その中で「システム投稿(ガイド)」と「通常の投稿」に分けて並び替える
     const parentPosts = [
-        ...allParentPosts.filter(p => p.is_system), // 💡 ガイドを一番上へ
-        ...allParentPosts.filter(p => !p.is_system) // 💡 通常の投稿をその下へ
+        ...allParentPosts.filter(p => p.is_system),
+        ...allParentPosts.filter(p => !p.is_system)
     ];
     return (
         <div className="flex flex-col h-[650px] bg-white border rounded-3xl shadow-xl overflow-hidden text-left font-sans relative">
@@ -440,12 +429,12 @@ const submitPost = async () => {
                     <span>＋</span> Sub Chat
                 </button>
             </div>
-        {/* 📌 新設：PIN済み広告 ＆ 参加予定ミートアップのお知らせバー */}
+        {/* PIN済み広告 ＆ 参加予定ミートアップのお知らせバー */}
         {(pinnedAds.length > 0 || posts.some(p => p.is_meetup && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended))) && (
             <div className="bg-rose-50/50 border-b border-rose-100 px-4 py-2 flex flex-col gap-2 shrink-0">
-                {/* ミートアップ表示エリア */}
                 <div className="flex flex-wrap gap-2">
                     {posts.filter(p => p.is_meetup 
+                        && p.meetup_status !== 'cancelled'  // ✅ キャンセル済みはバーに表示しない
                         && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended)
                         && (!p.meetup_date || new Date(p.meetup_date) > new Date())
                     ).map(meetup => (
@@ -459,7 +448,6 @@ const submitPost = async () => {
                         </button>
                     ))}
                 </div>
-                {/* 既存のPIN済み広告エリア */}
                 {pinnedAds.length > 0 && (
                     <div className="flex flex-wrap gap-2 border-t border-amber-100 pt-1">
                         {pinnedAds.map(post => (
@@ -501,10 +489,10 @@ const submitPost = async () => {
                     const isJoined = allParticipants.some(p => p.user_id === currentUserId);
                     const interaction = adInteractions[post.id];
                     const isClosed = closedAds.has(post.id);
+                    const isCancelledMeetup = post.is_meetup && post.meetup_status === 'cancelled'; // ✅ キャンセル済みフラグ
                     const adBg = post.ad_color === 'red' ? 'bg-red-50' : post.ad_color === 'blue' ? 'bg-blue-50' : post.ad_color === 'purple' ? 'bg-purple-50' : post.ad_color === 'white' ? 'bg-slate-50' : 'bg-green-50';
                     const adBorder = post.ad_color === 'red' ? 'border-red-200 text-red-900' : post.ad_color === 'blue' ? 'border-blue-200 text-blue-900' : post.ad_color === 'purple' ? 'border-purple-200 text-purple-900' : post.ad_color === 'white' ? 'border-slate-200 text-slate-900' : 'border-green-200 text-green-900';
                     const adBorderL = post.ad_color === 'red' ? 'border-red-400' : post.ad_color === 'blue' ? 'border-blue-400' : post.ad_color === 'purple' ? 'border-purple-400' : post.ad_color === 'white' ? 'border-slate-300' : 'border-green-400';
-                    // AD用：掲示期間計算（IIFEを使わずreturn前に計算）
                     const isAdExpanded = expandedAds.has(post.id);
                     const adExpiry = post.ad_end_date
                         ? new Date(post.ad_end_date)
@@ -519,7 +507,6 @@ const submitPost = async () => {
                             {post.is_ad ? (
                                 <div className="mb-4">
                                     {isClosed ? (
-                                        /* ── ユーザーが非表示にした状態（最小バー） ── */
                                         <div className={`px-3 py-2 border-l-4 rounded-r-2xl ${adBg} ${adBorderL}`}>
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[8px] font-black bg-gray-800 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
@@ -531,22 +518,17 @@ const submitPost = async () => {
                                             </div>
                                         </div>
                                     ) : (
-                                        /* ── 通常表示（コンパクト3行 + 展開） ── */
                                         <div className={`rounded-[24px] border-2 shadow-sm overflow-hidden ${adBg} ${adBorder}`}>
-                                            {/* ▼ 常時表示：3行コンパクトヘッダー */}
                                             <div className="px-4 pt-3 pb-2">
-                                                {/* 行1：ADバッジ + タイトル + 閉じるボタン */}
                                                 <div className="flex items-center gap-1.5 mb-1">
                                                     <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
                                                     <h3 className="font-black text-[13px] leading-tight flex-1 truncate">{post.content.split('\n')[0]}</h3>
                                                     <Link to={`/profile/${post.user_id}`} className="text-[9px] font-bold text-gray-400 hover:text-pink-500 shrink-0 transition-colors">@{post.author_nickname}</Link>
                                                     <button type="button" onClick={() => toggleAdCollapse(post.id)}
-
                                                         className="p-1 text-gray-300 hover:text-gray-500 shrink-0" title="非表示にする">
                                                         ✕
                                                     </button>
                                                 </div>
-                                                {/* 行2：掲示期間（45日固定・常に表示） */}
                                                 <div className="flex items-center gap-2 text-[10px] font-bold mb-1.5">
                                                     <span className="opacity-60">
                                                         📅 {adStartStr} 〜 {adExpiryStr}
@@ -555,7 +537,6 @@ const submitPost = async () => {
                                                         </span>
                                                     </span>
                                                 </div>
-                                                {/* 行3：VIBE・PIN + 詳細ボタン */}
                                                 <div className="flex items-center gap-2">
                                                     <button type="button" onClick={() => handleAdAction(post.id, 'like')}
                                                         className={`px-2.5 py-1 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${interaction?.is_liked ? 'bg-pink-500 text-white' : 'bg-white/70 text-gray-500 border border-gray-200'}`}>
@@ -576,7 +557,6 @@ const submitPost = async () => {
                                                     </button>
                                                 </div>
                                             </div>
-                                            {/* ▼ 展開時：本文 */}
                                             {isAdExpanded && (
                                                 <div className="px-4 pb-4 pt-1 border-t border-black/5 animate-in fade-in slide-in-from-top-1 duration-200">
                                                     <p className="text-[12px] opacity-90 whitespace-pre-wrap leading-relaxed mt-2">
@@ -605,16 +585,34 @@ const submitPost = async () => {
                                     )}
                                 </div>
                             ) : post.is_meetup ? (
-                                /* 🎪 MEETUP カード（完全復元版） */
+                                /* 🎪 MEETUP カード */
                                 <div className="space-y-2 mb-4">
-                                    <div className={`p-3 rounded-[24px] border-2 shadow-sm bg-orange-50 border-orange-200 text-left`}>
+                                    {/* ✅ キャンセル済みはグレーアウト、通常はオレンジ */}
+                                    <div className={`p-3 rounded-[24px] border-2 shadow-sm text-left ${
+                                        isCancelledMeetup
+                                            ? 'bg-gray-100 border-gray-300'
+                                            : 'bg-orange-50 border-orange-200'
+                                    }`}>
+                                        {/* ✅ キャンセル済みバッジ */}
+                                        {isCancelledMeetup && (
+                                            <div className="flex items-center gap-1.5 mb-2 px-1">
+                                                <span className="text-[10px] font-black bg-gray-500 text-white px-2 py-0.5 rounded-full">
+                                                    🚫 キャンセル済み
+                                                </span>
+                                                <span className="text-[9px] text-gray-400">このMEETUPは中止になりました</span>
+                                            </div>
+                                        )}
                                         {/* 💡 1行目：開催名 & 日時 */}
                                         <div className="flex justify-between items-center mb-1.5 px-1">
-                                            <h3 className="text-[13px] font-black text-orange-800 truncate flex-1 leading-tight">
+                                            <h3 className={`text-[13px] font-black truncate flex-1 leading-tight ${
+                                                isCancelledMeetup ? 'text-gray-400 line-through' : 'text-orange-800'
+                                            }`}>
                                                 {post.content.split('\n')[0]}
                                             </h3>
-                                            <div className="flex items-center gap-1 text-orange-700 font-black text-[11px] shrink-0 leading-none">
-                                                <Clock size={12} className="text-orange-500" />
+                                            <div className={`flex items-center gap-1 font-black text-[11px] shrink-0 leading-none ${
+                                                isCancelledMeetup ? 'text-gray-400' : 'text-orange-700'
+                                            }`}>
+                                                <Clock size={12} className={isCancelledMeetup ? 'text-gray-400' : 'text-orange-500'} />
                                                 <span>
                                                     {post.meetup_date 
                                                         ? `${post.meetup_date.slice(5, 10).replace('-', '/')} ${post.meetup_date.slice(11, 16)}` 
@@ -625,26 +623,24 @@ const submitPost = async () => {
                                         {/* 💡 2行目：場所 & 人数 & 費用 & ボタン */}
                                         <div className="flex items-center justify-between px-1">
                                             <div className="flex flex-col gap-1">
-                                                {/* 場所 */}
                                                 <div className="flex items-center gap-1 text-[10px] text-gray-600 font-bold">
-                                                    <MapPin size={11} className="text-orange-500" />
+                                                    <MapPin size={11} className={isCancelledMeetup ? 'text-gray-400' : 'text-orange-500'} />
                                                     <span className="truncate max-w-[180px]">{post.meetup_location || '場所未定'}</span>
                                                 </div>
-                                                {/* 人数 & 費用 */}
                                                 <div className="flex items-center gap-2 text-[10px] text-gray-600 font-bold">
-                                                    <Users size={11} className="text-orange-400" />
+                                                    <Users size={11} className={isCancelledMeetup ? 'text-gray-400' : 'text-orange-400'} />
                                                     <span>{dbParticipants.length}/{post.meetup_capacity}人</span>
-                                                    <Coins size={11} className="text-orange-400" />
-                                                    <span className="text-orange-600 font-black text-[10px]">
+                                                    <Coins size={11} className={isCancelledMeetup ? 'text-gray-400' : 'text-orange-400'} />
+                                                    <span className={`font-black text-[10px] ${isCancelledMeetup ? 'text-gray-400' : 'text-orange-600'}`}>
                                                         {post.meetup_fee_info && !isNaN(Number(post.meetup_fee_info)) && Number(post.meetup_fee_info) > 0 
                                                             ? `¥${post.meetup_fee_info}` 
                                                             : (post.meetup_fee_info || 'お茶代')}
                                                     </span>
                                                 </div>
                                             </div>
-                                            {/* ボタン群 */}
+                                            {/* ✅ キャンセル済みはボタン非表示、DETAILSのみ残す */}
                                             <div className="flex flex-col gap-1 items-end">
-                                                {(isJoined || isOwner) && (
+                                                {!isCancelledMeetup && (isJoined || isOwner) && (
                                                     <button 
                                                         onClick={() => setActiveChat({ id: post.id, title: post.content.split('\n')[0] })}
                                                         className="px-3 py-1 bg-blue-600 text-white rounded-full text-[9px] font-black shadow-sm flex items-center gap-1 hover:bg-blue-700 transition-colors"
@@ -654,21 +650,25 @@ const submitPost = async () => {
                                                 )}
                                                 <button 
                                                     onClick={() => setExpandedThreads(p => { const n = new Set(p); n.has(post.id) ? n.delete(post.id) : n.add(post.id); return n; })} 
-                                                    className="px-3 py-1 bg-orange-600 text-white rounded-full text-[9px] font-black shadow-sm hover:bg-orange-700 transition-colors"
+                                                    className={`px-3 py-1 rounded-full text-[9px] font-black shadow-sm transition-colors ${
+                                                        isCancelledMeetup
+                                                            ? 'bg-gray-400 text-white hover:bg-gray-500'
+                                                            : 'bg-orange-600 text-white hover:bg-orange-700'
+                                                    }`}
                                                 >
                                                     {isExpanded ? "CLOSE" : "DETAILS"}
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
-                                    {/* 詳細展開エリア（参加ボタン・参加者リストを含む） */}
+                                    {/* 詳細展開エリア */}
                                     {isExpanded && (
                                         <div className="p-4 bg-white rounded-3xl border border-orange-100 shadow-inner animate-in fade-in slide-in-from-top-1 text-left">
                                             <p className="text-[12px] text-gray-700 whitespace-pre-wrap mb-4 leading-relaxed">
                                                 {post.content}
                                             </p>
-                                            {/* 主催者のみ：文章追記 */}
-                                            {isOwner && (
+                                            {/* 主催者のみ：文章追記（キャンセル済みは非表示） */}
+                                            {isOwner && !isCancelledMeetup && (
                                                 <div className="mb-3 pb-3 border-b border-dashed border-orange-200">
                                                     <button
                                                         type="button"
@@ -691,12 +691,11 @@ const submitPost = async () => {
                                                 </div>
                                             )}
                                             <div className="border-t border-orange-50 pt-3">
-                                                {/* 参加者 */}
                                                 <p className="text-[9px] font-black text-orange-400 mb-2 uppercase tracking-widest">Participants</p>
                                                 <div className="flex flex-wrap gap-2 mb-3">
                                                     {allParticipants.filter(p => p.id === -1 || p.content !== 'Waitlist').map(p => (
                                                         <div key={p.id} className="flex items-center gap-1.5 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
-                                                            {isOwner && p.id !== -1 && (
+                                                            {isOwner && p.id !== -1 && !isCancelledMeetup && (
                                                                 <button onClick={() => toggleAttendance(p.id).then(fetchPosts)} className="text-orange-500 hover:scale-110 transition-transform">
                                                                     {p.is_attended ? <CheckSquare size={14} /> : <Square size={14} />}
                                                                 </button>
@@ -718,8 +717,8 @@ const submitPost = async () => {
                                                                     <span className="text-[11px] font-bold text-gray-500">
                                                                         {p.author_nickname}
                                                                     </span>
-                                                                    {/* 自分がWaitlistの場合：参加ボタン（50%オフ） */}
-                                                                    {p.user_id === currentUserId && (
+                                                                    {/* キャンセル済みでなければWaitlistから参加ボタンを表示 */}
+                                                                    {p.user_id === currentUserId && !isCancelledMeetup && (
                                                                         <button
                                                                             onClick={async () => {
                                                                                 if (!window.confirm('50%オフで参加しますか？\n参加費がある場合は決済が発生します。')) return;
@@ -743,7 +742,6 @@ const submitPost = async () => {
                                                                                             fetchPosts();
                                                                                         }
                                                                                     } else {
-                                                                                        // 参加費なし → 直接参加
                                                                                         await fetch(`${BACKEND_URL}/api/stripe/meetup-waitlist-join`, {
                                                                                             method: 'POST',
                                                                                             headers: { 'Content-Type': 'application/json' },
@@ -770,14 +768,21 @@ const submitPost = async () => {
                                                         </div>
                                                     </div>
                                                 )}
-                                                {/* 参加・キャンセル待ちボタン */}
-                                                {!isJoined && !isOwner && (
+
+                                                {/* ✅ キャンセル済みメッセージ（全ユーザー向け） */}
+                                                {isCancelledMeetup && (
+                                                    <div className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl text-[11px] font-black text-center border border-gray-200">
+                                                        🚫 このMEETUPは主催者によりキャンセルされました
+                                                    </div>
+                                                )}
+
+                                                {/* ✅ キャンセル済みでない場合のみ参加・ボタン群を表示 */}
+                                                {!isCancelledMeetup && !isJoined && !isOwner && (
                                                     dbParticipants.length < (post.meetup_capacity || 0) ? (
                                                         <button
                                                             onClick={async () => {
                                                                 const fee = Number(post.meetup_fee_info);
                                                                 if (post.meetup_fee_info && !isNaN(fee) && fee > 0) {
-                                                                    // 参加費あり → 先にStripeへ（レコードはまだ作らない）
                                                                     const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-join-setup`, {
                                                                         method: 'POST',
                                                                         headers: { 'Content-Type': 'application/json' },
@@ -790,7 +795,6 @@ const submitPost = async () => {
                                                                     const { checkout_url } = await res.json();
                                                                     window.location.href = checkout_url;
                                                                 } else {
-                                                                    // 参加費なし → 参加レコード作成
                                                                     await authApi.post(`/posts/${post.id}/responses`, {
                                                                         content: "Join!", is_participation: true
                                                                     });
@@ -806,7 +810,6 @@ const submitPost = async () => {
                                                             onClick={async () => {
                                                                 const fee = Number(post.meetup_fee_info);
                                                                 if (post.meetup_fee_info && !isNaN(fee) && fee > 0) {
-                                                                    // 参加費あり → カード登録してからWaitlist登録
                                                                     const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-join-setup`, {
                                                                         method: 'POST',
                                                                         headers: { 'Content-Type': 'application/json' },
@@ -820,7 +823,6 @@ const submitPost = async () => {
                                                                     const { checkout_url } = await res.json();
                                                                     window.location.href = checkout_url;
                                                                 } else {
-                                                                    // 参加費なし → 直接Waitlist登録
                                                                     await authApi.post(`/posts/${post.id}/responses`, {
                                                                         content: "Waitlist", is_participation: true
                                                                     });
@@ -833,9 +835,10 @@ const submitPost = async () => {
                                                         </button>
                                                     )
                                                 )}
-                                                {(isJoined || isOwner) && (
+
+                                                {/* ✅ キャンセル済みでない場合のみ参加済みボタン群を表示 */}
+                                                {!isCancelledMeetup && (isJoined || isOwner) && (
                                                     <div className="space-y-2">
-                                                        {/* 参加者向け：キャンセルボタン */}
                                                         {isJoined && !isOwner && (
                                                             <button
                                                                 onClick={async () => {
@@ -868,7 +871,6 @@ const submitPost = async () => {
                                                                 キャンセルする
                                                             </button>
                                                         )}
-                                                        {/* ステータス表示 */}
                                                         <div className={`w-full py-2 rounded-xl text-[11px] font-black text-center ${
                                                             isOwner ? 'bg-orange-100 text-orange-600' : 'bg-green-50 text-green-600'
                                                         }`}>
@@ -876,10 +878,8 @@ const submitPost = async () => {
                                                             allParticipants.find(p => p.user_id === currentUserId)?.content === "Waitlist"
                                                                 ? "ON WAITLIST (キャンセル待ち中)" : "YOU ARE JOINED! ✅"}
                                                         </div>
-                                                        {/* 主催者だけのボタン群 */}
                                                         {isOwner && (
                                                             <div className="space-y-2 pt-2 border-t border-orange-100">
-                                                                {/* 開催確定 & 主催者キャンセル判定 */}
                                                                 {!post.meetup_confirmed_at && post.meetup_organizer_showed !== false && (() => {
                                                                     const meetupDt = post.meetup_date ? new Date(post.meetup_date) : null;
                                                                     const isPastDeadline = meetupDt
@@ -945,21 +945,20 @@ const submitPost = async () => {
                                                                     );
                                                                 })()}
 
-                                                                {/* No Show 判定表示 */}
                                                                 {!post.meetup_confirmed_at && post.meetup_organizer_showed === false && (
                                                                     <div className="w-full py-2 bg-red-50 text-red-400 rounded-xl text-[11px] font-black text-center">
                                                                         ⚠️ No Show報告済み・開催不可
                                                                     </div>
                                                                 )}
 
-                                                                {/* 開催済み表示 */}
                                                                 {post.meetup_confirmed_at && (
                                                                     <div className="w-full py-2 bg-green-500 text-white rounded-xl text-[11px] font-black text-center">
                                                                         ✅ 開催確定済み
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                        )}                                                    </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
@@ -984,7 +983,6 @@ const submitPost = async () => {
                                                     <button type="button" onClick={() => handleReportPost(post.id)} className="p-1 text-gray-300 hover:text-red-400"><AlertTriangle size={12} /></button>
                                                 </div>
                                             </div>
-                                            {/* 親投稿の文字を大きく */}
                                             <p className="text-gray-800 text-[13px] leading-relaxed whitespace-pre-wrap">{post.content}</p>
                                             <button
                                                 type="button"
@@ -998,7 +996,6 @@ const submitPost = async () => {
                                             </button>
                                         </div>
                                     </div>
-                                    {/* 返信一覧（YouTube風に格納） */}
                                     {posts.filter(r => r.parent_id === post.id).length > 0 && (
                                         <div className="ml-4 mt-1">
                                             <button
@@ -1020,7 +1017,6 @@ const submitPost = async () => {
                                                     {posts.filter(r => r.parent_id === post.id).map(reply => (
                                                         <div key={reply.id} className="bg-gray-50/50 border border-gray-100 rounded-xl px-3 py-2 shadow-sm">
                                                             <Link to={`/users/${reply.user_id}`} className="font-black text-[9px] text-pink-400 block hover:underline">{reply.author_nickname}</Link>
-                                                            {/* 返信の文字は少し小さく控えめに */}
                                                             <p className="text-gray-600 text-[12px] leading-relaxed whitespace-pre-wrap">{reply.content}</p>
                                                             <button
                                                                 type="button"
@@ -1102,11 +1098,9 @@ const submitPost = async () => {
                     </div>
                     <div className="flex gap-2">
                         <button type="button" onClick={() => switchPostType('normal')} className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${postType === 'normal' ? 'bg-gray-800 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>CHAT</button>
-                        {/* ★ isPublic が false の時だけ MEETUP を表示 */}
                         {!isPublic && (
                         <button type="button" onClick={() => switchPostType('meetup')} className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${postType === 'meetup' ? 'bg-orange-500 text-white shadow-md' : 'bg-orange-50 text-orange-300'}`}>MEETUP</button>
                         )}
-                        {/* ★ isPublic が false の時だけ AD を表示 */}
                         {!isPublic && (
                         <button type="button" onClick={() => setShowAdModal(true)} className="flex-1 py-2 rounded-xl text-[10px] font-black transition-all bg-green-50 text-green-400 hover:bg-green-500 hover:text-white">AD</button>
                         )}
@@ -1138,13 +1132,11 @@ const submitPost = async () => {
                 <MessageSquare size={16} className="text-pink-500" />
                 Sub Chat を作成
             </h3>
-            {/* GUIDEへの案内 */}
             <p className="text-[11px] text-gray-400 leading-relaxed">
                 新しいカテゴリーの追加をご希望の場合は、
                 <Link to="/community/6" className="text-pink-500 font-bold underline">GUIDE</Link>
                 のお問い合わせからご申請ください。
             </p>
-            {/* 名前入力 */}
             <div className="space-y-1">
                 <p className="text-[10px] font-black text-gray-400 uppercase">推しの正式名で入力ください</p>
                 <input
@@ -1156,7 +1148,6 @@ const submitPost = async () => {
                     autoFocus
                 />
             </div>
-            {/* 本尊の候補リスト */}
             {searchResults.length > 0 && (
                 <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase">既存の本尊が見つかりました</p>
@@ -1176,7 +1167,6 @@ const submitPost = async () => {
                     </p>
                 </div>
             )}
-            {/* 本尊が選択された場合 */}
             {selectedMasterId && (
                 <div className="flex items-center gap-2 p-3 bg-green-50 rounded-2xl border border-green-200">
                     <span className="text-[10px] font-black text-green-600">✅ 本尊：</span>
@@ -1189,7 +1179,6 @@ const submitPost = async () => {
                     </button>
                 </div>
             )}
-            {/* タイプ選択 */}
             <div className="space-y-2">
                 <p className="text-[10px] font-black text-gray-400 uppercase">タイプ（任意）</p>
                 <div className="flex gap-2">
@@ -1213,7 +1202,6 @@ const submitPost = async () => {
                     ))}
                 </div>
             </div>
-            {/* 質問フォーム */}
             <div className="bg-pink-50 rounded-2xl p-4 space-y-3 border border-pink-100">
                 <p className="text-[10px] font-black text-pink-600 uppercase tracking-widest">作成前の確認</p>
                 <div className="space-y-1">
@@ -1258,7 +1246,6 @@ const submitPost = async () => {
                     ))}
                 </div>
             </div>
-            {/* ボタン */}
             <div className="flex gap-2">
                 <button
                     onClick={() => {
@@ -1288,12 +1275,10 @@ const submitPost = async () => {
         {showPaymentConfirm && (
             <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
                 <div className="bg-white rounded-[32px] shadow-2xl p-6 w-full max-w-sm space-y-4">
-                    {/* タイトル */}
                     <h3 className="text-sm font-black text-gray-800 flex items-center gap-2">
                         <Coins size={16} className="text-orange-500" />
                         MEETUP投稿の確認
                     </h3>
-                    {/* 投稿内容サマリー */}
                     <div className="bg-orange-50 rounded-2xl p-4 space-y-1">
                         <p className="text-[11px] font-black text-orange-800">{meetupDetails.title}</p>
                         {meetupDetails.date && (
@@ -1307,7 +1292,6 @@ const submitPost = async () => {
                             </p>
                         )}
                     </div>
-                    {/* 料金説明 */}
                     <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
                         <div className="flex justify-between items-center">
                             <span className="text-xs text-gray-600">MEETUP掲載料</span>
@@ -1318,11 +1302,9 @@ const submitPost = async () => {
                             <span className="text-base font-black text-orange-600">¥500</span>
                         </div>
                     </div>
-                    {/* Stripe説明 */}
                     <p className="text-[10px] text-gray-400 text-center">
                         Stripeの安全な決済画面に移動します。
                     </p>
-                    {/* ボタン */}
                     <div className="flex gap-2">
                         <button
                             onClick={() => setShowPaymentConfirm(false)}

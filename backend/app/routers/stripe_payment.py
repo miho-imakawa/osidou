@@ -1609,7 +1609,7 @@ async def meetup_organizer_cancel(data: dict, db: Session = Depends(get_db)):
     # MEETUP自体をキャンセル状態に
     db.execute(text("""
         UPDATE hobby_posts
-        SET meetup_status = 'cancelled', is_hidden = true
+        SET meetup_status = 'cancelled', is_hidden = false
         WHERE id = :pid
     """), {"pid": post_id})
     db.commit()

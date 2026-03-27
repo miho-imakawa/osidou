@@ -29,6 +29,16 @@ interface FriendCount {
   is_billing: boolean;
 }
 
+// ✅ 通知型定義
+interface MyNotification {
+  id: number;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  event_post_id: number | null;
+  hobby_category_id: number | null;
+}
+
 const MOOD_TYPES: Record<string, { label: string; emoji: string }> = {
   motivated: { label: 'On Fire! 熱', emoji: '🔥' },
   excited:   { label: 'Yay! 喜',    emoji: '🤩' },
@@ -64,6 +74,9 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   const [pendingCount, setPendingCount] = useState(0);
   const [friendCount, setFriendCount] = useState<FriendCount | null>(null);
 
+  // ✅ 通知リスト（件数ではなく個別通知）
+  const [notifications, setNotifications] = useState<MyNotification[]>([]);
+
   //友達申請
   const loadPendingCount = useCallback(async () => {
     try {
@@ -71,21 +84,33 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       setPendingCount(res.data.pending_count || 0);
     } catch {}
   }, []);
-    const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
-    const loadUnreadNotifCount = useCallback(async () => {
-        try {
-            const res = await authApi.get('/notifications/unread-count');
-            setUnreadNotifCount(res.data.unread_count || 0);
-        } catch {}
-    }, []);
+  // ✅ 通知一覧を取得
+  const loadNotifications = useCallback(async () => {
+    try {
+      const res = await authApi.get('/notifications/my');
+      setNotifications(res.data || []);
+    } catch {}
+  }, []);
 
-    const loadUnconfirmedMeetups = useCallback(async () => {
-      try {
-        const res = await authApi.get('/hobby-categories/my-unconfirmed-meetups');
-        setUnconfirmedMeetups(res.data || []);
-      } catch {}
-    }, []);
+  // ✅ 個別通知を既読にしてリストから消す
+  const handleNotifClick = async (notif: MyNotification) => {
+    try {
+      await authApi.patch(`/notifications/${notif.id}/read`);
+      setNotifications(prev => prev.filter(n => n.id !== notif.id));
+    } catch {}
+    // 該当MEETUPのコミュニティへ飛ぶ
+    if (notif.hobby_category_id) {
+      navigate(`/community/${notif.hobby_category_id}`);
+    }
+  };
+
+  const loadUnconfirmedMeetups = useCallback(async () => {
+    try {
+      const res = await authApi.get('/hobby-categories/my-unconfirmed-meetups');
+      setUnconfirmedMeetups(res.data || []);
+    } catch {}
+  }, []);
 
   // -------------------------------------------------------
   // フレンドの気分ログ読み込み
@@ -115,15 +140,13 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   }, [profile.id]);
 
   // -------------------------------------------------------
-  // 友達数取得（COUNT 1本・軽い）
+  // 友達数取得
   // -------------------------------------------------------
   const loadFriendCount = useCallback(async () => {
     try {
       const res = await authApi.get('/friends/me/friends/count');
       setFriendCount(res.data);
-    } catch {
-      // 失敗しても表示しないだけ
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -131,9 +154,9 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
     loadFriendsLogStatus();
     loadFriendCount();
     loadPendingCount();
-    loadUnreadNotifCount();
+    loadNotifications(); // ✅ 件数ではなく一覧を取得
     loadUnconfirmedMeetups();
-  }, [loadFriendsLogStatus, loadFriendCount, loadPendingCount, loadUnreadNotifCount, loadUnconfirmedMeetups]);
+  }, [loadFriendsLogStatus, loadFriendCount, loadPendingCount, loadNotifications, loadUnconfirmedMeetups]);
 
   // -------------------------------------------------------
   // Stripe 成功後のアクティベート処理
@@ -254,7 +277,6 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
 
     return (
       <div className="flex items-center gap-2">
-        {/* 残り回数：30本の縦棒、使うたびに1本消える */}
         <div className="flex items-center gap-0.5">
           {Array.from({ length: 30 }).map((_, i) => (
             <div
@@ -322,46 +344,48 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
         </p>
       </div>
 
-        {pendingCount > 0 && (
+      {/* 友達申請通知 */}
+      {pendingCount > 0 && (
         <Link
-            to="/friends"
-            state={{ tab: 'requests' }}
-            className="block text-xs font-bold text-amber-500 hover:text-amber-600 mb-4"
+          to="/friends"
+          state={{ tab: 'requests' }}
+          className="block text-xs font-bold text-amber-500 hover:text-amber-600 mb-4"
         >
-            🔔 ともだち申請が{pendingCount}件あります
+          🔔 ともだち申請が{pendingCount}件あります
         </Link>
-        )}
+      )}
 
-        {unreadNotifCount > 0 && (            
-            <Link
-                to="/community/832"
-                onClick={async () => {
-                    try {
-                        await authApi.patch('/notifications/read-all');
-                        setUnreadNotifCount(0);
-                    } catch {}
-                }}
-                className="block text-xs font-bold text-orange-500 hover:text-orange-600 mb-4"
+      {/* ✅ MEETUP通知：個別表示・クリックで既読＋該当コミュニティへ飛ぶ */}
+      {notifications.length > 0 && (
+        <div className="mb-4 space-y-1.5">
+          {notifications.map(notif => (
+            <button
+              key={notif.id}
+              onClick={() => handleNotifClick(notif)}
+              className="w-full text-left block text-xs font-bold text-orange-500 hover:text-orange-600 hover:bg-orange-50 px-3 py-2 rounded-xl transition-colors"
             >
-                🔔 MEETUPの通知が{unreadNotifCount}件あります
-            </Link>
-        )}
-        {unconfirmedMeetups.map(meetup => (
-            <Link
-                key={meetup.id}
-                to={`/community/${meetup.hobby_category_id}`}
-                className="block text-xs font-black text-orange-500 hover:text-orange-600 mb-4"
-            >
-                🎪 「{meetup.title}」の開催確定を押してください
-            </Link>
-        ))}
+              🔔 {notif.message}
+            </button>
+          ))}
+        </div>
+      )}
 
+      {/* 開催確定待ちMEETUP */}
+      {unconfirmedMeetups.map(meetup => (
+        <Link
+          key={meetup.id}
+          to={`/community/${meetup.hobby_category_id}`}
+          className="block text-xs font-black text-orange-500 hover:text-orange-600 mb-4"
+        >
+          🎪 「{meetup.title}」の開催確定を押してください
+        </Link>
+      ))}
 
       {/* 気分入力 */}
       <MoodInput onSuccess={loadMoods} />
 
       <div className="mt-8 space-y-3">
-        {/* Friends' Log ヘッダー：タイトル + 友達数 + DLバー */}
+        {/* Friends' Log ヘッダー */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-[14px] font-black text-gray-900 tracking-[0.2em] uppercase leading-none">
@@ -373,7 +397,6 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
         </div>
         {dlMessage && <p className="text-[10px] text-gray-400">{dlMessage}</p>}
 
-        {/* ローディング・エラー表示 */}
         {loading && (
           <p className="text-center py-10 text-[10px] font-black text-gray-300 animate-pulse">
             LOADING...
@@ -381,7 +404,6 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
         )}
         {error && <p className="text-red-500 text-xs font-bold">{error}</p>}
 
-        {/* リストが空の場合 */}
         {!loading && friendMoods.length === 0 && (
           <div className="bg-white p-10 rounded-[32px] border-2 border-dashed border-gray-100 text-center">
             <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">
@@ -390,7 +412,6 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
           </div>
         )}
 
-        {/* フレンドの気分リスト */}
         <div className="grid gap-2">
           {friendMoods.map((friendMood) => {
             const moodDetail = MOOD_TYPES[friendMood.current_mood] || { label: '?', emoji: '✨' };
@@ -402,9 +423,9 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                 className="flex items-center gap-4 py-3 border-b border-gray-50"
               >
                 <div className="w-28 flex-shrink-0">
-                <Link to={`/profile/${friendMood.user_id}`} className="text-xs font-black text-gray-800 hover:text-pink-500 hover:underline transition-colors">
-                  {friendMood.nickname || friendMood.username}
-                </Link>
+                  <Link to={`/profile/${friendMood.user_id}`} className="text-xs font-black text-gray-800 hover:text-pink-500 hover:underline transition-colors">
+                    {friendMood.nickname || friendMood.username}
+                  </Link>
                   {friendMood.friend_note && (
                     <span className="text-[9px] text-gray-400 font-medium ml-1">
                       ({friendMood.friend_note})
@@ -432,9 +453,9 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                 </span>
 
                 {!friendMood.is_muted && friendMood.current_mood_comment && (
-                    <p className="text-sm text-gray-600 font-medium flex-1 truncate">
-                        {friendMood.current_mood_comment}
-                    </p>
+                  <p className="text-sm text-gray-600 font-medium flex-1 truncate">
+                    {friendMood.current_mood_comment}
+                  </p>
                 )}
               </div>
             );

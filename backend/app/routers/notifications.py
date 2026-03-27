@@ -304,3 +304,50 @@ def mark_all_notifications_read(
     ).update({"is_read": True})
     db.commit()
     return {"status": "ok"}
+
+# =====================
+#　MEETUPキャンセルとか
+# =====================
+
+@router.get("/notifications/my")
+def get_my_notifications(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    from sqlalchemy import text
+    notifications = db.execute(text("""
+        SELECT n.id, n.message, n.is_read, n.created_at,
+               n.event_post_id,
+               hp.hobby_category_id
+        FROM notifications n
+        LEFT JOIN hobby_posts hp ON hp.id = n.event_post_id
+        WHERE n.recipient_id = :uid
+          AND n.is_read = false
+        ORDER BY n.created_at DESC
+        LIMIT 20
+    """), {"uid": current_user.id}).fetchall()
+
+    return [
+        {
+            "id": row.id,
+            "message": row.message,
+            "is_read": row.is_read,
+            "created_at": row.created_at,
+            "event_post_id": row.event_post_id,
+            "hobby_category_id": row.hobby_category_id,
+        }
+        for row in notifications
+    ]
+
+@router.patch("/notifications/{notification_id}/read")
+def mark_notification_read(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    db.query(models.Notification).filter(
+        models.Notification.id == notification_id,
+        models.Notification.recipient_id == current_user.id
+    ).update({"is_read": True})
+    db.commit()
+    return {"status": "ok"}
