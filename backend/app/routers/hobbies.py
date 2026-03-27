@@ -15,6 +15,7 @@ from .auth import get_current_user
 from pydantic import BaseModel
 from functools import lru_cache
 import time
+from sqlalchemy import text
  
 
 # キャッシュ（5分間有効）
@@ -576,6 +577,7 @@ def get_my_unconfirmed_meetups(
           AND meetup_confirmed_at IS NULL
           AND meetup_date IS NOT NULL
           AND meetup_date <= :now
+          AND meetup_date >= :now - INTERVAL '4 hours'
         ORDER BY meetup_date DESC
     """), {"uid": current_user.id, "now": now}).fetchall()
 
