@@ -360,7 +360,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       {/* 気分入力 */}
       <MoodInput onSuccess={loadMoods} />
 
-      <div className="mt-12 space-y-6">
+      <div className="mt-12 space-y-3">
         {/* Friends' Log ヘッダー：タイトル + 友達数 + DLバー */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
