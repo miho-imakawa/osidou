@@ -132,6 +132,16 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [fetchPosts]);
+    
+    useEffect(() => {
+        const markRead = async () => {
+            try {
+                await authApi.patch('/notifications/read-all');
+            } catch {}
+        };
+        markRead();
+    }, [chatTargetId]);
+
     useEffect(() => {
         const loadInteractions = async () => {
             try {
@@ -174,7 +184,7 @@ useEffect(() => {
         .then(() => {
             alert('🎉 お支払い完了！MEET UPを楽しんで！');
             window.history.replaceState({}, '', window.location.pathname);
-            fetchPosts();
+            setTimeout(() => fetchPosts(), 500);
         })
         .catch(() => alert('アクティベートに失敗しました'));
     }
@@ -224,7 +234,7 @@ useEffect(() => {
         .then(() => {
             alert('✅ 参加が確定しました！');
             window.history.replaceState({}, '', window.location.pathname);
-            fetchPosts();
+            setTimeout(() => fetchPosts(), 500);
         });
     }
 
@@ -238,7 +248,7 @@ useEffect(() => {
         .then(() => {
             alert('🎉 AD掲載完了！');
             window.history.replaceState({}, '', window.location.pathname);
-            fetchPosts();
+            setTimeout(() => fetchPosts(), 500);
         })
         .catch(() => alert('ADのアクティベートに失敗しました'));
     }
