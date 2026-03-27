@@ -3,7 +3,7 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, distinct, func
+from sqlalchemy import or_, distinct, func, text
 from sqlalchemy.exc import IntegrityError
 from typing import List, Dict, Set, Optional
 import collections
@@ -549,3 +549,42 @@ def create_sub_category(
         "parent_id": new_cat.parent_id,
         "message": f"「{new_cat.name}」を作成しました！"
     }
+
+# --------------------------------------------------
+# 💡 開催確定忘れMEETUP取得（主催者向けバナー用）
+# --------------------------------------------------
+@router.get("/my-unconfirmed-meetups")
+def get_my_unconfirmed_meetups(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    自分が主催していて、開催時間を過ぎているのに
+    meetup_confirmed_at が NULL のMEETUPを返す。
+    HOME・MYPAGEのバナー表示用。
+    """
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+
+    rows = db.execute(text("""
+        SELECT id, content, meetup_date, hobby_category_id
+        FROM hobby_posts
+        WHERE user_id = :uid
+          AND is_meetup = true
+          AND is_hidden = false
+          AND meetup_status != 'cancelled'
+          AND meetup_confirmed_at IS NULL
+          AND meetup_date IS NOT NULL
+          AND meetup_date <= :now
+        ORDER BY meetup_date DESC
+    """), {"uid": current_user.id, "now": now}).fetchall()
+
+    return [
+        {
+            "id": r.id,
+            "title": r.content.split('\n')[0],
+            "meetup_date": r.meetup_date.isoformat() if r.meetup_date else None,
+            "hobby_category_id": r.hobby_category_id,
+        }
+        for r in rows
+    ]
