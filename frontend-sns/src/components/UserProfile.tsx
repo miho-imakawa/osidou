@@ -234,7 +234,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   if (!displayProfile) return <div className="text-center py-10 text-gray-400">ユーザーが見つかりません。</div>;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="max-w-4xl mx-auto p-6 space-y-3">
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -254,7 +254,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
         /* EDIT MODE */
         <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 space-y-8 animate-in fade-in">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-6">
+            <div className="space-y-3">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Nickname</label>
                 <input type="text" className="w-full p-4 bg-gray-50 rounded-[20px] border-none focus:ring-2 focus:ring-pink-500 font-bold" value={tempProfile.nickname || ''} onChange={e => setTempProfile({...tempProfile, nickname: e.target.value})} />
@@ -287,7 +287,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Birth</label>
@@ -338,7 +338,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
         </div>
       ) : (
         /* VIEW MODE */
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* SNS Links & Bio — 常に表示 */}
           <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
             <div className="flex flex-wrap gap-4 mb-6">
