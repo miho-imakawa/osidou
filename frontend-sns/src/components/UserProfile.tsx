@@ -194,7 +194,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
     };
 
     loadData();
-  }, [displayProfile?.id, isMe, location.pathname]);
+  }, [displayProfile?.id, isMe]);
 
   const groupedLogs = moodLogs.reduce((acc: any, log) => {
     const date = new Date(log.created_at.endsWith('Z') ? log.created_at : log.created_at + 'Z');

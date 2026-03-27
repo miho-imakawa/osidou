@@ -656,13 +656,16 @@ async def download_friends_feeling_log(user_id: int, db: Session = Depends(get_d
 
     logs = db.execute(text("""
     SELECT DISTINCT ON (ml.user_id)
-        u.nickname,
-        u.username,
-        ml.mood_type,
-        ml.comment,
-        ml.created_at
+        u.nickname, u.username, ml.mood_type, ml.created_at,
+        CASE 
+            WHEN u.is_mood_comment_visible = true 
+             AND f.is_muted = false 
+            THEN ml.comment 
+            ELSE NULL 
+        END AS comment
     FROM mood_logs ml
     JOIN users u ON u.id = ml.user_id
+    JOIN friendships f ON f.friend_id = ml.user_id AND f.user_id = :uid
     WHERE ml.user_id IN (
         SELECT CASE
             WHEN f.user_id = :uid THEN f.friend_id
