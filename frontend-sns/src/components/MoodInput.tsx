@@ -5,16 +5,16 @@ import { postMoodLog } from '../api';
 import { Send, Smile } from 'lucide-react';
 
 const MOOD_TYPES = [
-    { type: 'motivated', label: 'SELECTED:「On Fire！やるぞ～」',  emoji: '🔥', group: 'green' },
-    { type: 'excited',   label: 'SELECTED:「Yay！うれしい～」',    emoji: '🤩', group: 'green' },
-    { type: 'happy',     label: 'SELECTED:「Happy！しあわせ～」',  emoji: '😊', group: 'green' },
-    { type: 'grateful',  label: 'SELECTED:「Aww～ありがとう～」',  emoji: '🙏', group: 'green' },
-    { type: 'calm',      label: 'SELECTED:「Relax～まったり～」',  emoji: '😌', group: 'yellow' },
-    { type: 'neutral',   label: 'SELECTED:「Meh…まずまず」',    emoji: '😶', group: 'yellow' },
-    { type: 'anxious',   label: 'SELECTED:「Hmm…もやもや～」',    emoji: '💭', group: 'red' },
-    { type: 'tired',     label: 'SELECTED:「Ugh…つかれた～」',    emoji: '😩', group: 'red' },
-    { type: 'sad',       label: 'SELECTED:「Sigh…なける…」',     emoji: '😭', group: 'red' },
-    { type: 'angry',     label: 'SELECTED:「Grrr！むかつく！」',  emoji: '😡', group: 'red' },
+    { type: 'motivated', label: 'On Fire！やるぞ～',  emoji: '🔥', group: 'green' },
+    { type: 'excited',   label: 'Yay！うれしい～',    emoji: '🤩', group: 'green' },
+    { type: 'happy',     label: 'Happy！しあわせ～',  emoji: '😊', group: 'green' },
+    { type: 'grateful',  label: 'Aww～ありがとう～',  emoji: '🙏', group: 'green' },
+    { type: 'calm',      label: 'Relax～まったり～',  emoji: '😌', group: 'yellow' },
+    { type: 'neutral',   label: 'Meh…まずまず',    emoji: '😶', group: 'yellow' },
+    { type: 'anxious',   label: 'Hmm…もやもや～',    emoji: '💭', group: 'red' },
+    { type: 'tired',     label: 'Ugh…つかれた～',    emoji: '😩', group: 'red' },
+    { type: 'sad',       label: 'Sigh…なける…」',     emoji: '😭', group: 'red' },
+    { type: 'angry',     label: 'Grrr！むかつく！',  emoji: '😡', group: 'red' },
 ];
 
 // グループごとの色定義
@@ -139,7 +139,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
                 <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder={`${currentMoodObj?.label || '普通'} コメントを残してね`}
+                    placeholder={`SELECTED:「${currentMoodObj?.label || '普通'}」 コメントを残してね。`}
                     rows={2}
                     maxLength={200}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none transition bg-white"
