@@ -13,7 +13,7 @@ const MOOD_TYPES = [
     { type: 'neutral',   label: 'Meh…まずまず',    emoji: '😶', group: 'yellow' },
     { type: 'anxious',   label: 'Hmm…もやもや～',    emoji: '💭', group: 'red' },
     { type: 'tired',     label: 'Ugh…つかれた～',    emoji: '😩', group: 'red' },
-    { type: 'sad',       label: 'Sigh…なける…」',     emoji: '😭', group: 'red' },
+    { type: 'sad',       label: 'Sigh…なける…',     emoji: '😭', group: 'red' },
     { type: 'angry',     label: 'Grrr！むかつく！',  emoji: '😡', group: 'red' },
 ];
 
