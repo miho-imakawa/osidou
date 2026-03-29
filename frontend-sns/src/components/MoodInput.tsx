@@ -5,16 +5,16 @@ import { postMoodLog } from '../api';
 import { Send, Smile } from 'lucide-react';
 
 const MOOD_TYPES = [
-    { type: 'motivated',  label: 'On Fire! 熱', emoji: '🔥', group: 'green' },
-    { type: 'excited',  label: 'Yay! 喜',     emoji: '🤩', group: 'green' },
-    { type: 'happy',    label: 'Happy 幸',    emoji: '😊', group: 'green' },
-    { type: 'grateful', label: 'Aww 感謝',    emoji: '🙏', group: 'green' },
-    { type: 'calm',     label: 'Relax 穏',    emoji: '😌', group: 'yellow' },
-    { type: 'neutral',  label: 'Meh 凪',      emoji: '😶', group: 'yellow' },
-    { type: 'anxious',  label: 'Hmm 憂',      emoji: '😟', group: 'red' },
-    { type: 'tired',    label: 'Ugh 倦',      emoji: '😥', group: 'red' },
-    { type: 'sad',      label: 'Sigh 悲',     emoji: '😭', group: 'red' },
-    { type: 'angry',    label: 'Grrr! 怒',    emoji: '😡', group: 'red' },
+    { type: 'motivated', label: 'Selected「On Fire！やるぞ～」',  emoji: '🔥', group: 'green' },
+    { type: 'excited',   label: 'Selected「Yay！うれしい～」',    emoji: '🤩', group: 'green' },
+    { type: 'happy',     label: 'Selected「Happy！しあわせ～」',  emoji: '😊', group: 'green' },
+    { type: 'grateful',  label: 'Selected「Aww～ありがとう～」',  emoji: '🙏', group: 'green' },
+    { type: 'calm',      label: 'Selected「Relax～まったり～」',  emoji: '😌', group: 'yellow' },
+    { type: 'neutral',   label: 'Selected「Meh…まずまず」',    emoji: '😶', group: 'yellow' },
+    { type: 'anxious',   label: 'Selected「Hmm…もやもや～」',    emoji: '💭', group: 'red' },
+    { type: 'tired',     label: 'Selected「Ugh…つかれた～」',    emoji: '😩', group: 'red' },
+    { type: 'sad',       label: 'Selected「Sigh…なける…」',     emoji: '😭', group: 'red' },
+    { type: 'angry',     label: 'Selected「Grrr！むかつく！」',  emoji: '😡', group: 'red' },
 ];
 
 // グループごとの色定義
@@ -130,7 +130,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
                                     }
                                 `}
                             >
-                                {mood.emoji} {mood.label}
+                                <span className="text-2xl">{mood.emoji}</span>
                             </button>
                         );
                     })}
@@ -139,7 +139,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
                 <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder={`「${currentMoodObj?.label || '普通'}」を選びました。一言コメントを残しましょう！`}
+                    placeholder={`SELECTED:「${currentMoodObj?.label || '普通'}」`}
                     rows={2}
                     maxLength={200}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none transition bg-white"

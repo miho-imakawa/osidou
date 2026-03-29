@@ -134,7 +134,7 @@ const LoginPage: React.FC = () => {
                     {mode === 'login' && (
                         <p className="text-center text-[11px] text-gray-400">
                             パスワードをお忘れの方は{' '}
-                            <a href="mailto:mihou.imakawa@machistrategist.com" className="text-pink-500 underline font-bold">
+                            <a href="mailto:system@machistrategist.com" className="text-pink-500 underline font-bold">
                                 推集炉管理者にメールでお問い合わせ
                             </a>
                             {' '}からご連絡ください。
