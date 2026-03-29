@@ -139,7 +139,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
                 <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder={`「${currentMoodObj?.label || '普通'}」`}
+                    placeholder={`「${currentMoodObj?.label || '普通'}」コメントを残してね`}
                     rows={2}
                     maxLength={200}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none transition bg-white"
