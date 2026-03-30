@@ -1986,7 +1986,7 @@ async def create_connect_onboard(data: dict, db: Session = Depends(get_db)):
         )
         return {"url": account_link.url}
     except stripe.error.StripeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Stripe エラー: {str(e)}")
 
 
 @router.get("/stripe/connect/status")

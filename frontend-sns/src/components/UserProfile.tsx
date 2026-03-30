@@ -353,7 +353,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               <div className="pt-4 border-t border-gray-50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-tx font-bold text-gray-400 uppercase tracking-widest mb-1">
+                    <p className="text-tx font-bold text-gray-500 uppercase tracking-widest mb-1">
                       MEETUP 主催者登録
                     </p>
                     {connectStatus?.is_ready ? (
