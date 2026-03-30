@@ -456,7 +456,12 @@ const submitPost = async () => {
                 </button>
             </div>
         {/* PIN済み広告 ＆ 参加予定ミートアップのお知らせバー */}
-        {(pinnedAds.length > 0 || posts.some(p => p.is_meetup && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended))) && (
+        {(pinnedAds.length > 0 || posts.some(p => 
+            p.is_meetup 
+            && p.meetup_status !== 'cancelled'
+            && (p.user_id === currentUserId || adInteractions[p.id]?.is_attended)
+            && (!p.meetup_date || new Date(p.meetup_date) > new Date())
+        )) && (
             <div className="bg-rose-50/50 border-b border-rose-100 px-4 py-2 flex flex-col gap-2 shrink-0">
                 <div className="flex flex-wrap gap-2">
                     {posts.filter(p => p.is_meetup 
