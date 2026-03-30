@@ -236,7 +236,7 @@ export const fetchMyCommunities = async (): Promise<HobbyCategory[]> => {
 export const fetchFollowingMoods = async (): Promise<UserMoodResponse[]> => (await authApi.get('/users/following/moods')).data;
 
 export const fetchMyMoodHistory = async (): Promise<MoodLog[]> => {
-    const res = await authApi.get('/users/moods/my-logs');
+    const res = await authApi.get('/users/me/mood-history');
     return res.data;
 };
 

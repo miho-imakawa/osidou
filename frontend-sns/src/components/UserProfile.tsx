@@ -421,7 +421,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                         </div>
                       </Link>
                     );
-                  }) : <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Feeling posts</p>}
+                  }) : <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Communities</p>}
                 </div>
               </div>
 
