@@ -42,6 +42,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   const [pendingCount, setPendingCount] = useState(0);
   const [unconfirmedMeetups, setUnconfirmedMeetups] = useState<any[]>([]);
 
+  const [connectStatus, setConnectStatus] = useState<{
+    connected: boolean;
+    is_ready?: boolean;
+  } | null>(null);
+
   const getRankClasses = (count: number) => {
     if (count >= 10000) return "bg-yellow-50 text-yellow-700 border-yellow-300 shadow-sm";
     if (count >= 500) return "bg-pink-50 text-pink-700 border-pink-200";
@@ -117,13 +122,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
     }
   };
 
-  useEffect(() => {
-    const query = new URLSearchParams(location.search);
-    const sessionId = query.get('session_id');
-    if (sessionId && !isDownloading) {
-      executeDownload(sessionId);
-    }
-  }, [location.search]);
+useEffect(() => {
+  const query = new URLSearchParams(location.search);
+  const sessionId = query.get('session_id');
+  if (sessionId && !isDownloading) {
+    executeDownload(sessionId);
+  }
+  // ✅ Connect完了後の再確認
+  if (query.get('connect_done')) {
+    authApi.get(`/api/stripe/connect/status?user_id=${myProfile?.id}`)
+      .then(res => setConnectStatus(res.data))
+      .catch(() => {});
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+}, [location.search]);
 
   useEffect(() => {
     if (userId) {
@@ -187,6 +199,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
 
         const logs = await fetchMyMoodHistory();
         setMoodLogs(logs);
+
+                // Stripe Connect状態確認
+        try {
+          const connectRes = await authApi.get(`/api/stripe/connect/status?user_id=${displayProfile.id}`);
+          setConnectStatus(connectRes.data);
+        } catch {}
 
       } catch (err) {
         console.error("データ取得失敗:", err);
@@ -332,6 +350,43 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               </div>
             </div>
           </div>
+          {/* Stripe Connect 口座登録 */}
+          <div className="pt-4 border-t border-gray-50">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                  💳 MEETUP 主催者登録
+                </p>
+                {connectStatus?.is_ready ? (
+                  <p className="text-[11px] font-bold text-green-600">✅ 登録済み・振込可能 👑</p>
+                ) : connectStatus?.connected ? (
+                  <p className="text-[11px] font-bold text-amber-500">⚠️ 手続き中</p>
+                ) : (
+                  <p className="text-[11px] text-gray-400">未登録（MEETUP参加費を受け取るために必要）</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await authApi.post('/api/stripe/connect/onboard', {
+                      userId: displayProfile.id
+                    });
+                    if (res.data.url) window.location.href = res.data.url;
+                  } catch {
+                    alert('エラーが発生しました。');
+                  }
+                }}
+                className={`px-3 py-2 rounded-xl text-[10px] font-black transition-all ${
+                  connectStatus?.is_ready
+                    ? 'bg-gray-100 text-gray-400 cursor-default'
+                    : 'bg-orange-500 text-white hover:bg-orange-600'
+                }`}
+              >
+                {connectStatus?.is_ready ? '登録済み' : '口座を登録する'}
+              </button>
+            </div>
+          </div>
           <button onClick={handleSave} className="w-full py-5 bg-gray-900 text-white rounded-[24px] font-bold flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-[0.98]">
             <Save size={20} /> プロフィールを保存
           </button>
@@ -401,9 +456,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
             <>
               {/* Communities */}
               <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
-                <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
-                  <MessageSquare className="text-pink-600" size={14}/> Communities
-                </h2>
+              <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
+                <MessageSquare className="text-pink-600" size={14}/> Communities
+                {connectStatus?.is_ready && (
+                  <span className="ml-1 text-[14px]" title="HOST登録済み">👑</span>
+                )}
+              </h2>
                 <div className="flex flex-wrap gap-2">
                   {myCategories.length > 0 ? myCategories.map(cat => {
                     const totalCount = cat.member_count || 0; 
