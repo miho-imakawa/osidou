@@ -376,14 +376,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                         alert('エラーが発生しました。');
                       }
                     }}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black transition-all ${
+                    className={`flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-black transition-all ${
                       connectStatus?.is_ready
                         ? 'bg-gray-100 text-gray-400 cursor-default'
                         : 'bg-orange-500 text-white hover:bg-orange-600 shadow-md'
                     }`}
                   >
                     <BadgeCheck size={14} />
-                    {connectStatus?.is_ready ? '登録済み' : '口座を登録する'}
+                    {connectStatus?.is_ready ? '登録済み' : '口座登録'}
                   </button>
                 </div>
               </div>
