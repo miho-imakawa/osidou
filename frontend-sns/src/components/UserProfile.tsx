@@ -516,7 +516,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                       <div className="space-y-4 pl-1">
                         {groupedLogs[month].map((log: any) => {
                           const date = new Date(log.created_at.endsWith('Z') ? log.created_at : log.created_at + 'Z');
-                          const moodMap: any = { motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌', neutral: '😶', anxious: '💭', tired: '😩', sad: '😭', angry: '😡', grateful: '🙏' };
+                          const moodMap: any = { 
+                            motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌', 
+                            neutral: '😶', anxious: '💭', tired: '😩', sad: '😭', 
+                            angry: '😡', grateful: '🙏',
+                            MOTIVATED: '🔥', EXCITED: '🤩', HAPPY: '😊', CALM: '😌',
+                            NEUTRAL: '😶', ANXIOUS: '💭', TIRED: '😩', SAD: '😭',
+                            ANGRY: '😡', GRATEFUL: '🙏'
+                          };
                           return (
                             <div key={log.id} className="flex items-center gap-5 text-sm">
                               <div className="flex items-center gap-1 w-24 flex-shrink-0">
