@@ -353,15 +353,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               <div className="pt-4 border-t border-gray-50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                      MEETUP 主催者登録
+                    <p className="text-tx font-bold text-gray-400 uppercase tracking-widest mb-1">
+                      MEETUP 主催者登録 ☞ ☞ ☞
                     </p>
                     {connectStatus?.is_ready ? (
-                      <p className="text-[11px] font-bold text-green-600">✅ 主催者登録済み 振込可能 👑</p>
+                      <p className="text-[10px] font-bold text-green-600">✅ 主催者登録済み 振込可能 👑</p>
                     ) : connectStatus?.connected ? (
-                      <p className="text-[11px] font-bold text-amber-500">⚠️ 手続き中</p>
+                      <p className="text-[10px] font-bold text-amber-500">⚠️ 手続き中</p>
                     ) : (
-                      <p className="text-[11px] text-gray-400">MEETUP参加費 受領用</p>
+                      <p className="text-[10px] text-gray-400">MEETUP参加費 受領用</p>
                     )}
                   </div>
                   <button
