@@ -157,14 +157,30 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
     };
     useEffect(() => {
         if (posts.length > 0) {
-            const pinned = posts.filter(post => adInteractions[post.id]?.is_pinned);
+            const pinned = posts.filter(post => {
+                if (!adInteractions[post.id]?.is_pinned) return false;
+                // ✅ 期限+1日を過ぎたPINは非表示
+                const expiresAt = post.ad_end_date
+                    ? new Date(post.ad_end_date)
+                    : new Date(new Date(post.created_at || Date.now()).getTime() + 45 * 86400000);
+                const gracePeriod = new Date(expiresAt.getTime() + 1 * 86400000);
+                return gracePeriod > new Date();
+            });
             setPinnedAds(pinned);
         }
     }, [posts, adInteractions]);
    
     useEffect(() => {
     if (posts.length > 0) {
-        const pinned = posts.filter(post => adInteractions[post.id]?.is_pinned);
+        const pinned = posts.filter(post => {
+            if (!adInteractions[post.id]?.is_pinned) return false;
+            // ✅ 期限+1日を過ぎたPINは非表示
+            const expiresAt = post.ad_end_date
+                ? new Date(post.ad_end_date)
+                : new Date(new Date(post.created_at || Date.now()).getTime() + 45 * 86400000);
+            const gracePeriod = new Date(expiresAt.getTime() + 1 * 86400000);
+            return gracePeriod > new Date();
+        });
         setPinnedAds(pinned);
     }
 }, [posts, adInteractions]);
