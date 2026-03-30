@@ -1350,10 +1350,15 @@ async def meetup_confirm(data: dict, db: Session = Depends(get_db)):
 
             # ✅ Stripe Connect設定済みの場合：主催者アカウントへ95%をTransfer
             # 環境変数 STRIPE_CONNECT_ACCOUNT_ID が設定されていれば自動Transfer
-            if ORGANIZER_CONNECT_ACCOUNT_ID:
+            organizer = db.execute(
+                text("SELECT stripe_connect_account_id, stripe_connect_onboarded FROM users WHERE id = :uid"),
+                {"uid": organizer_id}
+            ).fetchone()
+
+            if organizer and organizer.stripe_connect_account_id and organizer.stripe_connect_onboarded:
                 pi_params["transfer_data"] = {
                     "amount": organizer_amount,
-                    "destination": ORGANIZER_CONNECT_ACCOUNT_ID,
+                    "destination": organizer.stripe_connect_account_id,
                 }
 
             pi = stripe.PaymentIntent.create(**pi_params)
@@ -1922,3 +1927,103 @@ async def get_billing_summary(user_id: int, db: Session = Depends(get_db)):
         "hide_affiliate":    hide_affiliate_active,
         "one_time_payments": one_time,
     }
+
+
+# -------------------------------------------------------
+# Stripe Connect：主催者オンボーディング
+# -------------------------------------------------------
+
+@router.post("/stripe/connect/onboard")
+async def create_connect_onboard(data: dict, db: Session = Depends(get_db)):
+    """
+    主催者がStripe Connectアカウントを作成してオンボーディングするURL発行。
+    """
+    user_id = data.get("userId")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="userId が必要です")
+    
+    user_id = int(user_id)
+    
+    # ユーザー情報取得
+    user = db.execute(
+        text("SELECT id, email, nickname, stripe_connect_account_id FROM users WHERE id = :uid"),
+        {"uid": user_id}
+    ).fetchone()
+    if not user:
+        raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+
+    # すでにConnectアカウントがあればそれを使う
+    connect_account_id = user.stripe_connect_account_id
+
+    if not connect_account_id:
+        # 新規Expressアカウント作成
+        account = stripe.Account.create(
+            type="express",
+            country="JP",
+            email=user.email,
+            capabilities={
+                "transfers": {"requested": True},
+            },
+            metadata={"user_id": str(user_id)},
+        )
+        connect_account_id = account.id
+
+        # DBに保存
+        db.execute(text("""
+            UPDATE users 
+            SET stripe_connect_account_id = :acct_id
+            WHERE id = :uid
+        """), {"acct_id": connect_account_id, "uid": user_id})
+        db.commit()
+
+    # オンボーディングURL発行
+    try:
+        account_link = stripe.AccountLink.create(
+            account=connect_account_id,
+            refresh_url=f"{FRONTEND_URL}/profile?connect_refresh=true",
+            return_url=f"{FRONTEND_URL}/profile?connect_done=true",
+            type="account_onboarding",
+        )
+        return {"url": account_link.url}
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stripe/connect/status")
+async def get_connect_status(user_id: int, db: Session = Depends(get_db)):
+    """
+    主催者のConnect状態を確認する。
+    """
+    user = db.execute(
+        text("SELECT stripe_connect_account_id, stripe_connect_onboarded FROM users WHERE id = :uid"),
+        {"uid": user_id}
+    ).fetchone()
+    
+    if not user or not user.stripe_connect_account_id:
+        return {"connected": False}
+
+    # Stripeから最新状態を確認
+    try:
+        account = stripe.Account.retrieve(user.stripe_connect_account_id)
+        is_ready = (
+            account.charges_enabled and 
+            account.payouts_enabled and
+            account.details_submitted
+        )
+        
+        # DBのステータスも更新
+        if is_ready and not user.stripe_connect_onboarded:
+            db.execute(text("""
+                UPDATE users SET stripe_connect_onboarded = true WHERE id = :uid
+            """), {"uid": user_id})
+            db.commit()
+        
+        return {
+            "connected": True,
+            "account_id": user.stripe_connect_account_id,
+            "charges_enabled": account.charges_enabled,
+            "payouts_enabled": account.payouts_enabled,
+            "is_ready": is_ready,
+        }
+    except stripe.error.StripeError:
+        return {"connected": False}
