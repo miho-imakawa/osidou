@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { 
   User, Globe, Twitter, Facebook, Instagram, BookOpen,
-  Edit, MessageSquare, Heart, Download, Save, X, Eye, EyeOff, AtSign, MapPin, Clock, Flame, Calendar
+  Edit, MessageSquare, Heart, Download, Save, X, Eye, EyeOff, AtSign, MapPin, Clock, Flame, Calendar, BadgeCheck
 } from 'lucide-react';
 import { 
   authApi, 
@@ -122,20 +122,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
     }
   };
 
-useEffect(() => {
-  const query = new URLSearchParams(location.search);
-  const sessionId = query.get('session_id');
-  if (sessionId && !isDownloading) {
-    executeDownload(sessionId);
-  }
-  // ✅ Connect完了後の再確認
-  if (query.get('connect_done')) {
-    authApi.get(`/api/stripe/connect/status?user_id=${myProfile?.id}`)
-      .then(res => setConnectStatus(res.data))
-      .catch(() => {});
-    window.history.replaceState({}, '', window.location.pathname);
-  }
-}, [location.search]);
+  useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    const sessionId = query.get('session_id');
+    if (sessionId && !isDownloading) {
+      executeDownload(sessionId);
+    }
+    // ✅ Connect完了後の再確認
+    if (query.get('connect_done')) {
+      authApi.get(`/api/stripe/connect/status?user_id=${myProfile?.id}`)
+        .then(res => setConnectStatus(res.data))
+        .catch(() => {});
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (userId) {
@@ -168,21 +168,26 @@ useEffect(() => {
           authApi.get('/posts/my-hosted-meetups')
         ]);
 
-      if (isMe) {
-        const adsRes = await authApi.get('/posts/my-ads-stats'); 
-        setMyAdsStats(adsRes.data || []);
+        if (isMe) {
+          const adsRes = await authApi.get('/posts/my-ads-stats'); 
+          setMyAdsStats(adsRes.data || []);
 
-        const pendingRes = await authApi.get('/friends/pending/count');
-        setPendingCount(pendingRes.data.pending_count || 0);
+          const pendingRes = await authApi.get('/friends/pending/count');
+          setPendingCount(pendingRes.data.pending_count || 0);
 
-        try {
-          const unconfirmedRes = await authApi.get('/hobby-categories/my-unconfirmed-meetups');
-          setUnconfirmedMeetups(unconfirmedRes.data || []);
-        } catch {}
-      }
+          try {
+            const unconfirmedRes = await authApi.get('/hobby-categories/my-unconfirmed-meetups');
+            setUnconfirmedMeetups(unconfirmedRes.data || []);
+          } catch {}
+
+          // Stripe Connect状態確認
+          try {
+            const connectRes = await authApi.get(`/api/stripe/connect/status?user_id=${myProfile?.id}`);
+            setConnectStatus(connectRes.data);
+          } catch {}
+        }
 
         const joined = joinedRes.data || [];
-
         const hosted = hostedRes.data || [];
 
         const allMeetups = [...hosted];
@@ -199,12 +204,6 @@ useEffect(() => {
 
         const logs = await fetchMyMoodHistory();
         setMoodLogs(logs);
-
-                // Stripe Connect状態確認
-        try {
-          const connectRes = await authApi.get(`/api/stripe/connect/status?user_id=${displayProfile.id}`);
-          setConnectStatus(connectRes.data);
-        } catch {}
 
       } catch (err) {
         console.error("データ取得失敗:", err);
@@ -336,6 +335,7 @@ useEffect(() => {
                 <textarea className="w-full p-5 bg-gray-50 rounded-[32px] border-none text-sm h-32 focus:ring-2 focus:ring-pink-500" value={tempProfile.bio || ''} onChange={e => setTempProfile({...tempProfile, bio: e.target.value})} />
               </div>
 
+              {/* 気分コメント表示設定 */}
               <div className="pt-4 border-t border-gray-50">
                 <label className="flex items-center gap-3 cursor-pointer group">
                   <input type="checkbox" className="hidden" checked={tempProfile.is_mood_comment_visible} onChange={e => setTempProfile({...tempProfile, is_mood_comment_visible: e.target.checked})} />
@@ -348,45 +348,48 @@ useEffect(() => {
                   </div>
                 </label>
               </div>
-            </div>
-          </div>
-          {/* Stripe Connect 口座登録 */}
-          <div className="pt-4 border-t border-gray-50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                  💳 MEETUP 主催者登録
-                </p>
-                {connectStatus?.is_ready ? (
-                  <p className="text-[11px] font-bold text-green-600">✅ 登録済み・振込可能 👑</p>
-                ) : connectStatus?.connected ? (
-                  <p className="text-[11px] font-bold text-amber-500">⚠️ 手続き中</p>
-                ) : (
-                  <p className="text-[11px] text-gray-400">未登録（MEETUP参加費を受け取るために必要）</p>
-                )}
+
+              {/* ✅ Stripe Connect 口座登録 — 気分コメントの直下 */}
+              <div className="pt-4 border-t border-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                      MEETUP 主催者登録
+                    </p>
+                    {connectStatus?.is_ready ? (
+                      <p className="text-[11px] font-bold text-green-600">✅ 登録済み・振込可能 👑</p>
+                    ) : connectStatus?.connected ? (
+                      <p className="text-[11px] font-bold text-amber-500">⚠️ 手続き中</p>
+                    ) : (
+                      <p className="text-[11px] text-gray-400">未登録（MEETUP参加費を受け取るために必要）</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await authApi.post('/api/stripe/connect/onboard', {
+                          userId: displayProfile.id
+                        });
+                        if (res.data.url) window.location.href = res.data.url;
+                      } catch {
+                        alert('エラーが発生しました。');
+                      }
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black transition-all ${
+                      connectStatus?.is_ready
+                        ? 'bg-gray-100 text-gray-400 cursor-default'
+                        : 'bg-orange-500 text-white hover:bg-orange-600 shadow-md'
+                    }`}
+                  >
+                    <BadgeCheck size={14} />
+                    {connectStatus?.is_ready ? '登録済み' : '口座を登録する'}
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const res = await authApi.post('/api/stripe/connect/onboard', {
-                      userId: displayProfile.id
-                    });
-                    if (res.data.url) window.location.href = res.data.url;
-                  } catch {
-                    alert('エラーが発生しました。');
-                  }
-                }}
-                className={`px-3 py-2 rounded-xl text-[10px] font-black transition-all ${
-                  connectStatus?.is_ready
-                    ? 'bg-gray-100 text-gray-400 cursor-default'
-                    : 'bg-orange-500 text-white hover:bg-orange-600'
-                }`}
-              >
-                {connectStatus?.is_ready ? '登録済み' : '口座を登録する'}
-              </button>
             </div>
           </div>
+
           <button onClick={handleSave} className="w-full py-5 bg-gray-900 text-white rounded-[24px] font-bold flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-[0.98]">
             <Save size={20} /> プロフィールを保存
           </button>
@@ -440,7 +443,7 @@ useEffect(() => {
               </Link>
           ))}
 
-          {/* 🔒 非公開バナー — 自分のページかつ is_mood_visible=false のときのみ表示 */}
+          {/* 🔒 非公開バナー */}
           {isMe && (
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-gray-200"></div>
@@ -451,17 +454,16 @@ useEffect(() => {
             </div>
           )}
 
-          {/* ▼ showDetailSections で一括制御 */}
           {isMe && (
             <>
               {/* Communities */}
               <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
-              <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
-                <MessageSquare className="text-pink-600" size={14}/> Communities
-                {connectStatus?.is_ready && (
-                  <span className="ml-1 text-[14px]" title="HOST登録済み">👑</span>
-                )}
-              </h2>
+                <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
+                  <MessageSquare className="text-pink-600" size={14}/> Communities
+                  {connectStatus?.is_ready && (
+                    <span className="ml-1 text-[14px]" title="HOST登録済み">👑</span>
+                  )}
+                </h2>
                 <div className="flex flex-wrap gap-2">
                   {myCategories.length > 0 ? myCategories.map(cat => {
                     const totalCount = cat.member_count || 0; 
@@ -483,7 +485,7 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* JOINING & MY MEETUPS — 自分のページのみ表示（他人には不要な情報） */}
+              {/* JOINING & MY MEETUPS */}
               {isMe && (
                 <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
                   <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
@@ -517,43 +519,45 @@ useEffect(() => {
                 </div>
               )}
 
-              {/* MY ADS STATS */}
-              {myAdsStats.length > 0 && (
-                <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
-                  <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
-                    My Ads
-                  </h2>
-                  <div className="flex flex-wrap gap-2">
-                    {myAdsStats
-                      .filter(ad => {  // ✅ これを追加
-                        const expiry = ad.ad_end_date
-                          ? new Date(new Date(ad.ad_end_date).getTime() + 1 * 86400000)
-                          : new Date(new Date(ad.created_at).getTime() + 46 * 86400000);
-                        return expiry > new Date();
-                      })
-                      .map(ad => (
-                      <Link
-                        key={ad.id}
-                        to={`/community/${ad.hobby_category_id}`}
-                        className="flex items-center gap-3 px-4 py-1.5 bg-green-50 border border-green-200 rounded-full hover:bg-green-100 transition-all"
-                      >
-                        <span className="text-[11px] font-bold text-green-800 truncate max-w-[120px]">
-                          {ad.title}
-                        </span>
-                        <div className="flex items-center gap-2 shrink-0 border-l border-green-200 pl-2">
-                          <span className="text-[11px] font-black text-pink-500">👍 {ad.like_count}</span>
-                          <span className="text-[11px] font-black text-yellow-500">📌 {ad.pin_count}</span>
-                          {ad.ad_end_date && (
-                            <span className="text-[9px] text-green-400">
-                              〜{ad.ad_end_date.slice(0, 10)}
-                            </span>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
+              {/* ✅ MY ADS STATS — 期限切れフィルター修正 */}
+              {(() => {
+                const activeAds = myAdsStats.filter(ad => {
+                  const expiry = ad.ad_end_date
+                    ? new Date(new Date(ad.ad_end_date).getTime() + 1 * 86400000)
+                    : new Date(new Date(ad.created_at).getTime() + 46 * 86400000);
+                  return expiry > new Date();
+                });
+                if (activeAds.length === 0) return null;
+                return (
+                  <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
+                    <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
+                      My Ads
+                    </h2>
+                    <div className="flex flex-wrap gap-2">
+                      {activeAds.map(ad => (
+                        <Link
+                          key={ad.id}
+                          to={`/community/${ad.hobby_category_id}`}
+                          className="flex items-center gap-3 px-4 py-1.5 bg-green-50 border border-green-200 rounded-full hover:bg-green-100 transition-all"
+                        >
+                          <span className="text-[11px] font-bold text-green-800 truncate max-w-[120px]">
+                            {ad.title}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0 border-l border-green-200 pl-2">
+                            <span className="text-[11px] font-black text-pink-500">👍 {ad.like_count}</span>
+                            <span className="text-[11px] font-black text-yellow-500">📌 {ad.pin_count}</span>
+                            {ad.ad_end_date && (
+                              <span className="text-[9px] text-green-400">
+                                〜{ad.ad_end_date.slice(0, 10)}
+                              </span>
+                            )}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Feeling Logs */}
               <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-2">
