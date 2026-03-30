@@ -357,11 +357,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                       MEETUP 主催者登録
                     </p>
                     {connectStatus?.is_ready ? (
-                      <p className="text-[11px] font-bold text-green-600">✅ 登録済み・振込可能 👑</p>
+                      <p className="text-[11px] font-bold text-green-600">✅ 主催者登録済み 振込可能 👑</p>
                     ) : connectStatus?.connected ? (
                       <p className="text-[11px] font-bold text-amber-500">⚠️ 手続き中</p>
                     ) : (
-                      <p className="text-[11px] text-gray-400">未登録（MEETUP参加費を受け取るために必要）</p>
+                      <p className="text-[11px] text-gray-400">MEETUP参加費 受領用</p>
                     )}
                   </div>
                   <button
