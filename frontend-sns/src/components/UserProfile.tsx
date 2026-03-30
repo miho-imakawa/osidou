@@ -466,7 +466,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                     My Ads
                   </h2>
                   <div className="flex flex-wrap gap-2">
-                    {myAdsStats.map(ad => (
+                    {myAdsStats
+                      .filter(ad => {  // ✅ これを追加
+                        const expiry = ad.ad_end_date
+                          ? new Date(new Date(ad.ad_end_date).getTime() + 1 * 86400000)
+                          : new Date(new Date(ad.created_at).getTime() + 46 * 86400000);
+                        return expiry > new Date();
+                      })
+                      .map(ad => (
                       <Link
                         key={ad.id}
                         to={`/community/${ad.hobby_category_id}`}
