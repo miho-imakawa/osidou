@@ -353,7 +353,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               <div className="pt-4 border-t border-gray-50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-tx font-bold text-gray-500 uppercase tracking-widest mb-1">
+                    <p className="text-ts font-bold text-gray-500 uppercase tracking-widest mb-1">
                       MEETUP 主催者登録
                     </p>
                     {connectStatus?.is_ready ? (
@@ -376,7 +376,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                         alert('エラーが発生しました。');
                       }
                     }}
-                    className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-black transition-all ${
+                    className={`flex items-center gap-1 px-2 py-2 rounded-xl text-[10px] font-black transition-all ${
                       connectStatus?.is_ready
                         ? 'bg-gray-100 text-gray-500 cursor-default'
                         : 'bg-orange-500 text-white hover:bg-orange-600 shadow-md'

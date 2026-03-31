@@ -9,7 +9,7 @@ const TokuteiPage: React.FC = () => {
     { label: "メールアドレス", value: "system@machistrategist.com" },
     { label: "販売価格", value: "各サービスページに表示の価格（200円〜）" },
     { label: "代金の支払い", value: "クレジットカード決済（Stripe）" },
-    { label: "商品の引渡時期", value: "決済完了後、即時（ダウンロード、掲載枠が有効化" },
+    { label: "商品の引渡時期", value: "決済完了後、即時（ダウンロード、掲載枠が有効化）" },
     { label: "返品・交換・キャンセル", value: "デジタルコンテンツおよびサービスの性質上、決済完了後の返品・返金・キャンセルには応じられません。" },
   ];
 

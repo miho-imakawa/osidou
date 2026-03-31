@@ -1964,6 +1964,13 @@ async def create_connect_onboard(data: dict, db: Session = Depends(get_db)):
             capabilities={
                 "transfers": {"requested": True},
             },
+            # ここから下が追加・修正ポイントです
+            business_type="individual",  # 最初から「個人事業主」を選択状態にする
+            business_profile={
+                "url": "https://osidou.com",  # osidouのURLをセット
+                "mcc": "5734",  # 業種：コンピュータソフトウェアサービスを指定
+                "product_description": "osidou（推し道）プラットフォームを通じたコミュニティ運営・MEETUPイベントの参加費受領のため。",
+            },
             metadata={"user_id": str(user_id)},
         )
         connect_account_id = account.id
