@@ -143,10 +143,9 @@ const LoginPage: React.FC = () => {
                     {mode === 'login' && (
                         <p className="text-center text-[11px] text-gray-400">
                             パスワードをお忘れの方は{' '}
-                            <a href="mailto:system@osidou.com" className="text-pink-500 underline font-bold">
-                                お問い合わせ
+                            <a href="/forgot-password" className="text-pink-500 underline font-bold">
+                                こちら
                             </a>
-                            {' '}からご連絡ください。
                         </p>
                     )}
                 </div>
