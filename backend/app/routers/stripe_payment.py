@@ -1,3 +1,4 @@
+import asyncio 
 import csv
 import io
 import os
@@ -1393,7 +1394,7 @@ async def meetup_confirm(data: dict, db: Session = Depends(get_db)):
                 subject="【推し道】MEETUP参加費のお支払いが完了しました",
                 html=meetup_confirmed_email_html(
                     user_row.nickname or "",
-                    post_info.content[:30] if hasattr(post_info, 'content') else "MEETUP",
+                    post.content[:30] if hasattr(post, 'content') else "MEETUP",
                     fee,
                 ),
             ))
