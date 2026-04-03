@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { authApi } from '../api';
+import { Link } from 'react-router-dom'; // これを追加
 
 const LoginPage: React.FC = () => {
     const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -143,9 +144,9 @@ const LoginPage: React.FC = () => {
                     {mode === 'login' && (
                         <p className="text-center text-[11px] text-gray-400">
                             パスワードをお忘れの方は{' '}
-                            <a href="/forgot-password" className="text-pink-500 underline font-bold">
+                            <Link to="/forgot-password" className="text-pink-500 underline font-bold">
                                 こちら
-                            </a>
+                            </Link>
                         </p>
                     )}
                 </div>

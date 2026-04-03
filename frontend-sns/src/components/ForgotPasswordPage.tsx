@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { authApi } from '../api';
+import { Link } from 'react-router-dom'; // 1. これを追加
 
 const ForgotPasswordPage: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -31,12 +32,12 @@ const ForgotPasswordPage: React.FC = () => {
                         <p className="text-sm text-gray-500 mb-6">
                             登録済みのメールアドレスであれば、再設定リンクを送信しました。メールをご確認ください。
                         </p>
-                        <a
-                            href="/login"
+                        <Link
+                            to="/login"
                             className="block text-center text-pink-500 text-sm font-bold underline"
                         >
                             ログイン画面に戻る
-                        </a>
+                        </Link>
                     </>
                 ) : (
                     <>
@@ -60,12 +61,12 @@ const ForgotPasswordPage: React.FC = () => {
                             >
                                 {loading ? '送信中...' : '再設定メールを送る'}
                             </button>
-                            <a
-                                href="/login"
+                            <Link
+                                to="/login"
                                 className="block text-center text-gray-400 text-[11px]"
                             >
                                 ログイン画面に戻る
-                            </a>
+                            </Link>
                         </div>
                     </>
                 )}

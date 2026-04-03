@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { authApi } from '../api';
 
 const ResetPasswordPage: React.FC = () => {
@@ -48,12 +48,12 @@ const ResetPasswordPage: React.FC = () => {
                         <p className="text-sm text-gray-500 mb-6">
                             パスワードを変更しました！新しいパスワードでログインしてください。
                         </p>
-                        <a
-                            href="/login"
+                        <Link
+                            to="/login"
                             className="block w-full bg-pink-500 text-white py-3 rounded-2xl font-black text-sm text-center hover:bg-pink-600 transition-colors"
                         >
                             ログインする
-                        </a>
+                        </Link>
                     </>
                 ) : (
                     <div className="space-y-4">
