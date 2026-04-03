@@ -1,5 +1,5 @@
 # app/routers/auth.py
-
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -60,18 +60,24 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
         db.refresh(db_user)
         
         # ↓ここから追加（ウェルカムメール）
+        # ウェルカムメール送信
         try:
-            import asyncio
-            from ..utils.email import send_email, welcome_email_html
-            asyncio.create_task(send_email(
-                to=db_user.email,
-                subject="推し道へようこそ！",
-                html=welcome_email_html(db_user.username),
-            ))
+            import httpx
+            from ..utils.email import welcome_email_html
+            with httpx.Client(timeout=5.0) as client:
+                client.post(
+                    "https://api.resend.com/emails",
+                    headers={"Authorization": f"Bearer {os.getenv('RESEND_API_KEY')}"},
+                    json={
+                        "from": "system@osidou.com",
+                        "to": db_user.email,
+                        "subject": "推し道へようこそ！",
+                        "html": welcome_email_html(db_user.username),
+                    },
+                )
         except Exception as e:
             print(f"ウェルカムメール送信エラー: {e}")
-        # ↑ここまで追加
-        
+
         return db_user
         
     except HTTPException as http_e:
