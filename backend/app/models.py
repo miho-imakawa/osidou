@@ -471,7 +471,7 @@ class User(Base):
     current_mood = Column(SQLEnum(MoodType), default=MoodType.NEUTRAL, nullable=False)
     current_mood_comment = Column(String(200), nullable=True)
     mood_updated_at = Column(DateTime, nullable=True)
-    is_mood_comment_visible = Column(Boolean, default=True, nullable=False)
+    is_mood_comment_visible = Column(Boolean, default=False, nullable=False)
     is_mood_visible = Column(Boolean, default=True, nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
