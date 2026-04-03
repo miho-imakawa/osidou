@@ -9,7 +9,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from calendar import monthrange
-from ..utils.email import send_email, meetup_confirmed_email_html
 
 from ..database import get_db
 
