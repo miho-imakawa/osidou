@@ -11,6 +11,8 @@ import { Menu, X } from 'lucide-react';
 import LoginPage from './components/LoginPage';
 import TokuteiPage from './components/TokuteiPage';
 import FeelingLogDownload from './components/FeelingLogDownload';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
 
 // 💡 初期値の設定
 const initialProfile: UserProfileType = {
@@ -256,6 +258,10 @@ useEffect(() => {
                         <Route path="/community/:categoryId" element={<CommunityDetail currentUserId={profile.id} />} />
                         <Route path="/community/:categoryId/detail" element={<CategoryDetailPage />} />
                         <Route path="*" element={<HomeFeed profile={profile} />} />
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/tokutei" element={<TokuteiPage />} />
+                        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                        <Route path="/reset-password" element={<ResetPasswordPage />} />
                     </>
                 )}
             </Routes>

@@ -76,3 +76,26 @@ def meetup_waitlist_notification_html(nickname: str, meetup_title: str) -> str:
       </p>
     </div>
     """
+
+def password_reset_email_html(nickname: str, reset_url: str) -> str:
+    return f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+      <h2 style="color:#FF4D8D;">パスワードの再設定</h2>
+      <p>{nickname} さん、パスワード再設定のリクエストを受け付けました。</p>
+      <p>以下のボタンから新しいパスワードを設定してください。<br>
+         このリンクは <strong>1時間</strong> で無効になります。</p>
+      <a href="{reset_url}"
+         style="display:inline-block;margin-top:16px;padding:12px 28px;
+                background:#FF4D8D;color:#fff;border-radius:40px;
+                text-decoration:none;font-weight:700;">
+        パスワードを再設定する →
+      </a>
+      <p style="margin-top:24px;font-size:13px;color:#666;">
+        このリクエストに心当たりがない場合は、このメールを無視してください。<br>
+        パスワードは変更されません。
+      </p>
+      <p style="margin-top:32px;font-size:12px;color:#999;">
+        ※ このメールは自動送信です。返信はできません。
+      </p>
+    </div>
+    """

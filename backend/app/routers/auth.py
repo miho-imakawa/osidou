@@ -3,7 +3,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 # Local imports
 from .. import models # app/models.py
@@ -119,3 +119,74 @@ def login_for_access_token(
 @router.get("/me", response_model=UserMe)
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+import secrets
+from datetime import timezone
+from ..utils.email import send_email, password_reset_email_html
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://osidou.com")
+
+@router.post("/password-reset-request")
+async def password_reset_request(
+    email: str,
+    db: Session = Depends(get_db)
+):
+    # ユーザーが存在しなくても同じレスポンスを返す（メアド推測を防ぐ）
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user:
+        # 既存の未使用トークンを無効化
+        db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.user_id == user.id,
+            models.PasswordResetToken.is_used == False
+        ).update({"is_used": True})
+
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow().replace(tzinfo=timezone.utc) + timedelta(hours=1)
+
+        db.add(models.PasswordResetToken(
+            user_id=user.id,
+            token=token,
+            expires_at=expires_at,
+        ))
+        db.commit()
+
+        reset_url = f"{FRONTEND_URL}/reset-password?token={token}"
+        nickname = user.nickname or user.username
+        await send_email(
+            to=user.email,
+            subject="【推し道】パスワードの再設定",
+            html=password_reset_email_html(nickname, reset_url),
+        )
+
+    return {"message": "メールアドレスが登録されている場合、再設定メールを送信しました。"}
+
+
+@router.post("/password-reset")
+def password_reset(
+    token: str,
+    new_password: str,
+    db: Session = Depends(get_db)
+):
+    now = datetime.utcnow().replace(tzinfo=timezone.utc)
+
+    reset_token = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token == token,
+        models.PasswordResetToken.is_used == False,
+        models.PasswordResetToken.expires_at > now,
+    ).first()
+
+    if not reset_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="リンクが無効または期限切れです。再度お試しください。"
+        )
+
+    user = db.query(models.User).filter(
+        models.User.id == reset_token.user_id
+    ).first()
+
+    user.hashed_password = get_password_hash(new_password)
+    reset_token.is_used = True
+    db.commit()
+
+    return {"message": "パスワードを変更しました。ログインしてください。"}
