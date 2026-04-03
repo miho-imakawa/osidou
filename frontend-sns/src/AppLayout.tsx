@@ -245,6 +245,8 @@ useEffect(() => {
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/tokutei" element={<TokuteiPage />} /> 
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 {!token || error ? (
                     <Route path="*" element={welcomeScreen} />
                 ) : (
@@ -259,8 +261,6 @@ useEffect(() => {
                         <Route path="/community/:categoryId/detail" element={<CategoryDetailPage />} />
                         <Route path="*" element={<HomeFeed profile={profile} />} />
                         <Route path="/tokutei" element={<TokuteiPage />} />
-                        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                        <Route path="/reset-password" element={<ResetPasswordPage />} />
                         <Route path="/login" element={<LoginPage />} />
                     </>
                 )}
