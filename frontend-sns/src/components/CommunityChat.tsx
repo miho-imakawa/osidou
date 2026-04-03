@@ -103,12 +103,12 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
     }, [chatTargetId]);
     useEffect(() => {
         fetchPosts();
-        let interval = setInterval(fetchPosts, 5000);
+        let interval = setInterval(fetchPosts, 30000);
         let idleTimer: ReturnType<typeof setTimeout>;
         const resetIdleTimer = () => {
             clearTimeout(idleTimer);
             clearInterval(interval);
-            interval = setInterval(fetchPosts, 5000);
+            interval = setInterval(fetchPosts, 30000    );
             idleTimer = setTimeout(() => {
                 clearInterval(interval);
             }, 10 * 60 * 1000);

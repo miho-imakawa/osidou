@@ -117,13 +117,13 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
   useEffect(() => {
     fetchMessages();
     fetchParticipants();
-    let interval = setInterval(fetchMessages, 3000);
+    let interval = setInterval(fetchMessages, 10000);
     let idleTimer: ReturnType<typeof setTimeout>;
 
     const resetIdleTimer = () => {
       clearTimeout(idleTimer);
       clearInterval(interval);
-      interval = setInterval(fetchMessages, 3000);
+      interval = setInterval(fetchMessages, 10000);
       idleTimer = setTimeout(() => {
         clearInterval(interval);
       }, 10 * 60 * 1000);
