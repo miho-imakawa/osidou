@@ -36,6 +36,15 @@ const LoginPage: React.FC = () => {
 
     const handleSignup = async () => {
         setError(null);
+        if (!username || username.length < 3) {
+            setError('USER IDは3文字以上で入力してください');
+            return;
+        }
+        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            setError('USER IDは半角英数字とアンダースコアのみ使用できます');
+            return;
+        }
+        // ↑追加ここまで
         if (password.length < 8) {
             setError('パスワードは8文字以上で入力してください');
             return;
@@ -134,8 +143,8 @@ const LoginPage: React.FC = () => {
                     {mode === 'login' && (
                         <p className="text-center text-[11px] text-gray-400">
                             パスワードをお忘れの方は{' '}
-                            <a href="mailto:system@machistrategist.com" className="text-pink-500 underline font-bold">
-                                推集炉管理者にメールでお問い合わせ
+                            <a href="mailto:system@osidou.com" className="text-pink-500 underline font-bold">
+                                お問い合わせ
                             </a>
                             {' '}からご連絡ください。
                         </p>

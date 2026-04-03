@@ -38,6 +38,10 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
         if existing:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="このメールアドレスは既に使われています。")
 
+        existing_username = db.query(models.User).filter(models.User.username == user_in.username).first()
+        if existing_username:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="このユーザー名は既に使われています。")
+        
         # 1. パスワードをハッシュ化して変数に格納
         hashed_password = get_password_hash(user_in.password) 
         
@@ -54,6 +58,19 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
+        
+        # ↓ここから追加（ウェルカムメール）
+        try:
+            import asyncio
+            from ..utils.email import send_email, welcome_email_html
+            asyncio.create_task(send_email(
+                to=db_user.email,
+                subject="推し道へようこそ！",
+                html=welcome_email_html(db_user.username),
+            ))
+        except Exception as e:
+            print(f"ウェルカムメール送信エラー: {e}")
+        # ↑ここまで追加
         
         return db_user
         

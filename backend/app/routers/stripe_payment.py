@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from calendar import monthrange
+from ..utils.email import send_email, meetup_confirmed_email_html
 
 from ..database import get_db
 
@@ -1380,6 +1381,23 @@ async def meetup_confirm(data: dict, db: Session = Depends(get_db)):
     """), {"pid": post_id})
     db.commit()
 
+    # 支払い完了メール（参加者全員に）
+    for c in charged:
+        user_row = db.execute(
+            text("SELECT email, nickname FROM users WHERE id = :uid"),
+            {"uid": c["user_id"]}
+        ).fetchone()
+        if user_row and user_row.email:
+            asyncio.create_task(send_email(
+                to=user_row.email,
+                subject="【推し道】MEETUP参加費のお支払いが完了しました",
+                html=meetup_confirmed_email_html(
+                    user_row.nickname or "",
+                    post_info.content[:30] if hasattr(post_info, 'content') else "MEETUP",
+                    fee,
+                ),
+            ))
+
     return {
         "status":            "confirmed",
         "charged":           len(charged),
@@ -1493,24 +1511,44 @@ async def meetup_cancel(data: dict, db: Session = Depends(get_db)):
         post_info = db.execute(
             text("SELECT hobby_category_id, user_id FROM hobby_posts WHERE id = :pid"),
             {"pid": post_id}
-        ).fetchone()
+            ).fetchone()
 
-        for w in waitlist:
-            try:
-                db.execute(text("""
-                    INSERT INTO notifications
-                        (recipient_id, sender_id, hobby_category_id, message, event_post_id, is_read)
-                    VALUES (:recipient, :sender, :cat_id, :msg, :post_id, false)
-                """), {
-                    "recipient": w.user_id,
-                    "sender":    post_info.user_id,
-                    "cat_id":    post_info.hobby_category_id,
-                    "msg":       "キャンセルが出ました！参加できますか？",
-                    "post_id":   post_id,
-                })
-                waitlist_count += 1
-            except Exception:
-                pass
+    for w in waitlist:
+                try:
+                    db.execute(text("""
+                        INSERT INTO notifications
+                            (recipient_id, sender_id, hobby_category_id, message, event_post_id, is_read)
+                        VALUES (:recipient, :sender, :cat_id, :msg, :post_id, false)
+                    """), {
+                        "recipient": w.user_id,
+                        "sender":    post_info.user_id,
+                        "cat_id":    post_info.hobby_category_id,
+                        "msg":       "キャンセルが出ました！参加できますか？",
+                        "post_id":   post_id,
+                    })
+                    waitlist_count += 1
+                except Exception:
+                    pass
+
+                # ↓ここから追加（メール通知）
+                try:
+                    waitlist_user = db.execute(
+                        text("SELECT email, nickname FROM users WHERE id = :uid"),
+                        {"uid": w.user_id}
+                    ).fetchone()
+                    if waitlist_user and waitlist_user.email:
+                        import asyncio
+                        from ..utils.email import send_email, meetup_waitlist_notification_html
+                        asyncio.create_task(send_email(
+                            to=waitlist_user.email,
+                            subject="【推し道】MEETUPにキャンセルが出ました！",
+                            html=meetup_waitlist_notification_html(
+                                waitlist_user.nickname or "",
+                                f"MEETUP (ID: {post_id})",
+                            ),
+                        ))
+                except Exception as e:
+                    print(f"メール送信エラー: {e}")
 
     db.commit()
 
