@@ -258,10 +258,10 @@ useEffect(() => {
                         <Route path="/community/:categoryId" element={<CommunityDetail currentUserId={profile.id} />} />
                         <Route path="/community/:categoryId/detail" element={<CategoryDetailPage />} />
                         <Route path="*" element={<HomeFeed profile={profile} />} />
-                        <Route path="/login" element={<LoginPage />} />
                         <Route path="/tokutei" element={<TokuteiPage />} />
                         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                         <Route path="/reset-password" element={<ResetPasswordPage />} />
+                        <Route path="/login" element={<LoginPage />} />
                     </>
                 )}
             </Routes>
