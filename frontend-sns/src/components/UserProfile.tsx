@@ -31,6 +31,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   const [tempProfile, setTempProfile] = useState<any>(null);
   const [myCategories, setMyCategories] = useState<HobbyCategory[]>([]);
   const [moodLogs, setMoodLogs] = useState<MoodLog[]>([]);
+  const [moodError, setMoodError] = useState<'logout' | 'failed' | null>(null);
   const [myMeetups, setMyMeetups] = useState<any[]>([]); 
 
   const [myAdsStats, setMyAdsStats] = useState<any[]>([]);
@@ -202,8 +203,21 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
         );
         setMyMeetups(futureMeetups);
 
-        const logs = await fetchMyMoodHistory();
-        setMoodLogs(logs);
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+          setMoodError('logout');
+        } else {
+          try {
+            const logs = await fetchMyMoodHistory();
+            setMoodLogs(logs);
+          } catch (err: any) {
+            if (err?.response?.status === 401) {
+              setMoodError('logout');
+            } else {
+              setMoodError('failed');
+            }
+          }
+        }
 
       } catch (err) {
         console.error("データ取得失敗:", err);
@@ -575,41 +589,52 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                     <Download size={14} /> <span>🤝DL¥200</span>
                   </button>
                 </div>
-                <div className="space-y-10">
-                  {Object.keys(groupedLogs).sort().reverse().map(month => (
-                    <div key={month} className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="px-4 py-1.5 bg-gray-900 text-white text-[12px] font-black rounded-xl border border-gray-900 tracking-tight shadow-sm">{month}</div>
-                        <div className="flex-1 h-px bg-gray-100"></div>
-                      </div>
-                      <div className="space-y-4 pl-1">
-                        {groupedLogs[month].map((log: any) => {
-                          const date = new Date(log.created_at.endsWith('Z') ? log.created_at : log.created_at + 'Z');
-                          const moodMap: any = { 
-                            motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌', 
-                            neutral: '😶', anxious: '💭', tired: '😩', sad: '😭', 
-                            angry: '😡', grateful: '🙏',
-                            MOTIVATED: '🔥', EXCITED: '🤩', HAPPY: '😊', CALM: '😌',
-                            NEUTRAL: '😶', ANXIOUS: '💭', TIRED: '😩', SAD: '😭',
-                            ANGRY: '😡', GRATEFUL: '🙏'
-                          };
-                          return (
-                            <div key={log.id} className="flex items-center gap-5 text-sm">
-                              <div className="flex items-center gap-1 w-24 flex-shrink-0">
-                                <span className="text-[12px] font-black text-gray-800 tabular-nums">{String(date.getDate()).padStart(2, '0')}</span>
-                                <span className="text-[10px] font-bold text-gray-400 tabular-nums flex items-center gap-1 opacity-80"><Clock size={10} strokeWidth={3} />{date.getHours()}:{String(date.getMinutes()).padStart(2, '0')}</span>
+                {moodError === 'logout' ? (
+                  <div className="py-6 text-center space-y-2">
+                    <p className="text-gray-400 text-[11px] font-bold">🔒 ログアウト中かもしれません</p>
+                    <Link to="/login" className="text-xs font-bold text-pink-500 hover:underline">
+                      ログインはこちら →
+                    </Link>
+                  </div>
+                ) : moodError === 'failed' ? (
+                  <p className="text-red-400 text-[11px] font-bold text-center py-4">読み込みに失敗しました</p>
+                ) : (
+                  <div className="space-y-10">
+                    {Object.keys(groupedLogs).sort().reverse().map(month => (
+                      <div key={month} className="space-y-4">
+                        <div className="flex items-center gap-4">
+                          <div className="px-4 py-1.5 bg-gray-900 text-white text-[12px] font-black rounded-xl border border-gray-900 tracking-tight shadow-sm">{month}</div>
+                          <div className="flex-1 h-px bg-gray-100"></div>
+                        </div>
+                        <div className="space-y-4 pl-1">
+                          {groupedLogs[month].map((log: any) => {
+                            const date = new Date(log.created_at.endsWith('Z') ? log.created_at : log.created_at + 'Z');
+                            const moodMap: any = { 
+                              motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌', 
+                              neutral: '😶', anxious: '💭', tired: '😩', sad: '😭', 
+                              angry: '😡', grateful: '🙏',
+                              MOTIVATED: '🔥', EXCITED: '🤩', HAPPY: '😊', CALM: '😌',
+                              NEUTRAL: '😶', ANXIOUS: '💭', TIRED: '😩', SAD: '😭',
+                              ANGRY: '😡', GRATEFUL: '🙏'
+                            };
+                            return (
+                              <div key={log.id} className="flex items-center gap-5 text-sm">
+                                <div className="flex items-center gap-1 w-24 flex-shrink-0">
+                                  <span className="text-[12px] font-black text-gray-800 tabular-nums">{String(date.getDate()).padStart(2, '0')}</span>
+                                  <span className="text-[10px] font-bold text-gray-400 tabular-nums flex items-center gap-1 opacity-80"><Clock size={10} strokeWidth={3} />{date.getHours()}:{String(date.getMinutes()).padStart(2, '0')}</span>
+                                </div>
+                                <span className="text-xl transform hover:scale-125 transition-transform cursor-default">
+                                  {moodMap[log.mood_type] || '✨'}
+                                </span>
+                                <p className="text-gray-500 font-semibold flex-1">{log.comment}</p>
                               </div>
-                              <span className="text-xl transform hover:scale-125 transition-transform cursor-default">
-                                {moodMap[log.mood_type] || '✨'}
-                              </span>
-                              <p className="text-gray-500 font-semibold flex-1">{log.comment}</p>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}

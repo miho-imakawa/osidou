@@ -115,13 +115,25 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   // -------------------------------------------------------
   // フレンドの気分ログ読み込み
   // -------------------------------------------------------
+
   const loadMoods = async () => {
+    // トークンチェック
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      setError('logout');
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const data = await fetchFollowingMoods();
       setFriendMoods(data);
-    } catch (err) {
-      setError('Failed to load logs.');
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        setError('logout');
+      } else {
+        setError('failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -402,14 +414,18 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
             LOADING...
           </p>
         )}
-        {error && <p className="text-red-500 text-xs font-bold">{error}</p>}
-
-        {!loading && friendMoods.length === 0 && (
-          <div className="bg-white p-10 rounded-[32px] border-2 border-dashed border-gray-100 text-center">
-            <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">
-              No activity found
+        {error === 'logout' && (
+          <div className="bg-white p-10 rounded-[32px] border-2 border-dashed border-gray-100 text-center space-y-2">
+            <p className="text-gray-400 text-[11px] font-bold">
+              🔒 Logged Out（ログアウト中）かもしれません
             </p>
+            <Link to="/login" className="text-xs font-bold text-pink-500 hover:underline">
+              Loginはこちら →
+            </Link>
           </div>
+        )}
+        {error === 'failed' && (
+          <p className="text-red-400 text-xs font-bold">Loading Failed... かもしれません</p>
         )}
 
         <div className="grid gap-2">
