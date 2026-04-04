@@ -591,13 +591,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                 </div>
                 {moodError === 'logout' ? (
                   <div className="py-6 text-center space-y-2">
-                    <p className="text-gray-400 text-[11px] font-bold">🔒 ログアウト中かもしれません</p>
+                    <p className="text-gray-400 text-[11px] font-bold">🔒 Logged out（ログアウト中）かもしれません</p>
                     <Link to="/login" className="text-xs font-bold text-pink-500 hover:underline">
-                      ログインはこちら →
+                      Loginはこちら →
                     </Link>
                   </div>
                 ) : moodError === 'failed' ? (
-                  <p className="text-red-400 text-[11px] font-bold text-center py-4">読み込みに失敗しました</p>
+                  <p className="text-red-400 text-[11px] font-bold text-center py-4">Loading Failed... かもしれません</p>
                 ) : (
                   <div className="space-y-10">
                     {Object.keys(groupedLogs).sort().reverse().map(month => (
