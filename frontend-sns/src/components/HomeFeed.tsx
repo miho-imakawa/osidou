@@ -425,7 +425,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
           </div>
         )}
         {error === 'failed' && (
-          <p className="text-red-400 text-xs font-bold">Loading Failed... かもしれません</p>
+          <p className="text-red-400 text-xs font-bold">Loading Failed…Logged Out（ログアウト中）かもしれません</p>
         )}
 
         <div className="grid gap-2">
