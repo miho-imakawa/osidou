@@ -134,6 +134,20 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
     }, [fetchPosts]);
     
     useEffect(() => {
+        if (posts.length > 0) {
+            const systemIds = posts
+                .filter(p => p.is_system && !p.parent_id)
+                .map(p => p.id);
+            setExpandedThreads(prev => {
+                const newSet = new Set(prev);
+                systemIds.forEach(id => newSet.add(id));
+                return newSet;
+            });
+        }
+    }, [posts]);
+
+
+    useEffect(() => {
         const markRead = async () => {
             try {
                 await authApi.patch('/notifications/read-all');
@@ -554,7 +568,9 @@ const submitPost = async () => {
                                                 <div className="flex items-center gap-1.5 mb-1">
                                                     <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded-full shrink-0">AD</span>
                                                     <h3 className="font-black text-[13px] leading-tight flex-1 truncate">{post.content.split('\n')[0]}</h3>
-                                                    <Link to={`/profile/${post.user_id}`} className="text-[9px] font-bold text-gray-400 hover:text-pink-500 shrink-0 transition-colors">@{post.author_nickname}</Link>
+                                                    <Link to={`/profile/${post.user_id}`} className="font-black text-[10px] text-pink-500 uppercase block hover:underline">
+                                                    {post.author_nickname}
+                                                    </Link>
                                                     <button type="button" onClick={() => toggleAdCollapse(post.id)}
                                                         className="p-1 text-gray-300 hover:text-gray-500 shrink-0" title="非表示にする">
                                                         ✕
@@ -1002,32 +1018,61 @@ const submitPost = async () => {
                                         <div className={`${post.is_system ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'} p-3 rounded-2xl shadow-sm border min-w-[140px] w-full`}>
                                             <div className="flex justify-between items-start mb-1">
                                                 {post.is_system ? (
-                                                    <div className="flex items-center gap-1">
-                                                        <Pin size={12} className="text-amber-500 fill-amber-500" />
-                                                        <span className="font-black text-[10px] text-amber-600 uppercase block tracking-widest">Official Guide</span>
-                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setExpandedThreads(prev => {
+                                                            const newSet = new Set(prev);
+                                                            newSet.has(post.id) ? newSet.delete(post.id) : newSet.add(post.id);
+                                                            return newSet;
+                                                        })}
+                                                        className="flex items-center gap-1.5 w-full text-left"
+                                                    >
+                                                        <Pin size={12} className="text-amber-500 fill-amber-500 shrink-0" />
+                                                        <span className="font-black text-[11px] text-amber-600 uppercase tracking-widest flex-1 truncate">
+                                                            {post.content.split('\n')[0]}
+                                                        </span>
+                                                        {expandedThreads.has(post.id)
+                                                            ? <ChevronUp size={14} className="text-amber-400 shrink-0" />
+                                                            : <ChevronDown size={14} className="text-amber-400 shrink-0" />
+                                                        }
+                                                    </button>
                                                 ) : (
                                                     <Link to={`/users/${post.user_id}`} className="font-black text-[10px] text-pink-500 uppercase block hover:underline">{post.author_nickname}</Link>
                                                 )}
-                                                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
-                                                    <button type="button" onClick={() => handleLocalHide(post.id)} className="p-1 text-gray-300 hover:text-gray-600"><EyeOff size={12} /></button>
-                                                    <button type="button" onClick={() => handleReportPost(post.id)} className="p-1 text-gray-300 hover:text-red-400"><AlertTriangle size={12} /></button>
-                                                </div>
+                                                {!post.is_system && (
+                                                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
+                                                        <button type="button" onClick={() => handleLocalHide(post.id)} className="p-1 text-gray-300 hover:text-gray-600"><EyeOff size={12} /></button>
+                                                        <button type="button" onClick={() => handleReportPost(post.id)} className="p-1 text-gray-300 hover:text-red-400"><AlertTriangle size={12} /></button>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <p className="text-gray-800 text-[13px] leading-relaxed whitespace-pre-wrap">{post.content}</p>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setReplyTo({ postId: post.id, nickname: post.author_nickname });
-                                                    setNewPost(`@${post.author_nickname} #${post.id}\n`);
-                                                }}
-                                                className="mt-2 text-[10px] text-gray-300 hover:text-pink-400 font-bold transition-colors"
-                                            >
-                                                返信する
-                                            </button>
+
+                                            {post.is_system ? (
+                                                expandedThreads.has(post.id) && (
+                                                    <div className="animate-in fade-in slide-in-from-top-1 duration-200 mt-2">
+                                                        <p className="text-gray-700 text-[12px] leading-relaxed whitespace-pre-wrap">
+                                                            {post.content.split('\n').slice(1).join('\n')}
+                                                        </p>
+                                                    </div>
+                                                )
+                                            ) : (
+                                                <>
+                                                    <p className="text-gray-800 text-[13px] leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setReplyTo({ postId: post.id, nickname: post.author_nickname });
+                                                            setNewPost(`@${post.author_nickname} #${post.id}\n`);
+                                                        }}
+                                                        className="mt-2 text-[10px] text-gray-300 hover:text-pink-400 font-bold transition-colors"
+                                                    >
+                                                        返信する
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
-                                    {posts.filter(r => r.parent_id === post.id).length > 0 && (
+                                    !post.is_system && {posts.filter(r => r.parent_id === post.id).length > 0 && (
                                         <div className="ml-4 mt-1">
                                             <button
                                                 type="button"
