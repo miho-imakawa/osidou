@@ -180,7 +180,12 @@ const AppLayout: React.FC = () => {
 
 useEffect(() => {
     const initializeApp = async () => {
-        await syncOfflinePosts();
+        // オフライン同期が失敗しても、メインの読み込みを止めないようにする
+        try {
+            await syncOfflinePosts().catch(e => console.error("Sync error ignored", e));
+        } catch (e) {}
+
+        // プロファイル取得を確実に実行
         await fetchProfile();
     };
     initializeApp();
