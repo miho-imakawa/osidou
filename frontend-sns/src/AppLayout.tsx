@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import UserProfile from './components/UserProfile';
 import HomeFeed from './components/HomeFeed';
 import FriendManager from './components/FriendManager';
@@ -198,10 +198,10 @@ const AppLayout: React.FC = () => {
         const initializeApp = async () => {
             try {
                 await syncOfflinePosts().catch(e => console.error("Sync error ignored", e));
+                await syncOfflineData().catch(e => console.error("Mood sync error ignored", e));
             } catch (e) {}
             await fetchProfile();
         };
-        initializeApp();
 
         const handleOnline = () => {
             syncOfflinePosts();
