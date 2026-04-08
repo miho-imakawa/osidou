@@ -211,9 +211,11 @@ const AppLayout: React.FC = () => {
     }, []);
 
     const renderContent = () => {
-        if (loading) return <div className="p-8 text-center text-gray-500">全体を読み込み中...</div>;
-
         const token = localStorage.getItem('access_token');
+
+        if (loading && !token) return (
+            <div className="p-8 text-center text-gray-500">全体を読み込み中...</div>
+        );
 
         const welcomeScreen = (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
