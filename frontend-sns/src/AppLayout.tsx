@@ -39,7 +39,7 @@ const initialProfile: UserProfileType = {
 };
 
 // BottomNavigation（スマホ専用）
-const BottomNav: React.FC<{ isLoggedIn: boolean }> = ({ isLoggedIn }) => {
+const BottomNav: React.FC = () => {
     const location = useLocation();
 
     const isActive = (path: string) => {
@@ -53,8 +53,6 @@ const BottomNav: React.FC<{ isLoggedIn: boolean }> = ({ isLoggedIn }) => {
         { path: '/friends', label: 'ともだち', icon: Heart },
         { path: '/mypage', label: 'MY PAGE', icon: User },
     ];
-
-    if (!isLoggedIn) return null;
 
     return (
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50"
@@ -280,7 +278,7 @@ const AppLayout: React.FC = () => {
                 {renderContent()}
             </main>
             <Footer />
-            <BottomNav isLoggedIn={isLoggedIn} />
+            <BottomNav />
         </div>
     );
 };
