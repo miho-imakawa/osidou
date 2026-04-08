@@ -196,12 +196,11 @@ const AppLayout: React.FC = () => {
 
     useEffect(() => {
         const initializeApp = async () => {
-            try {
-                await syncOfflinePosts().catch(e => console.error("Sync error ignored", e));
-                await syncOfflineData().catch(e => console.error("Mood sync error ignored", e));
-            } catch (e) {}
+            syncOfflinePosts().catch(e => console.error("Sync error ignored", e));
+            syncOfflineData().catch(e => console.error("Mood sync error ignored", e));
             await fetchProfile();
         };
+        initializeApp();
 
         const handleOnline = () => {
             syncOfflinePosts();
