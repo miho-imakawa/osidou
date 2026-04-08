@@ -141,19 +141,24 @@ const Header: React.FC = () => {
     );
 };
 
-const Footer: React.FC = () => (
-    <footer className="bg-gray-800 text-white mt-12">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm">
-            <p>&copy; {new Date().getFullYear()} 推集炉 (Suishuro) 運営事務局</p>
-            <p className="mt-1">推し道を行く人のための推集炉</p>
-            <p className="mt-3">
-                <Link to="/tokutei" className="text-gray-400 hover:text-white underline">
-                    特定商取引法に基づく表記
-                </Link>
-            </p>
-        </div>
-    </footer>
-);
+const Footer: React.FC = () => {
+    const isLoggedIn = !!localStorage.getItem('access_token');
+    if (isLoggedIn) return null;
+
+    return (
+        <footer className="bg-gray-800 text-white mt-12">
+            <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm">
+                <p>&copy; {new Date().getFullYear()} 推集炉 (Suishuro) 運営事務局</p>
+                <p className="mt-1">推し道を行く人のための推集炉</p>
+                <p className="mt-3">
+                    <Link to="/tokutei" className="text-gray-400 hover:text-white underline">
+                        特定商取引法に基づく表記
+                    </Link>
+                </p>
+            </div>
+        </footer>
+    );
+};
 
 // メインコンポーネント
 const AppLayout: React.FC = () => {
