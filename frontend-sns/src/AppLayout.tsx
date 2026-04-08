@@ -225,29 +225,6 @@ const AppLayout: React.FC = () => {
             </div>
         );
 
-        const hasSeenGuide = localStorage.getItem('has_seen_guide');
-        if (token && !hasSeenGuide) {
-            return (
-                <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
-                    <h2 className="text-2xl font-bold text-gray-900">ようこそ、推し道へ！🌸</h2>
-                    <p className="text-sm text-gray-500">はじめに使い方をご確認ください</p>
-                    <Link
-                        to="/community/1"
-                        onClick={() => localStorage.setItem('has_seen_guide', 'true')}
-                        className="bg-pink-500 text-white px-8 py-3 rounded-full font-bold hover:bg-pink-600 transition-colors"
-                    >
-                        📖 SEE THE GUIDE
-                    </Link>
-                    <button
-                        onClick={() => localStorage.setItem('has_seen_guide', 'true')}
-                        className="text-gray-400 text-sm underline"
-                    >
-                        スキップ
-                    </button>
-                </div>
-            );
-        }
-
         return (
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
