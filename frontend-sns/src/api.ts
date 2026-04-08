@@ -288,22 +288,29 @@ export const createPost = async (data: PostCreate): Promise<Post | { isOfflineSa
 };
 
 export const syncOfflinePosts = async () => {
-    const queue: (PostCreate & { created_at: string })[] = JSON.parse(localStorage.getItem(OFFLINE_POSTS_KEY) || '[]');
-    if (queue.length === 0) return;
-
+    let queue: any[] = [];
+    try {
+        queue = JSON.parse(localStorage.getItem(OFFLINE_POSTS_KEY) || '[]');
+    } catch (e) { return; }
+if (queue.length === 0) return;
+const remainingQueue = []; // 失敗したものを一時的に入れる箱
     let successCount = 0;
-    for (const post of [...queue]) {
+for (const post of queue) {
         try {
             await authApi.post('/posts', post);
             successCount++;
-            queue.shift(); 
-            localStorage.setItem(OFFLINE_POSTS_KEY, JSON.stringify(queue));
         } catch (e) {
-            console.error("Sync failed for a post. Stopping sync to retry later.", e);
-            break;
+            console.error("1件の同期に失敗しましたが、次を試します", e);
+            remainingQueue.push(post); // 失敗した投稿だけを残す
         }
     }
-    if (successCount > 0) console.log(`${successCount} posts synced successfully!`);
+// 最後に「1回だけ」ストレージを更新（iPhoneに優しい処理）
+    try {
+        localStorage.setItem(OFFLINE_POSTS_KEY, JSON.stringify(remainingQueue));
+    } catch (e) {
+        console.error("ストレージ更新失敗", e);
+    }
+if (successCount > 0) console.log(`${successCount} 件の投稿を同期しました！`);
 };
 
 export const syncOfflineData = async () => {
