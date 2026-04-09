@@ -431,7 +431,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-base">{displayProfile.bio || '自己紹介はまだありません。'}</p>
               {(displayProfile.prefecture || displayProfile.city) && (
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-300 uppercase tracking-widest border-t border-gray-50 pt-4">
-                  <MapPin size={12} /> {displayProfile.prefecture} {displayProfile.city} {displayProfile.town}
+                  <MapPin size={12} /> {displayProfile.prefecture} 
                 </div>
               )}
             </div>
