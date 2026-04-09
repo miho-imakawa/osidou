@@ -2,7 +2,7 @@ import sqlite3
 from fastapi import APIRouter
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any, text
 import re
 import os
 
@@ -314,15 +314,14 @@ def get_my_notifications(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    from sqlalchemy import text
     notifications = db.execute(text("""
         SELECT n.id, n.message, n.is_read, n.created_at,
-               n.event_post_id,
-               hp.hobby_category_id
+            n.event_post_id,
+            COALESCE(n.hobby_category_id, hp.hobby_category_id) AS hobby_category_id
         FROM notifications n
         LEFT JOIN hobby_posts hp ON hp.id = n.event_post_id
         WHERE n.recipient_id = :uid
-          AND n.is_read = false
+        AND n.is_read = false
         ORDER BY n.created_at DESC
         LIMIT 20
     """), {"uid": current_user.id}).fetchall()
