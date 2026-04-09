@@ -87,10 +87,17 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
 
   // ✅ 通知一覧を取得
   const loadNotifications = useCallback(async () => {
-    try {
-      const res = await authApi.get('/notifications/my');
-      setNotifications(res.data || []);
-    } catch {}
+      try {
+          const res = await authApi.get('/notifications/my');
+          setNotifications(res.data || []);
+          
+          if (res.data && res.data.length > 0) {
+              setTimeout(async () => {
+                  await authApi.patch('/notifications/read-all');
+                  setNotifications([]);
+              }, 7000);
+          }
+      } catch {}
   }, []);
 
   // ✅ 個別通知を既読にしてリストから消す
