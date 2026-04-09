@@ -410,9 +410,9 @@ def _notify_region_milestone(db, category_id: int, category_name: str, new_user)
 
     checks = []
     if pref:
-        checks.append(("prefecture", pref, 1, f"👥 【{category_name}】{pref}のメンバーが{{count}}人に達しました！"))
+        checks.append(("prefecture", pref, 50, f"👥 【{category_name}】{pref}のメンバーが{{count}}人に達しました！"))
     if city:
-        checks.append(("city", city, 1, f"🏘️ 【{category_name}】{city}のメンバーが{{count}}人に達しました！"))
+        checks.append(("city", city, 10, f"🏘️ 【{category_name}】{city}のメンバーが{{count}}人に達しました！"))
 
     for (field, value, threshold, msg_template) in checks:
 
