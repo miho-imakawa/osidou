@@ -1985,6 +1985,7 @@ async def create_connect_onboard(data: dict, db: Session = Depends(get_db)):
             email=user.email,
             capabilities={
                 "transfers": {"requested": True},
+                "card_payments": {"requested": True},
             },
             # ここから下が追加・修正ポイントです
             business_type="individual",  # 最初から「個人事業主」を選択状態にする
