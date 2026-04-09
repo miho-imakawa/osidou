@@ -384,8 +384,123 @@ def join_hobby_category(category_id: int, db: Session = Depends(get_db), current
     except IntegrityError:
         db.rollback()
         return {"message": "このChatにはすでに参加済みです", "master_id": master_id}
+
+    # ✅ これだけ追加！
+    _notify_region_milestone(
+        db=db,
+        category_id=master_id,
+        category_name=category.name,
+        new_user=current_user,
+    )
     
     return {"message": "コミュニティに参加しました", "category_id": master_id}
+
+def _notify_region_milestone(db, category_id: int, category_name: str, new_user):
+    """
+    JOIN後に都道府県・市区町村のメンバー数をチェックし、
+    マイルストーン（都道府県50人単位、市区町村10人単位）に
+    達したら同コミュニティの同地域メンバー全員に通知する。
+    1日1回制限あり。古い通知は置き換え。
+    """
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text
+
+    pref = new_user.prefecture
+    city = new_user.city
+
+    checks = []
+    if pref:
+        checks.append(("prefecture", pref, 50, f"👥 【{category_name}】{pref}のメンバーが{{count}}人に達しました！"))
+    if city:
+        checks.append(("city", city, 10, f"🏘️ 【{category_name}】{city}のメンバーが{{count}}人に達しました！"))
+
+    for (field, value, threshold, msg_template) in checks:
+
+        # 同地域・同コミュニティのメンバー数を取得
+        if field == "prefecture":
+            count = db.execute(text("""
+                SELECT COUNT(DISTINCT u.id)
+                FROM user_hobby_links uhl
+                JOIN users u ON u.id = uhl.user_id
+                WHERE uhl.master_id = :cat_id
+                  AND u.prefecture = :val
+            """), {"cat_id": category_id, "val": value}).scalar() or 0
+        else:
+            count = db.execute(text("""
+                SELECT COUNT(DISTINCT u.id)
+                FROM user_hobby_links uhl
+                JOIN users u ON u.id = uhl.user_id
+                WHERE uhl.master_id = :cat_id
+                  AND u.city = :val
+            """), {"cat_id": category_id, "val": value}).scalar() or 0
+
+        # マイルストーン判定
+        if count == 0 or count % threshold != 0:
+            continue
+
+        message = msg_template.format(count=count)
+
+        # 同地域・同コミュニティのメンバー全員を取得
+        if field == "prefecture":
+            target_users = db.execute(text("""
+                SELECT DISTINCT u.id
+                FROM user_hobby_links uhl
+                JOIN users u ON u.id = uhl.user_id
+                WHERE uhl.master_id = :cat_id
+                  AND u.prefecture = :val
+            """), {"cat_id": category_id, "val": value}).fetchall()
+        else:
+            target_users = db.execute(text("""
+                SELECT DISTINCT u.id
+                FROM user_hobby_links uhl
+                JOIN users u ON u.id = uhl.user_id
+                WHERE uhl.master_id = :cat_id
+                  AND u.city = :val
+            """), {"cat_id": category_id, "val": value}).fetchall()
+
+        since = datetime.now(timezone.utc) - timedelta(hours=24)
+
+        for row in target_users:
+            recipient_id = row[0]
+
+            # 1日1回制限：同じコミュニティ×地域の通知が24時間以内にあればスキップ
+            recent = db.execute(text("""
+                SELECT id FROM notifications
+                WHERE recipient_id = :uid
+                  AND hobby_category_id = :cat_id
+                  AND message LIKE :msg_like
+                  AND created_at > :since
+                LIMIT 1
+            """), {
+                "uid": recipient_id,
+                "cat_id": category_id,
+                "msg_like": f"%{value}%",
+                "since": since,
+            }).fetchone()
+
+            if recent:
+                # 古い通知を置き換え
+                db.execute(text("""
+                    UPDATE notifications
+                    SET message = :msg, is_read = false, created_at = NOW()
+                    WHERE id = :nid
+                """), {"msg": message, "nid": recent.id})
+            else:
+                # 新規通知を作成
+                db.execute(text("""
+                    INSERT INTO notifications
+                        (recipient_id, sender_id, hobby_category_id, message, is_read, created_at)
+                    VALUES
+                        (:uid, :sender, :cat_id, :msg, false, NOW())
+                """), {
+                    "uid": recipient_id,
+                    "sender": new_user.id,
+                    "cat_id": category_id,
+                    "msg": message,
+                })
+
+    db.commit()
+
 
 @router.delete("/categories/{category_id}/leave", tags=["groups"])
 def leave_hobby_category(

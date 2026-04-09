@@ -1037,7 +1037,7 @@ const submitPost = async () => {
                                                         }
                                                     </button>
                                                 ) : (
-                                                    <Link to={`/users/${post.user_id}`} className="font-black text-[10px] text-pink-500 uppercase block hover:underline">{post.author_nickname}</Link>
+                                                    <Link to={`/profile/${post.user_id}`} className="font-black text-[10px] text-pink-500 uppercase block hover:underline">{post.author_nickname}</Link>
                                                 )}
                                                 {!post.is_system && (
                                                     <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
@@ -1092,7 +1092,7 @@ const submitPost = async () => {
                                                 <div className="mt-1 border-l border-pink-100 pl-3 space-y-1">
                                                     {posts.filter(r => r.parent_id === post.id).map(reply => (
                                                         <div key={reply.id} className="bg-gray-50/50 border border-gray-100 rounded-xl px-3 py-2 shadow-sm">
-                                                            <Link to={`/users/${reply.user_id}`} className="font-black text-[9px] text-pink-400 block hover:underline">{reply.author_nickname}</Link>
+                                                            <Link to={`/profile/${reply.user_id}`} className="font-black text-[9px] text-pink-400 block hover:underline">{reply.author_nickname}</Link>
                                                             <p className="text-gray-600 text-[12px] leading-relaxed whitespace-pre-wrap">{reply.content}</p>
                                                             <button
                                                                 type="button"
