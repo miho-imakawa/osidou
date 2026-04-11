@@ -1072,7 +1072,7 @@ const submitPost = async () => {
                                             )}
                                         </div>
                                     </div>
-                                    !post.is_system && {posts.filter(r => r.parent_id === post.id).length > 0 && (
+                                    {!post.is_system && posts.filter(r => r.parent_id === post.id).length > 0 && (
                                         <div className="ml-4 mt-1">
                                             <button
                                                 type="button"
