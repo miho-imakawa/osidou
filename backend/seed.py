@@ -950,18 +950,18 @@ def create_initial_data(db: Session):
     for item in hierarchy:
         insert_category(db, item)
 
+    # ← forループを抜けた後（インデントなし）
+    # --- GUIDE 初期投稿 ---
+    print("--- GUIDE 初期投稿チェック ---")
 
-# --- GUIDE 初期投稿 ---
-        print("--- GUIDE 初期投稿チェック ---")
+    admin_user = db.query(models.User).filter(
+        models.User.email == "system@machistrategist.com"
+    ).first()
 
-        admin_user = db.query(models.User).filter(
-            models.User.email == "system@machistrategist.com"
-        ).first()
-
-        guide_cat = db.query(models.HobbyCategory).filter(
-            models.HobbyCategory.name == "GUIDE （推し道の歩き方）"
-        ).first()
-
+    guide_cat = db.query(models.HobbyCategory).filter(
+        models.HobbyCategory.name == "GUIDE （推し道の歩き方）"
+    ).first()
+    
     # --- GUIDE 親カテゴリへの投稿 ---
     if admin_user and guide_cat:
         existing_guide_top = db.query(models.HobbyPost).filter(
