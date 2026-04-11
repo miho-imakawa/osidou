@@ -950,64 +950,12 @@ def create_initial_data(db: Session):
     for item in hierarchy:
         insert_category(db, item)
 
-    print("--- ユーザー登録チェック ---")
-    common_password = get_password_hash("password123")
-    test_users = [
-        {
-            "email": "system@osidou.com",
-            "username": "osidou_system",
-            "nickname": "推集炉",
-            "bio": "おしどう公式アカウントです。"
-        },
-        {
-            "email": "miho@example.com",
-            "username": "miho_senkawa",
-            "nickname": "みほ(千川)",
-            "bio": "千川エリアを盛り上げたいです。日本酒、サザン、岡田斗司夫ゼミが好き。"
-        },
-        {
-            "email": "kinki_fan@example.com",
-            "username": "tsuyoshi_love",
-            "nickname": "図書委員",
-            "bio": "KinKi Kids一筋。福山雅治さんのドラマもよく見ます。"
-        },
-        {
-            "email": "marine@example.com",
-            "username": "ocean_diver",
-            "nickname": "うみんちゅ",
-            "bio": "沖縄の海でダイビングするのが生きがいです。石垣島によくいます。"
-        }
-    ]
-
-    for u_data in test_users:
-        exists = db.query(models.User).filter(
-            or_(
-                models.User.email == u_data["email"],
-                models.User.username == u_data["username"],
-                models.User.nickname == u_data["nickname"]
-            )
-        ).first()
-        if not exists:
-            db.add(models.User(
-                email=u_data["email"],
-                username=u_data["username"],
-                nickname=u_data["nickname"],
-                bio=u_data["bio"],
-                public_code=generate_code(),
-                hashed_password=common_password,
-                is_active=True,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            ))
-            print(f" ✅ 作成完了: {u_data['nickname']}")
-        else:
-            print(f" ⏩ スキップ (登録済): {u_data['nickname']}")
 
 # --- GUIDE 初期投稿 ---
         print("--- GUIDE 初期投稿チェック ---")
 
         admin_user = db.query(models.User).filter(
-            models.User.email == "system@osidou.com"
+            models.User.email == "system@machistrategist.com"
         ).first()
 
         guide_cat = db.query(models.HobbyCategory).filter(
