@@ -151,14 +151,41 @@ const buildMonthlyReport = (logs: MoodLog[]) => {
     return { recent, weekdayAvg, overallAvg, best, worst, topCategories };
 };
 
-export const MonthlyReportSection: React.FC<{ logs: MoodLog[] }> = ({ logs }) => {
+const MonthlyReportSection: React.FC<{ logs: MoodLog[] }> = ({ logs }) => {
     const report = useMemo(() => buildMonthlyReport(logs), [logs]);
 
-    if (!report) return (
-        <div className="mb-3 px-4 py-3 bg-gray-50 rounded-2xl text-center">
-            <p className="text-[10px] text-gray-300 font-bold">📊 直近1ヶ月のデータがまだありません</p>
-        </div>
-    );
+if (!report) return (
+    <div className="mb-3 p-4 bg-gray-50 rounded-2xl space-y-2">
+        <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest mb-1">
+            📋 直近の記録
+        </p>
+        {logs.slice(0, 10).map(log => {
+            const EMOJI: Record<string, string> = {
+                motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌',
+                neutral: '😶', anxious: '💭', tired: '😩', sad: '😭',
+                angry: '😡', grateful: '🙏',
+            };
+            const date = new Date(log.created_at.endsWith('Z') ? log.created_at : log.created_at + 'Z');
+            return (
+                <div key={log.id} className="flex items-center gap-3 text-[11px]">
+                    <span className="text-gray-300 tabular-nums w-12 shrink-0">
+                        {String(date.getMonth()+1)}/{String(date.getDate()).padStart(2,'0')}
+                    </span>
+                    <span>{EMOJI[log.mood_type] || '✨'}</span>
+                    {log.category && (
+                        <span className="px-1.5 py-0.5 bg-pink-50 text-pink-400 rounded-full text-[9px] font-bold">
+                            {log.category}
+                        </span>
+                    )}
+                    <span className="text-gray-400 truncate">{log.comment}</span>
+                </div>
+            );
+        })}
+        {logs.length === 0 && (
+            <p className="text-[10px] text-gray-300 text-center py-2">気分を記録するとここに表示されます</p>
+        )}
+    </div>
+);
 
     const { recent, weekdayAvg, overallAvg, best, worst, topCategories } = report;
 
