@@ -71,6 +71,7 @@ class MoodLogResponse(BaseModel):
     comment: Optional[str]
     is_visible: bool
     created_at: datetime
+    category: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 

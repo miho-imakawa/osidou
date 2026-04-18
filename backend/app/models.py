@@ -316,14 +316,38 @@ class Notification(Base):
 class MoodLog(Base):
     __tablename__ = "mood_logs"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    mood_type = Column(SQLEnum(MoodType), nullable=False)
-    comment = Column(String(200), nullable=True)
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    mood_type  = Column(SQLEnum(MoodType), nullable=False)
+    comment    = Column(String(200), nullable=True)
+    category   = Column(String(50), nullable=True)   # ← NEW: タグ名を文字列で保存
     is_visible = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="mood_logs")
+
+
+# ──────────────────────────────────────────
+# 【追加1】UserTag テーブル（新規追加）
+# MoodLog クラスの直後に配置
+# ──────────────────────────────────────────
+
+class UserTag(Base):
+    """ユーザーが MY PAGE 編集モードで登録する「よく使うタグ」"""
+    __tablename__ = "user_tags"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    label      = Column(String(30), nullable=False)
+    color      = Column(String(20), default="gray", nullable=False)
+    sort_order = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="user_tags")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "label", name="uq_user_tag_label"),
+    )
 
 # ==========================================
 # 💡 5. 管理機能モデル (店舗・予約・決済)
@@ -492,6 +516,12 @@ class User(Base):
     requests_sent = relationship("FriendRequest", foreign_keys="FriendRequest.requester_id", back_populates="requester", cascade="all, delete-orphan")
     requests_received = relationship("FriendRequest", foreign_keys="FriendRequest.receiver_id", back_populates="receiver", cascade="all, delete-orphan")
     follows = relationship("Follow", overlaps="user")
+
+    user_tags = relationship(
+        "UserTag", back_populates="user",
+        order_by="UserTag.sort_order",
+        cascade="all, delete-orphan"
+    )
 
     paid_friend_slots = Column(Integer, default=0)
     is_premium = Column(Boolean, default=False)

@@ -92,17 +92,32 @@ const saveToOfflineQueue = (data: PostCreate) => {
 };
 
 export interface MoodLog {
-    id: number;
-    user_id: number;
-    mood_type: string;
-    comment: string | null;
+    id:         number;
+    user_id:    number;
+    mood_type:  string;
+    comment:    string | null;
+    category:   string | null;   // ← NEW
     is_visible: boolean;
     created_at: string;
 }
 
+export interface UserTag {
+    id:         number;
+    label:      string;
+    color:      string;
+    sort_order: number;
+}
+
+export interface UserTagCreate {
+    label:      string;
+    color:      string;
+    sort_order: number;
+}
+
 export interface MoodPostPayload {
-    mood_type: string;
-    comment?: string | null;
+    mood_type:  string;
+    comment?:   string | null;
+    category?:  string | null;   // ← NEW
     is_visible: boolean;
 }
 
@@ -483,4 +498,23 @@ export const verifyFriendsLogSession = async (sessionId: string): Promise<{
 }> => {
     const res = await authApi.get(`/api/stripe/friends-log-verify?session_id=${sessionId}`);
     return res.data;
+};
+
+export const fetchMyTags = async (): Promise<UserTag[]> => {
+    const res = await authApi.get('/users/me/tags');
+    return res.data;
+};
+
+export const createTag = async (data: UserTagCreate): Promise<UserTag> => {
+    const res = await authApi.post('/users/me/tags', data);
+    return res.data;
+};
+
+export const updateTag = async (tagId: number, data: UserTagCreate): Promise<UserTag> => {
+    const res = await authApi.put(`/users/me/tags/${tagId}`, data);
+    return res.data;
+};
+
+export const deleteTag = async (tagId: number): Promise<void> => {
+    await authApi.delete(`/users/me/tags/${tagId}`);
 };
