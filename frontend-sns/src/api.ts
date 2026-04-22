@@ -127,7 +127,8 @@ export interface UserProfile extends UserProfileType {
     is_city_visible?: boolean;
     is_town_visible?: boolean;
     birth_year_month: string | null; 
-    gender: string | null;               
+    gender: string | null;  
+    goal?: string;             
 }
 
 export interface FriendRequest {

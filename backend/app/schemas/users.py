@@ -37,6 +37,7 @@ class UserProfileUpdate(BaseModel):
     # プロフィール情報
     bio: Optional[str] = None 
     oshi_page_url: Optional[str] = None
+    goal: Optional[str] = Field(None, max_length=200, description="目標")
     
     # 💡 修正: 公開設定フラグ (入力用)
     is_mood_visible: Optional[bool] = None 
@@ -121,6 +122,7 @@ class UserMe(UserPublic):
     # 💡 追加：自分のプロフィール確認・編集画面で表示するために必要
     birth_year_month: Optional[str] = None
     gender: Optional[str] = None
+    goal: Optional[str] = None
 
     # 住所情報（本人にのみ返す）
     prefecture: Optional[str] = None

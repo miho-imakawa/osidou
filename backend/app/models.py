@@ -477,6 +477,7 @@ class User(Base):
     town = Column(String(100), index=True, nullable=True)
 
     bio = Column(Text, nullable=True)
+    goal = Column(String(200), nullable=True)
     oshi_page_url = Column(String(255), nullable=True)
     facebook_url = Column(String(255), nullable=True)
     x_url = Column(String(255), nullable=True)
