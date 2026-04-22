@@ -638,24 +638,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                 <textarea className="w-full p-5 bg-gray-50 rounded-[32px] border-none text-sm h-32 focus:ring-2 focus:ring-pink-500" value={tempProfile.bio || ''} onChange={e => setTempProfile({...tempProfile, bio: e.target.value})} />
               </div>
 
-              {/* Bio の直後に追加 */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1">
-                  🎯 Goal（目標）
-                </label>
-                <input
-                  type="text"
-                  maxLength={200}
-                  placeholder="例：今月は週3で運動する"
-                  className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-pink-500"
-                  value={tempProfile.goal || ''}
-                  onChange={e => setTempProfile({ ...tempProfile, goal: e.target.value })}
-                />
-                <p className="text-[9px] text-gray-300 text-right tabular-nums">
-                  {(tempProfile.goal || '').length}/200
-                </p>
-              </div>
-
               {/* 気分コメント表示設定 */}
               <div className="pt-4 border-t border-gray-50">
                 <label className="flex items-center gap-3 cursor-pointer group">
@@ -709,6 +691,25 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                 </div>
               </div>
             </div>
+          </div>
+
+          
+          {/* Bio の直後に追加 */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+              🎯 Goal（目標）
+            </label>
+            <input
+              type="text"
+              maxLength={200}
+              placeholder="例：今月は週3で運動する"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-pink-500"
+              value={tempProfile.goal || ''}
+              onChange={e => setTempProfile({ ...tempProfile, goal: e.target.value })}
+            />
+            <p className="text-[9px] text-gray-300 text-right tabular-nums">
+              {(tempProfile.goal || '').length}/200
+            </p>
           </div>
 
         <TagManagerSection
