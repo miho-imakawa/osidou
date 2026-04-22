@@ -695,7 +695,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
 
           
           {/* Bio の直後に追加 */}
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1">
               🎯 Goal（目標）
             </label>
@@ -703,7 +703,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               type="text"
               maxLength={200}
               placeholder="例：今月は週3で運動する"
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-pink-500"
+              className="w-full px-3 py-1.5 bg-gray-50 rounded-xl border-none text-xs focus:ring-2 focus:ring-pink-400 outline-none"
               value={tempProfile.goal || ''}
               onChange={e => setTempProfile({ ...tempProfile, goal: e.target.value })}
             />
