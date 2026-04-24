@@ -152,6 +152,7 @@ const buildMonthlyReport = (logs: MoodLog[]) => {
 
     const catScores: Record<string, number[]> = {};
     recent.forEach(log => {
+        console.log("mood_type:", log.mood_type, "score:", MOOD_SCORE[log.mood_type]); // ← 追加
         if (log.category) {
             if (!catScores[log.category]) catScores[log.category] = [];
             catScores[log.category].push(MOOD_SCORE[log.mood_type] ?? 3);
@@ -234,7 +235,7 @@ if (!report) return (
 
             {/* 曜日バイオリズム */}
             <div className="space-y-1.5">
-                <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">曜日別バイオリズム</p>
+                <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">月間・曜日別バイオリズム</p>
                 {weekdayAvg.map(({ day, avg, count }) => (
                     <div key={day} className="flex items-center gap-2">
                         <span className="text-[10px] font-black text-gray-500 w-4 shrink-0">{day}</span>
