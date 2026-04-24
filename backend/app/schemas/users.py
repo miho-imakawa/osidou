@@ -63,6 +63,7 @@ class MoodLogCreate(BaseModel):
     # 💡 型を Enum (models.MoodType) に指定
     mood_type: models.MoodType = Field(description="感情タイプ (Enum)") 
     comment: Optional[str] = Field(None, max_length=200, description="ひとことコメント")
+    category: Optional[str] = Field(None, max_length=50, description="タグ名")
     
 class MoodLogResponse(BaseModel):
     """気分履歴データ (GET /{user_id}/mood-history) 用の出力スキーマ"""
