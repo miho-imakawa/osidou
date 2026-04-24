@@ -265,9 +265,9 @@ export const postMoodLog = async (data: MoodPostPayload): Promise<void | { isOff
         return { isOfflineSaved: true };
     }
     try {
-        await authApi.post('users/me/mood', data); 
+        await authApi.post('users/me/mood', data);
     } catch (error) {
-        console.warn("送信失敗。ローカルに保存します...");
+        console.error("送信失敗エラー詳細:", error); // ← 詳細を出す
         const queue = JSON.parse(localStorage.getItem(OFFLINE_MOODS_KEY) || '[]');
         queue.push({ ...data, created_at: new Date().toISOString() });
         localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(queue));

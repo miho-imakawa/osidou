@@ -43,9 +43,9 @@ const TAG_COLOR_MAP: Record<string, string> = {
 };
 
 const MOOD_SCORE: Record<string, number> = {
-    motivated: 5, excited: 5, happy: 4, grateful: 4,
-    calm: 3, neutral: 3,
-    anxious: 2, tired: 2, sad: 1, angry: 1,
+    MOTIVATED: 5, EXCITED: 5, HAPPY: 4, GRATEFUL: 4,
+    CALM: 3, NEUTRAL: 3,
+    ANXIOUS: 2, TIRED: 2, SAD: 1, ANGRY: 1,
 };
 
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
