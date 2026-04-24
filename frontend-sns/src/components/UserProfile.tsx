@@ -148,7 +148,22 @@ const buildMonthlyReport = (logs: MoodLog[]) => {
 
     const topCategories = Object.entries(catCount).sort((a, b) => b[1] - a[1]).slice(0, 3);
 
-    return { recent, weekdayAvg, overallAvg, best, worst, topCategories };
+    type CatAvgScore = { label: string; avg: number; count: number };
+
+    const catScores: Record<string, number[]> = {};
+    recent.forEach(log => {
+        if (log.category) {
+            if (!catScores[log.category]) catScores[log.category] = [];
+            catScores[log.category].push(MOOD_SCORE[log.mood_type] ?? 3);
+        }
+    });
+    const catAvgScores: CatAvgScore[] = Object.entries(catScores).map(([label, scores]) => ({
+        label,
+        avg: Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10,
+        count: scores.length,
+    })).sort((a, b) => b.avg - a.avg);
+
+    return { recent, weekdayAvg, overallAvg, best, worst, topCategories, catAvgScores };
 };
 
 const MonthlyReportSection: React.FC<{ logs: MoodLog[] }> = ({ logs }) => {
@@ -187,8 +202,7 @@ if (!report) return (
     </div>
 );
 
-    const { recent, weekdayAvg, overallAvg, best, worst, topCategories } = report;
-
+    const { recent, weekdayAvg, overallAvg, best, worst, topCategories, catAvgScores } = report;
     const barColor = (avg: number | null) => {
         if (!avg) return 'bg-gray-200';
         if (avg >= 4) return 'bg-emerald-400';
@@ -261,6 +275,28 @@ if (!report) return (
                             </span>
                         ))}
                     </div>
+                </div>
+            )}
+
+            {/* ✅ ここに追加：タグ別スコア平均 */}
+            {catAvgScores.length > 0 && (
+                <div className="space-y-1.5">
+                    <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">タグ別 気分スコア</p>
+                    {catAvgScores.map(({ label, avg, count }) => (
+                        <div key={label} className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-gray-500 w-16 truncate shrink-0">{label}</span>
+                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                    className={`h-full rounded-full ${
+                                        avg >= 4 ? 'bg-emerald-400' : avg >= 3 ? 'bg-amber-400' : 'bg-rose-400'
+                                    }`}
+                                    style={{ width: `${(avg / 5) * 100}%` }}
+                                />
+                            </div>
+                            <span className="text-[9px] text-gray-400 tabular-nums w-6 text-right shrink-0">{avg}</span>
+                            <span className="text-[9px] text-gray-200 tabular-nums shrink-0">×{count}</span>
+                        </div>
+                    ))}
                 </div>
             )}
 
