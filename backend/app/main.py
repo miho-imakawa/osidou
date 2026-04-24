@@ -54,7 +54,7 @@ app.include_router(hobbies.router)
 app.include_router(community.router, prefix="/hobby-categories")
 app.include_router(posts.router) 
 app.include_router(notifications.router)
-app.include_router(moods.router, prefix="/users")
+# app.include_router(moods.router, prefix="/users")
 app.include_router(friend_requests.router, prefix="/friends")
 
 # 💡 2. MEETUPチャット系ルーターを登録
