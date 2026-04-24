@@ -432,14 +432,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
             state={{ tab: 'search' }}
             className="px-2.5 py-1 bg-pink-50 border border-pink-200 text-pink-600 rounded-lg text-[10px] font-bold hover:bg-pink-100 transition-all"
           >
-            👤 追加
-          </Link>
-          <Link
-            to="/friends"
-            state={{ tab: 'friends' }}
-            className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-lg text-[10px] font-bold hover:bg-gray-100 transition-all"
-          >
-            👥 管理
+            👤 追加・👥 管理
           </Link>
           {renderFriendsLogBar()}
         </div>
