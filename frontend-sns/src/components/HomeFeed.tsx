@@ -69,6 +69,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
   const [isActivating, setIsActivating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [dlMessage, setDlMessage] = useState<string | null>(null);
+  const [tempProfile, setTempProfile] = useState({ goal: '' });
 
   // 友達数
   const [pendingCount, setPendingCount] = useState(0);
@@ -403,18 +404,19 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       {/* 気分入力 */}
       <MoodInput onSuccess={loadMoods} />
 
-      {/* MoodInput の直後、ともだちs' LOG の直前に追加 */}
-      {profile.goal && (
-        <div className="mt-4 px-4 py-3 bg-gradient-to-r from-pink-50 to-white rounded-2xl border border-pink-100 flex items-start gap-2">
-          <span className="text-base shrink-0">🎯</span>
-          <div>
-            <p className="text-[9px] font-bold text-pink-400 uppercase tracking-widest mb-0.5">
-              My Goal
-            </p>
-            <p className="text-sm font-bold text-gray-700">{profile.goal}</p>
-          </div>
-        </div>
-      )}
+      <div className="pt-2 border-t border-gray-50 space-y-1">
+        <p className="text-[10px] text-gray-400 uppercase tracking-widest flex items-center gap-1">
+          👣 
+        </p>
+        <input
+          type="text"
+          maxLength={200}
+          placeholder="例：今月は週3で運動する"
+          className="w-full px-3 py-1.5 bg-gray-50 rounded-xl border-none text-xs focus:ring-2 focus:ring-pink-400 outline-none"
+          value={tempProfile.goal || ''}
+          onChange={e => setTempProfile({ ...tempProfile, goal: e.target.value })}
+        />
+      </div>
 
       <div className="mt-8 space-y-3">
         {/* Friends' Log ヘッダー */}

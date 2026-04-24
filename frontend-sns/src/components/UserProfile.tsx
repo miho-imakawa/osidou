@@ -696,7 +696,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
           {/* Bio の直後に追加 */}
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1">
-              🎯 Goal（目標）
+              👣 GOAL・目標・標/導・BEACON・MILESTONE
             </label>
             <input
               type="text"
