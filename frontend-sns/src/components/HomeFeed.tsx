@@ -419,16 +419,32 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
 
       <div className="mt-8 space-y-3">
         {/* Friends' Log ヘッダー */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-[14px] font-black text-gray-900 tracking-[0.2em] uppercase leading-none">
-              ともだちs' LOG
-            </h2>
-            {renderFriendCount()}
-          </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h2 className="text-[14px] font-black text-gray-900 tracking-[0.2em] uppercase leading-none">
+            ともだちs' LOG
+          </h2>
+          {renderFriendCount()}
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/friends"
+            state={{ tab: 'search' }}
+            className="px-2.5 py-1 bg-pink-50 border border-pink-200 text-pink-600 rounded-lg text-[10px] font-bold hover:bg-pink-100 transition-all"
+          >
+            👤 追加
+          </Link>
+          <Link
+            to="/friends"
+            state={{ tab: 'friends' }}
+            className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-lg text-[10px] font-bold hover:bg-gray-100 transition-all"
+          >
+            👥 管理
+          </Link>
           {renderFriendsLogBar()}
         </div>
-        {dlMessage && <p className="text-[10px] text-gray-400">{dlMessage}</p>}
+      </div>
+      {dlMessage && <p className="text-[10px] text-gray-400">{dlMessage}</p>}
 
         {loading && (
           <p className="text-center py-10 text-[10px] font-black text-gray-300 animate-pulse">

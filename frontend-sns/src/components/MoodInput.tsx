@@ -114,6 +114,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
         <div className={`p-6 rounded-xl border shadow-md transition-all duration-300 ${containerStyle}`}>
             <h3 className={`text-xl font-bold flex items-center mb-4 transition-colors duration-300 ${titleStyle}`}>
                 <Smile className="w-6 h-6 mr-2" /> CURRENT FEELING
+                <span className="text-sm font-medium ml-2 opacity-60">いまの気分は？</span>
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -168,7 +169,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
                 <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder={`SELECTED:「${currentMoodObj?.label || '普通'}」 コメントを残してね。`}
+                    placeholder={`「${currentMoodObj?.label || '今日'}」な気分…何があったか教えて😉 `}
                     rows={2}
                     maxLength={200}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none transition bg-white"

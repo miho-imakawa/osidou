@@ -152,7 +152,6 @@ const buildMonthlyReport = (logs: MoodLog[]) => {
 
     const catScores: Record<string, number[]> = {};
     recent.forEach(log => {
-        console.log("mood_type:", log.mood_type, "score:", MOOD_SCORE[log.mood_type.toUpperCase()]); // ← 追加
         if (log.category) {
             if (!catScores[log.category]) catScores[log.category] = [];
             catScores[log.category].push(MOOD_SCORE[log.mood_type.toUpperCase()] ?? 3);
@@ -822,68 +821,66 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
 
           {isMe && (
             <>
-              {/* Communities */}
-              <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
-                <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
-                  <MessageSquare className="text-pink-600" size={14}/> Communities
-                  {connectStatus?.is_ready && (
-                    <span className="ml-1 text-[14px]" title="HOST登録済み">👑</span>
-                  )}
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {myCategories.length > 0 ? myCategories.map(cat => {
-                    const totalCount = cat.member_count || 0; 
-                    return (
-                      <Link 
-                        key={cat.id} 
-                        to={`/community/${cat.id}`} 
-                        className={`px-4 py-1.5 rounded-full text-xs border flex items-center gap-3 font-black shadow-sm transition-all hover:scale-105 ${getRankClasses(totalCount)}`}
-                      >
-                        <span>{cat.name.split(' (')[0]}</span> 
-                        <div className="flex items-center gap-1 opacity-60 text-[10px] tabular-nums">
-                          <User size={10} strokeWidth={3} />
-                          <span>{totalCount.toLocaleString()}</span>
-                          {totalCount >= 500 && <Flame size={10} className="text-orange-500" />}
-                        </div>
-                      </Link>
-                    );
-                  }) : <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Communities</p>}
-                </div>
+          {/* Communities */}
+          {myCategories.length > 0 && (
+            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 space-y-4">
+              <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
+                <MessageSquare className="text-pink-600" size={14}/> Communities
+                {connectStatus?.is_ready && (
+                  <span className="ml-1 text-[14px]" title="HOST登録済み">👑</span>
+                )}
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {myCategories.map(cat => {
+                  const totalCount = cat.member_count || 0; 
+                  return (
+                    <Link 
+                      key={cat.id} 
+                      to={`/community/${cat.id}`} 
+                      className={`px-4 py-1.5 rounded-full text-xs border flex items-center gap-3 font-black shadow-sm transition-all hover:scale-105 ${getRankClasses(totalCount)}`}
+                    >
+                      <span>{cat.name.split(' (')[0]}</span> 
+                      <div className="flex items-center gap-1 opacity-60 text-[10px] tabular-nums">
+                        <User size={10} strokeWidth={3} />
+                        <span>{totalCount.toLocaleString()}</span>
+                        {totalCount >= 500 && <Flame size={10} className="text-orange-500" />}
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
+            </div>
+          )}
 
-              {/* JOINING & MY MEETUPS */}
-              {isMe && (
-                <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
-                  <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
-                    <Calendar className="text-orange-500" size={12}/> Joining & My Meetups
-                  </h2>
-                  {myMeetups.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {myMeetups.map(meetup => (
-                        <Link
-                          key={meetup.id}
-                          to={`/community/${meetup.hobby_category_id}`}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 transition-all"
-                        >
-                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${meetup.user_id === displayProfile.id ? 'bg-orange-500 text-white' : 'bg-orange-200 text-orange-700'}`}>
-                            {meetup.user_id === displayProfile.id ? "主催" : "参加"}
-                          </span>
-                          <span className="font-bold text-gray-700 text-[11px] max-w-[120px] truncate">
-                            {meetup.content.split('\n')[0]}
-                          </span>
-                          {meetup.meetup_date && (
-                            <span className="text-[9px] text-gray-400 shrink-0">
-                              {meetup.meetup_date.slice(5, 10).replace('-', '/')}
-                            </span>
-                          )}
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[10px] font-bold text-gray-300 uppercase text-center py-2">予定はありません</p>
-                  )}
-                </div>
-              )}
+          {/* JOINING & MY MEETUPS — 空なら非表示 */}
+          {myMeetups.length > 0 && (
+            <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100 space-y-3">
+              <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[9px]">
+                <Calendar className="text-orange-500" size={12}/> Joining & My Meetups
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {myMeetups.map(meetup => (
+                  <Link
+                    key={meetup.id}
+                    to={`/community/${meetup.hobby_category_id}`}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 transition-all"
+                  >
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${meetup.user_id === displayProfile.id ? 'bg-orange-500 text-white' : 'bg-orange-200 text-orange-700'}`}>
+                      {meetup.user_id === displayProfile.id ? "主催" : "参加"}
+                    </span>
+                    <span className="font-bold text-gray-700 text-[11px] max-w-[120px] truncate">
+                      {meetup.content.split('\n')[0]}
+                    </span>
+                    {meetup.meetup_date && (
+                      <span className="text-[9px] text-gray-400 shrink-0">
+                        {meetup.meetup_date.slice(5, 10).replace('-', '/')}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
               {/* ✅ MY ADS STATS — 期限切れフィルター修正 */}
               {(() => {
