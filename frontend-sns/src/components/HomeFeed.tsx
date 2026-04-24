@@ -407,7 +407,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       {/* MoodInput の直後、ともだちs' LOG の直前に追加 */}
       {profile.goal && (
         <div className="mt-4 px-4 py-3 bg-gradient-to-r from-pink-50 to-white rounded-2xl border border-pink-100 flex items-start gap-2">
-          <span className="text-base shrink-0">👣 </span>
+          <span className="text-base shrink-0"></span>
           <div>
             <p className="text-[9px] font-bold text-pink-400 uppercase tracking-widest mb-0.5">
               My Goal

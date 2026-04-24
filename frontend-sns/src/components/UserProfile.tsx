@@ -203,6 +203,7 @@ if (!report) return (
 );
 
     const { recent, weekdayAvg, overallAvg, best, worst, topCategories, catAvgScores } = report;
+    
     const barColor = (avg: number | null) => {
         if (!avg) return 'bg-gray-200';
         if (avg >= 4) return 'bg-emerald-400';
