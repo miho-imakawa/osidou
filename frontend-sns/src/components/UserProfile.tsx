@@ -125,7 +125,7 @@ const buildMonthlyReport = (logs: MoodLog[]) => {
 
     recent.forEach(log => {
         const d = new Date(log.created_at.endsWith('Z') ? log.created_at : log.created_at + 'Z');
-        buckets[d.getDay()].push(MOOD_SCORE[log.mood_type] ?? 3);
+        buckets[d.getDay()].push(MOOD_SCORE[log.mood_type.toUpperCase()] ?? 3);
         if (log.category) catCount[log.category] = (catCount[log.category] ?? 0) + 1;
     });
 
@@ -152,10 +152,10 @@ const buildMonthlyReport = (logs: MoodLog[]) => {
 
     const catScores: Record<string, number[]> = {};
     recent.forEach(log => {
-        console.log("mood_type:", log.mood_type, "score:", MOOD_SCORE[log.mood_type]); // ← 追加
+        console.log("mood_type:", log.mood_type, "score:", MOOD_SCORE[log.mood_type.toUpperCase()]); // ← 追加
         if (log.category) {
             if (!catScores[log.category]) catScores[log.category] = [];
-            catScores[log.category].push(MOOD_SCORE[log.mood_type] ?? 3);
+            catScores[log.category].push(MOOD_SCORE[log.mood_type.toUpperCase()] ?? 3);
         }
     });
     const catAvgScores: CatAvgScore[] = Object.entries(catScores).map(([label, scores]) => ({
