@@ -257,6 +257,9 @@ export const fetchMyMoodHistory = async (): Promise<MoodLog[]> => {
 };
 
 export const postMoodLog = async (data: MoodPostPayload): Promise<void | { isOfflineSaved: true }> => {
+    // 💡 修正：送信直前のデータをログ出力（デバッグ用）
+    console.log("📡 API送信試行:", data);
+
     if (!navigator.onLine) {
         console.warn("オフライン検知。ローカルに保存します...");
         const queue = JSON.parse(localStorage.getItem(OFFLINE_MOODS_KEY) || '[]');
@@ -264,10 +267,14 @@ export const postMoodLog = async (data: MoodPostPayload): Promise<void | { isOff
         localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(queue));
         return { isOfflineSaved: true };
     }
+
     try {
-        await authApi.post('users/me/mood', data);
+        // 💡 補足：もしこれでも404やエラーが出るなら パス末尾の '/' の有無を確認してください
+        await authApi.post('users/me/mood', data); 
+        console.log("✅ 送信成功");
     } catch (error) {
-        console.error("送信失敗エラー詳細:", error); // ← 詳細を出す
+        console.error("❌ 送信失敗:", error);
+        console.warn("ローカルに保存します...");
         const queue = JSON.parse(localStorage.getItem(OFFLINE_MOODS_KEY) || '[]');
         queue.push({ ...data, created_at: new Date().toISOString() });
         localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(queue));
@@ -336,7 +343,7 @@ export const syncOfflineData = async () => {
     const remainingQueue = [...moodQueue];
     for (const mood of moodQueue) {
         try {
-            await authApi.post('/users/moods', mood);
+            await authApi.post('users/me/mood', mood);
             remainingQueue.shift();
             localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(remainingQueue));
         } catch (e) {
