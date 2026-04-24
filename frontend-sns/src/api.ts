@@ -343,7 +343,7 @@ export const syncOfflineData = async () => {
     const remainingQueue = [...moodQueue];
     for (const mood of moodQueue) {
         try {
-            await authApi.post('users/me/mood', mood);
+            await authApi.post('users/me/mood', mood); // ✅ 修正
             remainingQueue.shift();
             localStorage.setItem(OFFLINE_MOODS_KEY, JSON.stringify(remainingQueue));
         } catch (e) {

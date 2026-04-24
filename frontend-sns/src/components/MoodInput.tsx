@@ -90,18 +90,11 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-
-        // 💡 (selectedTag as any) を使うことで 'never' エラーを強制回避します
-        const tag = selectedTag as any;
-        const categoryValue = (tag && typeof tag === 'object' && 'label' in tag)
-            ? tag.label
-            : (tag || null);
-
         try {
             await postMoodLog({
                 mood_type:  selectedMood,
                 comment:    comment,
-                category:   categoryValue,
+                category:   selectedTag,  // ← シンプルにこれだけ
                 is_visible: true,
             });
 
