@@ -270,7 +270,7 @@ export const postMoodLog = async (data: MoodPostPayload): Promise<void | { isOff
 
     try {
         // 💡 補足：もしこれでも404やエラーが出るなら パス末尾の '/' の有無を確認してください
-        await authApi.post('users/me/mood', data); 
+        await authApi.post('users/me/mood', data);
         console.log("✅ 送信成功");
     } catch (error) {
         console.error("❌ 送信失敗:", error);
