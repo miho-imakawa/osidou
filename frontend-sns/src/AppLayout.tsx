@@ -150,10 +150,13 @@ const Footer: React.FC = () => {
             <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm">
                 <p>&copy; {new Date().getFullYear()} 推集炉 (Suishuro) 運営事務局</p>
                 <p className="mt-1">推し道を行く人のための推集炉</p>
-                <p className="mt-3">
+                <p className="mt-3 flex justify-center gap-4">
                     <Link to="/tokutei" className="text-gray-400 hover:text-white underline">
                         特定商取引法に基づく表記
                     </Link>
+                    <a href="https://suishuro.com/privacy.html" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white underline">
+                        プライバシーポリシー
+                    </a>
                 </p>
             </div>
         </footer>
