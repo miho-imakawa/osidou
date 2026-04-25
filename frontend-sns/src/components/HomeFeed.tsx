@@ -498,11 +498,11 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
                   {moodDetail.label}
                 </span>
 
-              {!friendMood.is_muted && friendMood.current_mood_comment && friendMood.is_mood_comment_visible && (
-                <p className="text-sm text-gray-600 font-medium flex-1 truncate">
-                  {friendMood.current_mood_comment}
-                </p>
-              )}
+                {!friendMood.is_muted && friendMood.current_mood_comment && (
+                  <p className="text-sm text-gray-600 font-medium flex-1 truncate">
+                    {friendMood.current_mood_comment}
+                  </p>
+                )}
               </div>
             );
           })}
