@@ -60,6 +60,23 @@ const CommunityChat: React.FC<CommunityChatProps> = ({
         noHarassment: false,
         correctParent: false,
     });
+    const [blockedUserIds, setBlockedUserIds] = useState<Set<number>>(() => {
+        const saved = localStorage.getItem('blockedUsers');
+        return saved ? new Set(JSON.parse(saved)) : new Set();
+    });
+
+    const handleBlockUser = (userId: number, nickname: string) => {
+        if (userId === currentUserId) return; // 自分はブロック不可
+        if (!window.confirm(`「${nickname}」さんをブロックしますか？\n今後、このユーザーの投稿は一切表示されなくなります。`)) return;
+
+        setBlockedUserIds(prev => {
+            const newSet = new Set(prev);
+            newSet.add(userId);
+            localStorage.setItem('blockedUsers', JSON.stringify([...newSet]));
+            return newSet;
+        });
+        alert("ブロックしました。");
+    };
     const handleReportPost = async (postId: number) => {
         if (!window.confirm("この投稿を不適切として通報しますか？\n(通報が重なると自動的に非表示になります)")) return;
         try {
@@ -426,6 +443,9 @@ const submitPost = async () => {
     const now = new Date();
     const allParentPosts = posts.filter(p => {
         if (p.parent_id) return false;
+
+        // ✅ ここを追加：ブロックしたユーザーの投稿なら非表示にする
+        if (blockedUserIds.has(p.user_id)) return false;
         // ✅ MEETUPフィルター：キャンセル済みは開催後4時間フィルターを適用しない（掲示板に残す）
         if (p.is_meetup) {
             if (p.meetup_status === 'cancelled') {
@@ -1043,6 +1063,14 @@ const submitPost = async () => {
                                                     <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
                                                         <button type="button" onClick={() => handleLocalHide(post.id)} className="p-1 text-gray-300 hover:text-gray-600"><EyeOff size={12} /></button>
                                                         <button type="button" onClick={() => handleReportPost(post.id)} className="p-1 text-gray-300 hover:text-red-400"><AlertTriangle size={12} /></button>
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => handleBlockUser(post.user_id, post.author_nickname)} 
+                                                            className="p-1 text-gray-300 hover:text-red-600" 
+                                                            title="このユーザーをブロック"
+                                                        >
+                                                            <EyeOff size={12} className="fill-current" /> 
+                                                        </button>
                                                     </div>
                                                 )}
                                             </div>
