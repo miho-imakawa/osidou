@@ -23,16 +23,16 @@ class HobbyRoleType(str, enum.Enum):
     FANS = "fans"
 
 class MoodType(str, enum.Enum):
-    HAPPY = "happy"
-    EXCITED = "excited"
-    CALM = "calm"
-    TIRED = "tired"
-    SAD = "sad"
-    ANXIOUS = "anxious"
-    ANGRY = "angry"
-    NEUTRAL = "neutral"
-    GRATEFUL = "grateful"
-    MOTIVATED = "motivated"
+    HAPPY = "HAPPY"
+    EXCITED = "EXCITED"
+    CALM = "CALM"
+    TIRED = "TIRED"
+    SAD = "SAD"
+    ANXIOUS = "ANXIOUS"
+    ANGRY = "ANGRY"
+    NEUTRAL = "NEUTRAL"
+    GRATEFUL = "GRATEFUL"
+    MOTIVATED = "MOTIVATED"
 
 class FriendRequestStatus(str, enum.Enum):
     PENDING = "pending"

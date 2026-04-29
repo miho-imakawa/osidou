@@ -6,16 +6,16 @@ import { postMoodLog, authApi } from '../api';
 import { Send, Smile, Tag } from 'lucide-react';
 
 const MOOD_TYPES = [
-    { type: 'motivated', label: 'On Fire！やるぞ～',  emoji: '🔥', group: 'green' },
-    { type: 'excited',   label: 'Yay！うれしい～',    emoji: '🤩', group: 'green' },
-    { type: 'happy',     label: 'Happy！しあわせ～',  emoji: '😊', group: 'green' },
-    { type: 'grateful',  label: 'Aww～ありがとう～',  emoji: '🙏', group: 'green' },
-    { type: 'calm',      label: 'Relax～まったり～',  emoji: '😌', group: 'yellow' },
-    { type: 'neutral',   label: 'Meh…まずまず',       emoji: '😶', group: 'yellow' },
-    { type: 'anxious',   label: 'Hmm…もやもや～',    emoji: '💭', group: 'red' },
-    { type: 'tired',     label: 'Ugh…つかれた～',    emoji: '😩', group: 'red' },
-    { type: 'sad',       label: 'Sigh…なける…',      emoji: '😭', group: 'red' },
-    { type: 'angry',     label: 'Grrr！むかつく！',  emoji: '😡', group: 'red' },
+    { type: 'MOTIVATED', label: 'On Fire！やるぞ～',  emoji: '🔥', group: 'green' },
+    { type: 'EXCITED',   label: 'Yay！うれしい～',    emoji: '🤩', group: 'green' },
+    { type: 'HAPPY',     label: 'Happy！しあわせ～',  emoji: '😊', group: 'green' },
+    { type: 'GRATEFUL',  label: 'Aww～ありがとう～',  emoji: '🙏', group: 'green' },
+    { type: 'CALM',      label: 'Relax～まったり～',  emoji: '😌', group: 'yellow' },
+    { type: 'NEUTRAL',   label: 'Meh…まずまず',       emoji: '😶', group: 'yellow' },
+    { type: 'ANXIOUS',   label: 'Hmm…もやもや～',    emoji: '💭', group: 'red' },
+    { type: 'TIRED',     label: 'Ugh…つかれた～',    emoji: '😩', group: 'red' },
+    { type: 'SAD',       label: 'Sigh…なける…',      emoji: '😭', group: 'red' },
+    { type: 'ANGRYangry',     label: 'Grrr！むかつく！',  emoji: '😡', group: 'red' },
 ];
 
 const GROUP_STYLES: Record<string, {

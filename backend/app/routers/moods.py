@@ -59,7 +59,7 @@ def create_mood_log(
     current_user: models.User = Depends(get_current_user)
 ):
     # バリデーション
-    valid_moods = ["happy", "excited", "calm", "tired", "sad", "anxious", "angry", "neutral", "grateful", "motivated"]
+    valid_moods = ["HAPPY", "EXCITED", "CALM", "TIRED", "SAD", "ANXIOUS", "ANGRY", "NEUTRAL", "GRATEFUL", "MOTIVATED"]
     if mood.mood_type not in valid_moods:
         raise HTTPException(status_code=400, detail="無効な気分タイプです")
 

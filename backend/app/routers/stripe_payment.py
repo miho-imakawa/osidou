@@ -702,9 +702,9 @@ async def download_friends_feeling_log(user_id: int, db: Session = Depends(get_d
     writer.writerow(["name", "date", "time", "mood", "emoji", "comment"])
 
     MOOD_EMOJI = {
-        "happy": "😊", "excited": "🤩", "calm": "😌",
-        "tired": "😥", "sad": "😭", "anxious": "😟",
-        "angry": "😡", "neutral": "😐", "grateful": "🙏", "motivated": "🔥",
+        "HAPPY": "😊", "EXCITED": "🤩", "CALM": "😌",
+        "TIRED": "😥", "SAD": "😭", "ANXIOUS": "😟",
+        "ANGRY": "😡", "NEUTRAL": "😐", "GRATEFUL": "🙏", "MOTIVATED": "🔥",
     }
 
     for log in logs:
@@ -756,9 +756,9 @@ async def download_feeling_log(session_id: str, db: Session = Depends(get_db)):
     writer.writerow(["date", "time", "mood", "emoji", "comment"])
 
     MOOD_EMOJI = {
-        "happy": "😊", "excited": "🤩", "calm": "😌",
-        "tired": "😥", "sad": "😭", "anxious": "😟",
-        "angry": "😡", "neutral": "😐", "grateful": "🙏", "motivated": "🔥",
+        "HAPPY": "😊", "EXCITED": "🤩", "CALM": "😌",
+        "TIRED": "😥", "SAD": "😭", "ANXIOUS": "😟",
+        "ANGRY": "😡", "NEUTRAL": "😐", "GRATEFUL": "🙏", "MOTIVATED": "🔥",
     }
 
     for log in logs:

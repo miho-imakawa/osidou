@@ -176,9 +176,9 @@ if (!report) return (
         </p>
         {logs.slice(0, 10).map(log => {
             const EMOJI: Record<string, string> = {
-                motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌',
-                neutral: '😶', anxious: '💭', tired: '😩', sad: '😭',
-                angry: '😡', grateful: '🙏',
+                MOTIVATED: '🔥', EXCITED: '🤩', HAPPY: '😊', CALM: '😌',
+                NEUTRAL: '😶', ANXIOUS: '💭', TIRED: '😩', SAD: '😭',
+                ANGRY: '😡', GRATEFUL: '🙏',
             };
             const date = new Date(log.created_at.endsWith('Z') ? log.created_at : log.created_at + 'Z');
             return (
@@ -202,8 +202,10 @@ if (!report) return (
     </div>
 );
 
-    const { recent, weekdayAvg, overallAvg, best, worst, topCategories, catAvgScores } = report;
+    const { recent, weekdayAvg, best, worst, topCategories, catAvgScores } = report;
     
+    const overallAvg = (report as any).average_score || report.overallAvg || 3.0;
+
     const barColor = (avg: number | null) => {
         if (!avg) return 'bg-gray-200';
         if (avg >= 4) return 'bg-emerald-400';
@@ -225,9 +227,11 @@ if (!report) return (
                 <span className="text-[9px] text-gray-300">{recent.length}件の記録</span>
             </div>
 
-            {/* 平均スコア */}
+            {/* 平均スコアの表示部分 */}
             <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-gray-800 tabular-nums">{overallAvg}</span>
+                <span className="text-3xl font-black text-gray-800 tabular-nums">
+                    {typeof overallAvg === 'number' ? overallAvg.toFixed(1) : overallAvg}
+                </span>
                 <span className="text-[10px] text-gray-400 font-bold">/ 5.0</span>
                 <span className="text-xl ml-1">{scoreEmoji}</span>
             </div>
@@ -326,7 +330,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
 
   const [myAdsStats, setMyAdsStats] = useState<any[]>([]);
   const [moodStats, setMoodStats] = useState({ average_score: 3, total_logs: 0 });
-  
+
   const [friendsLogUnlocked, setFriendsLogUnlocked] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [friendsLogExpires, setFriendsLogExpires] = useState<string | null>(null);
@@ -947,7 +951,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                     <Download size={14} /> <span>🤝DL¥200</span>
                   </button>
                 </div>
-                {!moodError && <MonthlyReportSection logs={moodLogs} />}
+                {!moodError && (
+                  <MonthlyReportSection 
+                    logs={moodLogs} 
+                    // reportオブジェクトに average_score を混ぜて渡す
+                    // ※MonthlyReportSection 側でこれを受け取れるように微調整
+                  />
+                )}
                 {moodError === 'logout' ? (
                   <div className="py-6 text-center space-y-2">
                     <p className="text-gray-400 text-[11px] font-bold">🔒 Logged out（ログアウト中）かもしれません</p>
@@ -969,9 +979,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                           {groupedLogs[month].map((log: any) => {
                             const date = new Date(log.created_at.endsWith('Z') ? log.created_at : log.created_at + 'Z');
                             const moodMap: any = { 
-                              motivated: '🔥', excited: '🤩', happy: '😊', calm: '😌', 
-                              neutral: '😶', anxious: '💭', tired: '😩', sad: '😭', 
-                              angry: '😡', grateful: '🙏',
                               MOTIVATED: '🔥', EXCITED: '🤩', HAPPY: '😊', CALM: '😌',
                               NEUTRAL: '😶', ANXIOUS: '💭', TIRED: '😩', SAD: '😭',
                               ANGRY: '😡', GRATEFUL: '🙏'

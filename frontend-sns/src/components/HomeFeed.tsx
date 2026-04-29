@@ -40,16 +40,16 @@ interface MyNotification {
 }
 
 const MOOD_TYPES: Record<string, { label: string; emoji: string }> = {
-  motivated: { emoji: '🔥', label: 'On Fire！やるぞ～' },
-  excited:   { emoji: '🤩', label: 'Yay！うれしい～' },
-  happy:     { emoji: '😊', label: 'Happy！しあわせ～' },
-  calm:      { emoji: '😌', label: 'Relax～まったり～' },
-  neutral:   { emoji: '😶', label: 'Meh…まずまず' },
-  anxious:   { emoji: '💭', label: 'Hmm…もやもや～' },
-  tired:     { emoji: '😩', label: 'Ugh…つかれた～' },
-  sad:       { emoji: '😭', label: 'Sigh…なける…' },
-  angry:     { emoji: '😡', label: 'Grrr！むかつく！' },
-  grateful:  { emoji: '🙏', label: 'Aww～ありがとう～' },
+  MOTIVATED: { emoji: '🔥', label: 'On Fire！やるぞ～' },
+  EXCITED:   { emoji: '🤩', label: 'Yay！うれしい～' },
+  HAPPY:     { emoji: '😊', label: 'Happy！しあわせ～' },
+  CALM:      { emoji: '😌', label: 'Relax～まったり～' },
+  NEUTRAL:   { emoji: '😶', label: 'Meh…まずまず' },
+  ANXIOUS:   { emoji: '💭', label: 'Hmm…もやもや～' },
+  TIRED:     { emoji: '😩', label: 'Ugh…つかれた～' },
+  SAD:       { emoji: '😭', label: 'Sigh…なける…' },
+  ANGRY:     { emoji: '😡', label: 'Grrr！むかつく！' },
+  GRATEFUL:  { emoji: '🙏', label: 'Aww～ありがとう～' },
 };
 
 // -------------------------------------------------------
