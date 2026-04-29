@@ -223,41 +223,52 @@ def cleanup_old_mood_logs(db: Session, user_id: int):
     
     db.commit()
 
-# ==========================================
-# 💡 気分統計（おまけ機能）
-# ==========================================
-
 @router.get("/moods/my-stats", tags=["moods"])
 def get_my_mood_stats(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     """自分の気分ログの統計情報（過去30日間）"""
-    thirty_days_ago = datetime.now() - timedelta(days=30)
+    # タイムゾーンを意識した時刻取得（created_atに合わせる）
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     
-    # 各気分タイプの出現回数をカウント
-    stats = db.query(
-        models.MoodLog.mood_type,
-        func.count(models.MoodLog.id).label('count')
-    ).filter(
+    # 1. 過去30日間の全ログを取得
+    logs = db.query(models.MoodLog).filter(
         models.MoodLog.user_id == current_user.id,
         models.MoodLog.created_at >= thirty_days_ago
-    ).group_by(models.MoodLog.mood_type).all()
+    ).all()
+
+    if not logs:
+        return {
+            "period": "過去30日間",
+            "average_score": 3.0,
+            "total_logs": 0,
+            "mood_counts": {},
+            "most_common_mood": "neutral"
+        }
+
+    # 2. 平均スコアを計算 (models.pyに追加した .score プロパティを利用)
+    # 💡 log.score は models.py で定義した mapping (HAPPY=4, ANGRY=1 など) を参照します
+    total_score = sum(log.score for log in logs)
+    average_score = round(total_score / len(logs), 1)
+
+    # 3. 気分タイプごとのカウント（既存のロジック）
+    mood_counts = {}
+    for log in logs:
+        # Enumオブジェクトをキーにするため、.value を取るかそのまま使うかは実装合わせ
+        m_type = log.mood_type.value if hasattr(log.mood_type, 'value') else log.mood_type
+        mood_counts[m_type] = mood_counts.get(m_type, 0) + 1
     
-    # 辞書形式に変換
-    mood_stats = {stat.mood_type: stat.count for stat in stats}
-    
-    # 最も多い気分
-    most_common_mood = max(mood_stats, key=mood_stats.get) if mood_stats else "neutral"
+    # 最も多い気分を特定
+    most_common_mood = max(mood_counts, key=mood_counts.get) if mood_counts else "neutral"
     
     return {
         "period": "過去30日間",
-        "mood_counts": mood_stats,
-        "most_common_mood": most_common_mood,
-        "total_logs": sum(mood_stats.values())
+        "average_score": average_score,  # ← これがフロントエンドの「3」を動かす鍵です！
+        "total_logs": len(logs),
+        "mood_counts": mood_counts,
+        "most_common_mood": most_common_mood
     }
-
-# C:\osidou\backend\app\routers\moods.py の末尾に追加
 
 # ==========================================
 # 💡 フォロー中ユーザーの最新気分ログを取得

@@ -320,12 +320,29 @@ class MoodLog(Base):
     user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     mood_type  = Column(SQLEnum(MoodType), nullable=False)
     comment    = Column(String(200), nullable=True)
-    category   = Column(String(50), nullable=True)   # ← NEW: タグ名を文字列で保存
+    category   = Column(String(50), nullable=True)
     is_visible = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="mood_logs")
 
+    # 💡 ここから追記：気分を点数（1〜5）に変換する設定
+    @property
+    def score(self) -> int:
+        mapping = {
+            MoodType.MOTIVATED: 5,
+            MoodType.EXCITED: 5,
+            MoodType.HAPPY: 4,
+            MoodType.GRATEFUL: 4,
+            MoodType.CALM: 3,
+            MoodType.NEUTRAL: 3,
+            MoodType.ANXIOUS: 2,
+            MoodType.TIRED: 2,
+            MoodType.SAD: 1,
+            MoodType.ANGRY: 1,
+        }
+        # 保存されている mood_type を元に点数を返す（なければ3点）
+        return mapping.get(self.mood_type, 3)
 
 # ──────────────────────────────────────────
 # 【追加1】UserTag テーブル（新規追加）
