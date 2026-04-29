@@ -329,7 +329,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
   const [myMeetups, setMyMeetups] = useState<any[]>([]); 
 
   const [myAdsStats, setMyAdsStats] = useState<any[]>([]);
-  const [moodStats, setMoodStats] = useState({ average_score: 3, total_logs: 0 });
 
   const [friendsLogUnlocked, setFriendsLogUnlocked] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -484,14 +483,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
             const unconfirmedRes = await authApi.get('/hobby-categories/my-unconfirmed-meetups');
             setUnconfirmedMeetups(unconfirmedRes.data || []);
           } catch {}
-
-          try {
-            const moodStatsRes = await authApi.get('/moods/my-stats');
-            // stats というステート（useState）を定義している前提です
-            setMoodStats(moodStatsRes.data); 
-          } catch (err) {
-            console.error("Mood stats fetch failed:", err);
-          }
 
           // Stripe Connect状態確認
           try {
