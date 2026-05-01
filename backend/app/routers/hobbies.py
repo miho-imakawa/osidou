@@ -141,16 +141,15 @@ def get_member_counts_bulk(db: Session, category_ids: List[int]) -> Dict[int, in
     指定したカテゴリIDリストのmember_countを1回のSQLで一括取得。
     N+1問題を完全に解消する。
     """
-    if not category_ids:
-        return {}
     rows = db.query(
-        models.UserHobbyLink.hobby_category_id,
+        models.UserHobbyLink.master_id,
         func.count(distinct(models.UserHobbyLink.user_id))
     ).filter(
-        models.UserHobbyLink.hobby_category_id.in_(category_ids)
+        models.UserHobbyLink.master_id.in_(category_ids)
     ).group_by(
-        models.UserHobbyLink.hobby_category_id
+        models.UserHobbyLink.master_id
     ).all()
+    
     return {row[0]: row[1] for row in rows}
 
 
@@ -318,19 +317,8 @@ def _is_under_people(cat, all_categories, people_id=196):
 # ✅ 【高速化】カテゴリ詳細取得
 # --------------------------------------------------
 
-@router.get(
-    "/categories/{category_id}",
-    response_model=HobbyCategoryResponse,
-    summary="特定のカテゴリーIDの詳細と子ノード一覧を取得"
-)
+@router.get("/categories/{category_id}", response_model=HobbyCategoryResponse)
 def get_category_detail(category_id: int, db: Session = Depends(get_db)):
-    """
-    【改善点】
-    旧: 子カテゴリの数だけ個別にSQLを実行（N+1問題）
-    新: 子カテゴリのmember_countを1回のSQLで一括取得
-    → 子が10件でも100件でもSQLは合計3回のみ
-    """
-    # 1. 対象カテゴリを取得
     category = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.id == category_id
     ).first()
@@ -338,23 +326,32 @@ def get_category_detail(category_id: int, db: Session = Depends(get_db)):
     if not category:
         raise HTTPException(status_code=404, detail="カテゴリが見つかりません")
 
-    # 2. 直下の子カテゴリを取得（1回のSQL）
     children = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.parent_id == category_id
     ).order_by(models.HobbyCategory.name).all()
 
-    # 3. ✅ 親 + 全子のmember_countを1回のSQLで一括取得（N+1を解消）
-    all_target_ids = [category_id] + [c.id for c in children]
-    counts = get_member_counts_bulk(db, all_target_ids)
-
-    # 4. レスポンス構築（SQLは走らない）
-    response_category = HobbyCategoryResponse.model_validate(category)
-    response_category.member_count = counts.get(category_id, 0)
+    # 親カテゴリのmaster_idを考慮（自分自身がaliasの場合）
+    parent_master_id = category.master_id if category.master_id else category.id
     
+    # 子カテゴリのmaster_idリストを収集
+    child_master_ids = [
+        (c.master_id if c.master_id else c.id) for c in children
+    ]
+    
+    # 全master_idをまとめて一括カウント
+    all_master_ids = list(set([parent_master_id] + child_master_ids))
+    counts = get_member_counts_bulk(db, all_master_ids)
+
+    # 親カテゴリのレスポンス構築
+    response_category = HobbyCategoryResponse.model_validate(category)
+    response_category.member_count = counts.get(parent_master_id, 0)
+    
+    # 子カテゴリのレスポンス構築
     response_category.children = []
     for child in children:
         child_schema = HobbyCategoryResponse.model_validate(child)
-        child_schema.member_count = counts.get(child.id, 0)
+        child_master = child.master_id if child.master_id else child.id
+        child_schema.member_count = counts.get(child_master, 0)
         child_schema.children = []
         response_category.children.append(child_schema)
         
