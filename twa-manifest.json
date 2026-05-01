@@ -36,7 +36,12 @@
   "fullScopeUrl": "https://www.osidou.com/",
   "minSdkVersion": 21,
   "orientation": "portrait",
-  "fingerprints": [],
+  "fingerprints": [
+    {
+    "type": "SHA-256",
+    "value": "1C:CA:07:23:1B:B7:FB:CD:0B:76:5A:61:94:44:7C:74:A9:F0:D1:15:DB:15:32:D2:FB:0D:ED:EC:4B:EA:00:DA"
+    }
+  ],
   "additionalTrustedOrigins": [],
   "retainedBundles": [],
   "protocolHandlers": [],
