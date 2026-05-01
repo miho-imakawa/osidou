@@ -85,7 +85,7 @@ const UserSearch: React.FC<{ currentUserId: number | null }> = ({ currentUserId 
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                    placeholder="ユーザー検索"
+                    placeholder="ユーザー検索（ニックネーム）"
                 />
                 <button onClick={handleSearch} className="bg-pink-500 text-white px-4 rounded">
                     検索
