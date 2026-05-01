@@ -326,35 +326,39 @@ def get_category_detail(category_id: int, db: Session = Depends(get_db)):
     if not category:
         raise HTTPException(status_code=404, detail="カテゴリが見つかりません")
 
+    # 全カテゴリを一度だけ取得（N+1対策）
+    all_categories = db.query(models.HobbyCategory).all()
+
+    # 全UserHobbyLinkのmaster_idカウントを一括取得
+    all_counts = dict(
+        db.query(
+            models.UserHobbyLink.master_id,
+            func.count(distinct(models.UserHobbyLink.user_id))
+        ).group_by(models.UserHobbyLink.master_id).all()
+    )
+
+    def get_subtree_count(cat_id: int) -> int:
+        """指定カテゴリ以下の全子孫のmember_countを合算"""
+        descendant_ids = get_all_descendant_ids(cat_id, all_categories)
+        return sum(all_counts.get(did, 0) for did in descendant_ids)
+
+    # 直下の子カテゴリを取得
     children = db.query(models.HobbyCategory).filter(
         models.HobbyCategory.parent_id == category_id
     ).order_by(models.HobbyCategory.name).all()
 
-    # 親カテゴリのmaster_idを考慮（自分自身がaliasの場合）
-    parent_master_id = category.master_id if category.master_id else category.id
-    
-    # 子カテゴリのmaster_idリストを収集
-    child_master_ids = [
-        (c.master_id if c.master_id else c.id) for c in children
-    ]
-    
-    # 全master_idをまとめて一括カウント
-    all_master_ids = list(set([parent_master_id] + child_master_ids))
-    counts = get_member_counts_bulk(db, all_master_ids)
-
-    # 親カテゴリのレスポンス構築
+    # 親カテゴリのレスポンス構築（子孫全合算）
     response_category = HobbyCategoryResponse.model_validate(category)
-    response_category.member_count = counts.get(parent_master_id, 0)
-    
-    # 子カテゴリのレスポンス構築
+    response_category.member_count = get_subtree_count(category_id)
+
+    # 子カテゴリも同様に子孫全合算
     response_category.children = []
     for child in children:
         child_schema = HobbyCategoryResponse.model_validate(child)
-        child_master = child.master_id if child.master_id else child.id
-        child_schema.member_count = counts.get(child_master, 0)
+        child_schema.member_count = get_subtree_count(child.id)
         child_schema.children = []
         response_category.children.append(child_schema)
-        
+
     return response_category
 
 # --------------------------------------------------
