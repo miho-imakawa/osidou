@@ -4,7 +4,7 @@ const TokuteiPage: React.FC = () => {
     { label: "販売業者", value: "今川 美朋" },
     { label: "運営責任者", value: "今川 美朋" },
     { label: "所在地", value: "〒170-0013 東京都豊島区東池袋2丁目62番8号BIGオフィスプラザ池袋1206" },
-    { label: "電話番号", value: "050-1794-2054" },
+    { label: "電話番号", value: "050-1724-4262" },
 
     { label: "メールアドレス", value: "system@machistrategist.com" },
     { label: "販売価格", value: "各サービスページに表示の価格（200円〜）" },
