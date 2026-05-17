@@ -40,7 +40,7 @@
     <!-- Value from default config. -->
     <string name="orientation" translatable="false">portrait</string>
     <!-- Value from default config. -->
-    <string name="providerAuthority" translatable="false">com.osidou.app.fileprovider</string>
+    <string name="providerAuthority" translatable="false">com.suishuro.osidou.fileprovider</string>
     <!-- Value from default config. -->
     <string name="webManifestUrl" translatable="false">https://www.osidou.com/manifest.json</string>
 

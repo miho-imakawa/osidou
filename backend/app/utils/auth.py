@@ -51,3 +51,22 @@ def decode_access_token(token: str) -> Optional[dict]:
     
 def generate_public_code() -> str:
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+
+# 既存のコードの末尾に追加
+
+REFRESH_TOKEN_EXPIRE_DAYS = 30  # 30日間有効
+
+def create_refresh_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def decode_refresh_token(token: str) -> Optional[dict]:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            return None
+        return payload
+    except JWTError:
+        return None

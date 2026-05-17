@@ -29,6 +29,6 @@
     <string name="launchUrl" translatable="false">https://www.osidou.com/</string>
     <string name="launcherName" translatable="false">推し道</string>
     <string name="orientation" translatable="false">portrait</string>
-    <string name="providerAuthority" translatable="false">com.osidou.app.fileprovider</string>
+    <string name="providerAuthority" translatable="false">com.suishuro.osidou.fileprovider</string>
     <string name="webManifestUrl" translatable="false">https://www.osidou.com/manifest.json</string>
 </resources>

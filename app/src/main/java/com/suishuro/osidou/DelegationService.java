@@ -1,4 +1,4 @@
-package com.osidou.app;
+package com.suishuro.osidou;
 
 
 

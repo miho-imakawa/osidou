@@ -18,23 +18,38 @@ authApi.interceptors.request.use((config) => {
     return config;
 });
 
-// レスポンスインターセプター（401時のリダイレクト）は意図的にコメントアウト中
-// authApi.interceptors.response.use(
-//     (response) => response,
-//     (error) => {
-//         if (error?.response?.status === 401) {
-//             const url = error.config?.url || '';
-//             const isAuthEndpoint = url.includes('/auth/');
-//             const isMeEndpoint = url.includes('/users/me');
-//             const isAlreadyOnLogin = window.location.pathname === '/login';
-//             if (!isAuthEndpoint && !isMeEndpoint && !isAlreadyOnLogin) {
-//                 localStorage.removeItem('access_token');
-//                 window.location.href = '/login';
-//             }
-//         }
-//         return Promise.reject(error);
-//     }
-// );
+authApi.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+
+        if (error?.response?.status === 401 && !originalRequest._retry) {
+            originalRequest._retry = true;
+
+            const refreshToken = localStorage.getItem('refresh_token');
+            if (!refreshToken) {
+                window.location.href = '/login';
+                return Promise.reject(error);
+            }
+
+            try {
+                const res = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+                    refresh_token: refreshToken
+                });
+                const newToken = res.data.access_token;
+                localStorage.setItem('access_token', newToken);
+                originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                return authApi(originalRequest);
+            } catch {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                window.location.href = '/login';
+            }
+        }
+
+        return Promise.reject(error);
+    }
+);
 
 export const publicApi = axios.create({
     baseURL: API_BASE_URL,

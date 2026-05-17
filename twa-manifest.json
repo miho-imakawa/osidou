@@ -1,5 +1,5 @@
 {
-  "packageId": "com.osidou.app",
+  "packageId": "com.suishuro.osidou",
   "host": "www.osidou.com",
   "name": "推し道 - osidou",
   "launcherName": "推し道",
@@ -20,8 +20,8 @@
     "path": "C:\\osidou\\android.keystore",
     "alias": "android"
   },
-  "appVersionName": "1",
-  "appVersionCode": 1,
+  "appVersionName": "2",
+  "appVersionCode": 2,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://www.osidou.com/manifest.json",
@@ -38,8 +38,8 @@
   "orientation": "portrait",
   "fingerprints": [
     {
-    "type": "SHA-256",
-    "value": "1C:CA:07:23:1B:B7:FB:CD:0B:76:5A:61:94:44:7C:74:A9:F0:D1:15:DB:15:32:D2:FB:0D:ED:EC:4B:EA:00:DA"
+      "type": "SHA-256",
+      "value": "1C:CA:07:23:1B:B7:FB:CD:0B:76:5A:61:94:44:7C:74:A9:F0:D1:15:DB:15:32:D2:FB:0D:ED:EC:4B:EA:00:DA"
     }
   ],
   "additionalTrustedOrigins": [],
@@ -48,5 +48,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1"
+  "appVersion": "2"
 }

@@ -10,12 +10,12 @@ from .. import models # app/models.py
 from ..database import get_db
 
 # ✅ スキーマのインポート: schemasディレクトリ内のファイルからインポート
-from ..schemas.auth import Token, TokenData # JWT関連
+from ..schemas.auth import Token, TokenData, RefreshRequest # JWT関連
 from ..schemas.users import UserCreate, UserMe, UserPublic # ユーザー登録/取得関連
 
 # ✅ security.py から認証関連の関数/定数をインポート
 # security.pyは utils/security.py に移動済み
-from ..utils.auth import generate_public_code
+from ..utils.auth import generate_public_code, create_refresh_token, decode_refresh_token
 from ..utils.security import (
     authenticate_user,
     create_access_token,
@@ -91,7 +91,8 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
 
 
 # JWTトークンを発行するためのエンドポイント
-@router.post("/token", response_model=Token)
+# JWTトークンを発行するためのエンドポイント
+@router.post("/token")  # ← response_model=Token を削除（refresh_tokenが増えるため）
 def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
 ):
@@ -102,18 +103,30 @@ def login_for_access_token(
             detail="ユーザー名またはパスワードが間違っています",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-   # 💡 修正: トークンの有効期限を大幅に延長 (例: 1日 = 24 * 60分)
-    # ACCESS_TOKEN_EXPIRE_MINUTES がデフォルト 30 分の場合、ここでは 1440 分に上書きする
-    # 環境変数などを使わない場合は、ここでは定数値を直接設定してテストを容易にする
-    TOKEN_EXPIRE_MINUTES = 24 * 60 # 1日 (本番では短く設定してください)
-    
-    access_token_expires = timedelta(minutes=TOKEN_EXPIRE_MINUTES)
+
     access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        data={"sub": user.email},
+        expires_delta=timedelta(hours=1)  # アクセストークンは1時間
     )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = create_refresh_token(data={"sub": user.email})  # ← 追加
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,  # ← 追加
+        "token_type": "bearer"
+    }
+
+@router.post("/refresh")
+def refresh_token(request: RefreshRequest):
+    payload = decode_refresh_token(request.refresh_token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="リフレッシュトークンが無効です")
+
+    new_access_token = create_access_token(
+        data={"sub": payload["sub"]},
+        expires_delta=timedelta(hours=1)
+    )
+    return {"access_token": new_access_token, "token_type": "bearer"}
 
 # 認証済みユーザー情報を取得するテストエンドポイント
 @router.get("/me", response_model=UserMe)
@@ -190,3 +203,4 @@ def password_reset(
     db.commit()
 
     return {"message": "パスワードを変更しました。ログインしてください。"}
+

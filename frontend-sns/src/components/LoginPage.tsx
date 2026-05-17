@@ -24,6 +24,7 @@ const LoginPage: React.FC = () => {
             const token = res.data.access_token;
             if (!token) { setError('トークンが取得できませんでした'); return; }
             localStorage.setItem('access_token', token);
+            localStorage.setItem('refresh_token', res.data.refresh_token);
             await new Promise(resolve => setTimeout(resolve, 200));
             window.location.href = '/';
         } catch (err: any) {
@@ -66,6 +67,7 @@ const LoginPage: React.FC = () => {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
             });
             localStorage.setItem('access_token', res.data.access_token);
+            localStorage.setItem('refresh_token', res.data.refresh_token); 
             await new Promise(resolve => setTimeout(resolve, 200));
             window.location.href = '/';
         } catch (err: any) {

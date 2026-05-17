@@ -4,7 +4,7 @@
     "type": "BUNDLE",
     "kind": "RegularFile"
   },
-  "applicationId": "com.osidou.app",
+  "applicationId": "com.suishuro.osidou",
   "variantName": "release",
   "elements": [
     {
