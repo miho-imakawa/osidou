@@ -23,12 +23,18 @@ authApi.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
+        // 認証関連エンドポイントはスキップ（無限ループ防止）
+        const isAuthEndpoint = originalRequest?.url?.includes('/auth/');
+        if (isAuthEndpoint) {
+            return Promise.reject(error);
+        }
+
         if (error?.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
 
             const refreshToken = localStorage.getItem('refresh_token');
             if (!refreshToken) {
-                window.location.href = '/login';
+                // refresh_tokenがない場合はリダイレクトしない
                 return Promise.reject(error);
             }
 
