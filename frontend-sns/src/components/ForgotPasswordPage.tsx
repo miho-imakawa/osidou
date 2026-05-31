@@ -36,7 +36,7 @@ const ForgotPasswordPage: React.FC = () => {
                             to="/login"
                             className="block text-center text-pink-500 text-sm font-bold underline"
                         >
-                            ログイン画面に戻る
+                            Log-in画面に戻る
                         </Link>
                     </>
                 ) : (
@@ -65,7 +65,7 @@ const ForgotPasswordPage: React.FC = () => {
                                 to="/login"
                                 className="block text-center text-gray-400 text-[11px]"
                             >
-                                ログイン画面に戻る
+                                Log-in画面に戻る
                             </Link>
                         </div>
                     </>

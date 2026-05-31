@@ -225,7 +225,7 @@ const AppLayout: React.FC = () => {
                 <h2 className="text-2xl font-black text-gray-900">推し道へようこそ</h2>
                 <p className="text-sm text-gray-500">ログインして始めましょう</p>
                 <a href="/login" className="bg-pink-500 text-white px-8 py-3 rounded-full font-bold">
-                    ログイン / サインアップ
+                    Log-in / Sign up
                 </a>
             </div>
         );

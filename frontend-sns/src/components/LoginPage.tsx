@@ -140,7 +140,7 @@ const LoginPage: React.FC = () => {
                         disabled={loading}
                         className="w-full bg-pink-500 text-white py-3 rounded-2xl font-black text-sm hover:bg-pink-600 transition-colors disabled:opacity-50"
                     >
-                        {loading ? '処理中...' : mode === 'login' ? 'ログイン' : '登録する'}
+                        {loading ? '処理中...' : mode === 'login' ? 'Log-in' : '登録する'}
                     </button>
 
                     {mode === 'login' && (
