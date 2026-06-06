@@ -195,9 +195,9 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
           credits_remaining: res.credits_remaining,
           can_download: true,
         });
-        setDlMessage('🎉 購入完了！30回分ダウンロードできます（4時間ごとに1回）。');
+        setDlMessage('🎉 Purchase complete! You can download 30 times (once every 4 hours).');
       } catch (e: any) {
-        const msg = e?.response?.data?.detail || 'アクティベートに失敗しました';
+        const msg = e?.response?.data?.detail || 'Activation failed.';
         setDlMessage(`⚠️ ${msg}`);
       } finally {
         setIsActivating(false);
@@ -219,7 +219,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
         setDlMessage(`ℹ️ ${e.response.data.detail}`);
         loadFriendsLogStatus();
       } else {
-        alert(e?.response?.data?.detail || 'エラーが発生しました。');
+        alert(e?.response?.data?.detail || 'An error has occurred.');
       }
     }
   };
@@ -234,7 +234,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
         const minutes = Math.ceil(
           (new Date(next_available_at).getTime() - Date.now()) / 60000
         );
-        setDlMessage(`⏳ 次のダウンロードまであと${minutes}分です。`);
+        setDlMessage(`⏳ There are ${minutes} minutes left until the next download.`);
       }
       return;
     }
@@ -256,14 +256,14 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      setDlMessage('✅ ダウンロード完了！');
+      setDlMessage('✅ Download complete!');
       setFriendsLogStatus(prev => prev ? {
         ...prev,
         credits_remaining: (prev.credits_remaining ?? 1) - 1,
         can_download: false,
       } : prev);
     } catch (e: any) {
-      const detail = e?.response?.data?.detail || 'ダウンロードに失敗しました';
+      const detail = e?.response?.data?.detail || 'Download failed.';
       setDlMessage(`❌ ${detail}`);
     } finally {
       setIsDownloading(false);
@@ -357,7 +357,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       {/* ヘッダーエリア */}
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">
-          ハロー⭐ {profile.nickname || profile.username},
+          Hello⭐ {profile.nickname || profile.username},
         </h1>
         <p className="text-[10px] font-bold text-pink-500 opacity-70 tracking-widest uppercase mt-1">
           Welcome back
@@ -371,7 +371,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
           state={{ tab: 'requests' }}
           className="block text-xs font-bold text-amber-500 hover:text-amber-600 mb-4"
         >
-          🔔 ともだち申請が{pendingCount}件あります
+          🔔 You have {pendingCount} friend requests.
         </Link>
       )}
 
@@ -397,7 +397,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
           to={`/community/${meetup.hobby_category_id}`}
           className="block text-xs font-black text-orange-500 hover:text-orange-600 mb-4"
         >
-          🎪 「{meetup.title}」の開催確定を押してください
+          🎪 Please click "Confirm Event" for "{meetup.title}".
         </Link>
       ))}
 
@@ -422,7 +422,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h2 className="text-[14px] font-black text-gray-900 tracking-[0.2em] uppercase leading-none">
-            ともだちs' LOG
+            FRIENDs' LOG
           </h2>
           {renderFriendCount()}
         </div>
@@ -432,7 +432,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
             state={{ tab: 'search' }}
             className="px-2.5 py-1 bg-pink-50 border border-pink-200 text-pink-600 rounded-lg text-[10px] font-bold hover:bg-pink-100 transition-all"
           >
-            👤 追加・👥 管理
+            👤 ADD・👥 MANAGE
           </Link>
           {renderFriendsLogBar()}
         </div>
@@ -450,7 +450,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
               🔒 Logged Out?
             </p>
             <Link to="/login" className="text-xs font-bold text-pink-500 hover:underline">
-              Loginはこちら →
+              Login →
             </Link>
           </div>
         )}

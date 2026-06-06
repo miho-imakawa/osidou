@@ -104,7 +104,7 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
             setSelectedTag(null);
         } catch (err) {
             console.error('Failed to submit mood:', err);
-            alert('気分の投稿に失敗しました。');
+            alert('Current mood post failed.');
         } finally {
             setIsSubmitting(false);
         }
@@ -169,14 +169,14 @@ const MoodInput: React.FC<MoodInputProps> = ({ onSuccess }) => {
                 <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder={`「${currentMoodObj?.label || '今日'}」な気分…何があったか教えて😉 `}
+                    placeholder={`「${currentMoodObj?.label || 'Current Mood'}」Tell me what happened.😉 `}
                     rows={2}
                     maxLength={200}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none transition bg-white"
                 />
-                <p className="text-xs text-gray-400 text-right">{comment.length}/200文字</p>
+                <p className="text-xs text-gray-400 text-right">{comment.length}/200 words</p>
 
-                {/* 送信ボタン */}
+                {/* POSTING */}
                 <div className="flex justify-end">
                     <button
                         type="submit"
