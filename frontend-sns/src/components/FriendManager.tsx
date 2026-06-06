@@ -85,10 +85,10 @@ const UserSearch: React.FC<{ currentUserId: number | null }> = ({ currentUserId 
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                    placeholder="ユーザー検索（ニックネーム）"
+                    placeholder="User search (nickname)"
                 />
                 <button onClick={handleSearch} className="bg-pink-500 text-white px-4 rounded">
-                    検索
+                    SEARCH
                 </button>
             </div>
 
@@ -104,8 +104,8 @@ const UserSearch: React.FC<{ currentUserId: number | null }> = ({ currentUserId 
                             disabled={!!status[u.id]}
                             className="bg-pink-100 px-3 py-1 rounded disabled:opacity-50"
                         >
-                            {status[u.id] === 'sent'    ? '申請済み'  :
-                             status[u.id] === 'pending' ? '送信中...' : 'フレンド申請'}
+                            {status[u.id] === 'sent'    ? 'Application submitted'  :
+                             status[u.id] === 'pending' ? 'Sending...' : 'Friend request'}
                         </button>
                     </li>
                 ))}
@@ -134,10 +134,10 @@ const RequestList: React.FC = () => {
         try {
             // 承認する → バックエンドが申請者のサブスクを自動開始
             await acceptFriendRequest(requestId);
-            alert('承認しました！');
+            alert('Approved!');
             load();
         } catch (err: any) {
-            alert('エラーが発生しました。');
+            alert('An error has occurred.');
         } finally {
             setProcessing(prev => ({ ...prev, [requestId]: false }));
         }
@@ -151,14 +151,14 @@ const RequestList: React.FC = () => {
             await rejectFriendRequest(requestId);
             load();
         } catch {
-            alert('エラーが発生しました。');
+            alert('An error has occurred.');
         } finally {
             setProcessing(prev => ({ ...prev, [requestId]: false }));
         }
     };
 
     if (requests.length === 0) {
-        return <p className="text-gray-500 text-sm p-4">承認待ちの申請はありません。</p>;
+        return <p className="text-gray-500 text-sm p-4">There are no applications awaiting approval.</p>;
     }
 
     return (
@@ -169,7 +169,7 @@ const RequestList: React.FC = () => {
                         <Link to={`/profile/${r.requester.id}`} className="text-pink-500">
                             {r.requester.nickname || r.requester.username}
                         </Link>
-                        さんからの申請
+                        Application from 
                     </p>
                     <div className="space-x-2">
                         <button
@@ -177,14 +177,14 @@ const RequestList: React.FC = () => {
                             onClick={() => handleAccept(r.id)}
                             disabled={!!processing[r.id]}
                         >
-                            {processing[r.id] ? '処理中...' : '承認'}
+                            {processing[r.id] ? 'Processing...' : 'Approved'}
                         </button>
                         <button
                             className="px-3 py-1 rounded text-sm border disabled:opacity-50"
                             onClick={() => handleReject(r.id)}
                             disabled={!!processing[r.id]}
                         >
-                            拒否
+                            Rejection
                         </button>
                     </div>
                 </li>
@@ -212,23 +212,23 @@ const FriendList: React.FC = () => {
         if (note === undefined) return;
         try {
             await authApi.put(`/friends/friendships/${friendshipId}`, { friend_note: note });
-            alert('メモを保存しました');
+            alert('Saved the memo.');
             load();
         } catch {
-            alert('保存に失敗しました');
+            alert('Saving failed.');
         }
     };
 
     const handleDelete = async (friendshipId: number) => {
         // 💡 確認ダイアログを追加
-        if (!window.confirm('ともだちを解除しますか？\n解除しても相手には通知されません。')) return;
+        if (!window.confirm('Do you want to unfriend?\nUnfriending them will not notify them')) return;
 
         try {
             await authApi.delete(`/friends/friendships/${friendshipId}`);
             // リロードして一覧を更新
             load();
         } catch {
-            alert('解除に失敗しました');
+            alert('Unlock failed.');
         }
     };
 
@@ -240,7 +240,7 @@ const FriendList: React.FC = () => {
                         <p className="font-bold text-gray-900">
                             {(() => {
                                 const fInfo = f.friend;
-                                if (!fInfo) return '読み込み中...';
+                                if (!fInfo) return 'Loading...';
                                 if (fInfo.nickname) return fInfo.nickname;
                                 if (fInfo.email) return fInfo.email.split('@')[0];
                                 return fInfo.username;
@@ -251,7 +251,7 @@ const FriendList: React.FC = () => {
                             <input
                                 defaultValue={f.friend_note || ''}
                                 className="border text-xs p-1 flex-grow rounded"
-                                placeholder="メモを追加..."
+                                placeholder="Add a note..."
                                 onChange={e => setEditingNotes(prev => ({
                                     ...prev,
                                     [f.id]: e.target.value
@@ -261,7 +261,7 @@ const FriendList: React.FC = () => {
                                 onClick={() => handleSaveNote(f.id)}
                                 className="bg-blue-500 text-white text-xs px-2 py-1 rounded hover:bg-blue-600"
                             >
-                                保存
+                                Saved
                             </button>
                         </div>
                     </div>
@@ -281,8 +281,8 @@ const FriendList: React.FC = () => {
                                     : 'bg-pink-50 text-pink-400 hover:bg-pink-100'
                             }`}
                             title={f.is_muted
-                                ? 'EMOJI+MOODのみ表示中（クリックで全表示）'
-                                : '全表示中（クリックでコメント非表示）'
+                                ? 'Only EMOJI+MOOD is currently displayed (click to show all).'
+                                : 'Showing all (click to hide comments)'
                             }
                         >
                             {f.is_muted ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -292,7 +292,7 @@ const FriendList: React.FC = () => {
                         <button
                             onClick={() => handleDelete(f.id)}
                             className="p-1 text-[9px] text-gray-300 hover:text-gray-400 transition-colors"
-                            title="ともだち解除"
+                            title="Unfriend"
                         >
                             ❁
                         </button>
@@ -332,12 +332,12 @@ const FriendManager: React.FC = () => {
             try {
                 const receiverId = Number(receiverIdStr);
                 await sendFriendRequest(receiverId);
-                setSetupMessage('カード登録が完了しました。承認後に課金が開始されます。');
+                setSetupMessage('Your card registration is complete. Billing will begin after approval.');
             } catch (err: any) {
-                if (err.response?.status === 400 && err.response.data.detail === '既に申請済みです。') {
-                    setSetupMessage('カード登録が完了しました。申請は送信済みです。');
+                if (err.response?.status === 400 && err.response.data.detail === 'Already submitted the application.') {
+                    setSetupMessage('Card registration is complete. Your application has been submitted.');
                 } else {
-                    setSetupMessage('カード登録は完了しましたが、申請の送信に失敗しました。再度お試しください。');
+                    setSetupMessage('Your card registration was completed, but the application submission failed. Please try again.');
                 }
             } finally {
                 setIsProcessingSetup(false);
@@ -366,11 +366,11 @@ const FriendManager: React.FC = () => {
 
     return (
         <div className="p-6">
-            <h1 className="text-2xl font-bold mb-4">ともだち管理</h1>
+            <h1 className="text-2xl font-bold mb-4">FRIENDs management</h1>
 
             {/* SetupIntent 完了後メッセージ */}
             {isProcessingSetup && (
-                <p className="text-xs text-purple-400 animate-pulse mb-4">カード登録を確認中...</p>
+                <p className="text-xs text-purple-400 animate-pulse mb-4">Card registration is being verified...</p>
             )}
             {setupMessage && (
                 <p className="text-xs text-green-600 bg-green-50 border border-green-200 rounded p-3 mb-4">
