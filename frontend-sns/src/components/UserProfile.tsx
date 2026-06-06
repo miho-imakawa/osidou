@@ -606,7 +606,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
         </h1>
         {isMe && (
           <button onClick={toggleEdit} className="ml-4 px-3 py-2 bg-pink-600 text-white rounded-2xl flex items-center gap-1.5 text-sm font-bold shrink-0 transition-all hover:bg-pink-700 shadow-md active:scale-95">
-            {isEditing ? <><X size={16}/> 戻る</> : <><Edit size={16}/> 編集</>}
+            {isEditing ? <><X size={16}/> HOME</> : <><Edit size={16}/> EDIT</>}
           </button>
         )}
       </div>
