@@ -391,7 +391,7 @@ const FriendManager: React.FC = () => {
                         tab === 'requests' ? 'font-bold border-b-2 border-pink-500' : ''
                     } ${pendingCount > 0 ? 'text-amber-500 font-bold' : ''}`}
                 >
-                    承認待ち
+                    PENDING APPROVAL
                     {pendingCount > 0 && (
                         <span className="ml-1 bg-amber-500 text-white text-[10px] font-black rounded-full px-1.5 py-0.5">
                             {pendingCount}
@@ -402,7 +402,7 @@ const FriendManager: React.FC = () => {
                     onClick={() => setTab('friends')}
                     className={tab === 'friends' ? 'font-bold border-b-2 border-pink-500' : ''}
                 >
-                    一覧
+                    LIST
                 </button>
             </div>
 
