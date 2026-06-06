@@ -72,7 +72,7 @@ const UserSearch: React.FC<{ currentUserId: number | null }> = ({ currentUserId 
                     delete next[receiverId];
                     return next;
                 });
-                alert('送信に失敗しました');
+                alert('Sending failed.');
             }
         }
     };
