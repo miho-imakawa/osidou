@@ -383,7 +383,7 @@ const FriendManager: React.FC = () => {
                     onClick={() => setTab('search')}
                     className={tab === 'search' ? 'font-bold border-b-2 border-pink-500' : ''}
                 >
-                    検索
+                    SEARCH
                 </button>
                 <button
                     onClick={() => setTab('requests')}
