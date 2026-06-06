@@ -49,8 +49,8 @@ const BottomNav: React.FC = () => {
 
     const navItems = [
         { path: '/', label: 'HOME', icon: Home },
-        { path: '/community', label: 'コミュニティ', icon: Users },
-        { path: '/friends', label: 'ともだち', icon: Heart },
+        { path: '/community', label: 'COMMUNITY', icon: Users },
+        { path: '/friends', label: 'FRIENDS', icon: Heart },
         { path: '/mypage', label: 'MY PAGE', icon: User },
     ];
 
@@ -90,8 +90,8 @@ const Header: React.FC = () => {
 
     const navItems = [
         { path: '/', label: 'HOME' },
-        { path: '/community', label: 'コミュニティ' },
-        { path: '/friends', label: 'ともだち' },
+        { path: '/community', label: 'COMMUNITY' },
+        { path: '/friends', label: 'FRIENDS' },
         { path: '/mypage', label: 'MY PAGE' },
     ];
 
@@ -118,10 +118,10 @@ const Header: React.FC = () => {
                     ))}
                     {isLoggedIn ? (
                         <button onClick={handleLogout} className="text-gray-500 hover:text-red-500 text-sm border px-3 py-1 rounded">
-                            ログアウト
+                            Logout
                         </button>
                     ) : (
-                        <Link to="/login" className="text-pink-600 font-bold text-sm">ログイン</Link>
+                        <Link to="/login" className="text-pink-600 font-bold text-sm">Login</Link>
                     )}
                 </nav>
 
@@ -130,10 +130,10 @@ const Header: React.FC = () => {
                     {isLoggedIn ? (
                         <button onClick={handleLogout}
                             className="text-gray-500 text-xs border px-3 py-1.5 rounded-full">
-                            ログアウト
+                            Logout
                         </button>
                     ) : (
-                        <Link to="/login" className="text-pink-600 font-bold text-sm">ログイン</Link>
+                        <Link to="/login" className="text-pink-600 font-bold text-sm">Login</Link>
                     )}
                 </div>
             </div>

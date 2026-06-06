@@ -447,7 +447,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
         {error === 'logout' && (
           <div className="bg-white p-10 rounded-[32px] border-2 border-dashed border-gray-100 text-center space-y-2">
             <p className="text-gray-400 text-[11px] font-bold">
-              🔒 Logged Out（ログアウト中）かもしれません
+              🔒 Logged Out?
             </p>
             <Link to="/login" className="text-xs font-bold text-pink-500 hover:underline">
               Loginはこちら →
@@ -455,7 +455,7 @@ const HomeFeed: React.FC<{ profile: UserProfile }> = ({ profile }) => {
           </div>
         )}
         {error === 'failed' && (
-          <p className="text-red-400 text-xs font-bold">Loading Failed…Logged Out（ログアウト中）かもしれません</p>
+          <p className="text-red-400 text-xs font-bold">Loading Failed…Logged Out</p>
         )}
 
         <div className="grid gap-2">
