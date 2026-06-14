@@ -238,7 +238,7 @@ if (!report) return (
 
             {/* 曜日バイオリズム */}
             <div className="space-y-1.5">
-                <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">月間・曜日別バイオリズム</p>
+                <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">Monthly and Daily Biorhythms</p>
                 {weekdayAvg.map(({ day, avg, count }) => (
                     <div key={day} className="flex items-center gap-2">
                         <span className="text-[10px] font-black text-gray-500 w-4 shrink-0">{day}</span>
@@ -256,8 +256,8 @@ if (!report) return (
                 ))}
                 {best && worst && best.day !== worst.day && (
                     <p className="text-[9px] text-gray-400 pt-0.5">
-                        <span className="text-emerald-500 font-bold">{best.day}曜</span>が最高 ·{' '}
-                        <span className="text-rose-400 font-bold">{worst.day}曜</span>が最低
+                        <span className="text-emerald-500 font-bold">{best.day}</span> is your best day ·{' '}
+                        <span className="text-rose-400 font-bold">{worst.day}</span> is your toughest
                     </p>
                 )}
             </div>
@@ -265,7 +265,7 @@ if (!report) return (
             {/* よく使ったタグ */}
             {topCategories.length > 0 && (
                 <div className="space-y-1">
-                    <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">よく使ったタグ</p>
+                    <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">Top Tags</p>
                     <div className="flex flex-wrap gap-1">
                         {topCategories.map(([label, count], i) => (
                             <span
@@ -286,7 +286,7 @@ if (!report) return (
             {/* ✅ ここに追加：タグ別スコア平均 */}
             {catAvgScores.length > 0 && (
                 <div className="space-y-1.5">
-                    <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">タグ別 気分スコア</p>
+                    <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">Mood Score by Tag</p>
                     {catAvgScores.map(({ label, avg, count }) => (
                         <div key={label} className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-gray-500 w-16 truncate shrink-0">{label}</span>
@@ -307,8 +307,8 @@ if (!report) return (
 
             {/* 200円AI診断への誘導（③の布石） */}
             <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
-                <p className="text-[9px] text-gray-300">3ヶ月分のAI詳細レポートは↗</p>
-                <span className="text-[9px] text-pink-300 font-bold">準備中 🤖</span>
+                <p className="text-[9px] text-gray-300">The detailed AI report for 3 months is↗</p>
+                <span className="text-[9px] text-pink-300 font-bold">Under preparation🤖</span>
             </div>
         </div>
     );
@@ -372,7 +372,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || 'ダウンロードに失敗しました');
+        throw new Error(err.detail || 'Download failed.');
       }
 
       const blob = await response.blob();
@@ -388,7 +388,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
       alert("ダウンロードが完了しました！");
     } catch (error: any) {
       console.error("Download error:", error);
-      alert(error.message || "ダウンロード中にエラーが発生しました。");
+      alert(error.message || "An error occurred during the download.");
     } finally {
       setIsDownloading(false);
     }
@@ -415,7 +415,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
       }
     } catch (error) {
       console.error("Checkout error:", error);
-      alert("決済の準備に失敗しました。");
+      alert("Payment preparation failed.");
     } finally {
       setIsDownloading(false);
     }
@@ -523,7 +523,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
         }
 
       } catch (err) {
-        console.error("データ取得失敗:", err);
+        console.error("Data acquisition failed:", err);
       }
     };
 
@@ -549,8 +549,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
       await authApi.put('/users/me', tempProfile);
       fetchMyProfile();
       setIsEditing(false);
-      alert("プロフィールを更新しました！");
-    } catch (err) { alert("更新に失敗しました。"); }
+      alert("Updated the Profile!");
+    } catch (err) { alert("Update failed."); }
   };
 
   const handleAddTag = async () => {
@@ -565,7 +565,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
       setUserTags(prev => [...prev, created]);
       setNewTagLabel('');
     } catch (e: any) {
-      alert(e?.response?.data?.detail || 'タグの追加に失敗しました。');
+      alert(e?.response?.data?.detail || 'Failed to add tags.');
     } finally {
       setTagSaving(false);
     }
@@ -576,23 +576,23 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
       await deleteTag(tagId);
       setUserTags(prev => prev.filter(t => t.id !== tagId));
     } catch {
-      alert('タグの削除に失敗しました。');
+      alert('Tag removal failed.');
     }
   };
 
   const handleCancel = async (postId: number) => {
-    if (!window.confirm("このミートアップの参加をキャンセルしますか？\n※当日0時以降はキャンセル料が発生する場合があります。")) return;
+    if (!window.confirm("Do you want to cancel your participation in this meetup?\n※Cancellation fees may apply if you cancel after midnight on the day of the reservation.")) return;
     try {
       await authApi.delete(`/responses/cancel/${postId}`);
       setMyMeetups(prev => prev.filter(m => m.id !== postId));
-      alert("キャンセルを完了しました。");
+      alert("Cancellation complete.");
     } catch (err) {
-      alert("キャンセルの実行に失敗しました。");
+      alert("Cancellation failed.");
     }
   };
 
-  if (loading) return <div className="text-center py-10">読み込み中...</div>;
-  if (!displayProfile) return <div className="text-center py-10 text-gray-400">ユーザーが見つかりません。</div>;
+  if (loading) return <div className="text-center py-10">Loading...</div>;
+  if (!displayProfile) return <div className="text-center py-10 text-gray-400">No user found.</div>;
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-3">
@@ -635,7 +635,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                       <div className="flex justify-between items-center px-1">
                         <label className="text-[9px] font-bold text-gray-400 uppercase">{sns.id === 'x' ? xConfig?.label : sns.label}</label>
                         <button type="button" onClick={() => setTempProfile({...tempProfile, [sns.visibleKey]: !tempProfile[sns.visibleKey]})} className={`flex items-center gap-1.5 text-[9px] font-bold px-2.5 py-1 rounded-full transition-colors ${tempProfile[sns.visibleKey] ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-400'}`}>
-                          {tempProfile[sns.visibleKey] ? <><Eye size={10}/> 公開</> : <><EyeOff size={10}/> 非公開</>}
+                          {tempProfile[sns.visibleKey] ? <><Eye size={10}/> Public</> : <><EyeOff size={10}/> Private</>}
                         </button>
                       </div>
                       <div className="relative">
@@ -657,10 +657,10 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Gender</label>
                   <select className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" value={tempProfile.gender || ''} onChange={e => setTempProfile({...tempProfile, gender: e.target.value})}>
-                    <option value="">未設定</option>
-                    <option value="male">男🚹</option>
-                    <option value="female">女🚺</option>
-                    <option value="other">その他</option>
+                    <option value="">Not set</option>
+                    <option value="male">Male🚹</option>
+                    <option value="female">Female🚺</option>
+                    <option value="other">Others</option>
                   </select>
                 </div>
               </div>
@@ -687,8 +687,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                     {tempProfile.is_mood_comment_visible ? <MessageSquare size={18}/> : <EyeOff size={18}/>}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-bold text-gray-500">気分のコメントを表示する</span>
-                    <span className="text-[10px] text-gray-400">災害時など、言葉を伝えたい時にONにしてください</span>
+                    <span className="text-xs font-bold text-gray-500">Display comments about Feeling</span>
+                    <span className="text-[10px] text-gray-400">Open comments on Friend's HOME page.</span>
                   </div>
                 </label>
               </div>
@@ -698,14 +698,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-ts font-bold text-gray-500 uppercase tracking-widest mb-1">
-                      MEETUP 主催者登録
+                      MEETUP Organizer Registration
                     </p>
                     {connectStatus?.is_ready ? (
-                      <p className="text-[10px] font-bold text-green-600">✅ 主催者登録済み 振込可能 👑</p>
+                      <p className="text-[10px] font-bold text-green-600">✅ Registered with the organizer; bank transfer available. 👑</p>
                     ) : connectStatus?.connected ? (
-                      <p className="text-[10px] font-bold text-amber-500">⚠️ 手続き中</p>
+                      <p className="text-[10px] font-bold text-amber-500">⚠️ Processing in progress</p>
                     ) : (
-                      <p className="text-[10px] text-gray-400">MEETUP参加費 受領用</p>
+                      <p className="text-[10px] text-gray-400">MEETUP participation fee receipt form</p>
                     )}
                   </div>
                   <button
@@ -717,7 +717,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                         });
                         if (res.data.url) window.location.href = res.data.url;
                       } catch {
-                        alert('エラーが発生しました。');
+                        alert('An error has occurred.');
                       }
                     }}
                     className={`flex items-center gap-1 px-2 py-2 rounded-xl text-[10px] font-black transition-all ${
@@ -727,7 +727,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                     }`}
                   >
                     <BadgeCheck size={14} />
-                    {connectStatus?.is_ready ? '登録済み' : '口座登録'}
+                    {connectStatus?.is_ready ? 'Registered' : 'Account registration'}
                   </button>
                 </div>
               </div>
@@ -737,12 +737,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
           {/* Bio の直後に追加 */}
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1">
-              👣 GOAL・目標・標/導・BEACON・MILESTONE
+              👣 GOAL・BEACON・MILESTONE
             </label>
             <input
               type="text"
               maxLength={200}
-              placeholder="例：今月は週3で運動する"
+              placeholder="Example: Exercise three times a week this month."
               className="w-full p-3 py bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-pink-500"
               value={tempProfile.goal || ''}
               onChange={e => setTempProfile({ ...tempProfile, goal: e.target.value })}
@@ -760,7 +760,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
             handleDeleteTag={handleDeleteTag}
           />
           <button onClick={handleSave} className="w-full py-5 bg-gray-900 text-white rounded-[24px] font-bold flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-[0.98]">
-            <Save size={20} /> プロフィールを保存
+            <Save size={20} /> Save Profile
           </button>
         </div>
       ) : (
@@ -799,7 +799,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               state={{ tab: 'requests' }}
               className="block text-xs font-bold text-amber-500 hover:text-amber-600"
             >
-              🔔 ともだち申請が{pendingCount}件あります
+              🔔 You have {pendingCount} friend requests.
             </Link>
           )}
           {unconfirmedMeetups.map(meetup => (
@@ -808,7 +808,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                   to={`/community/${meetup.hobby_category_id}`}
                   className="block text-xs font-black text-orange-500 hover:text-orange-600 mb-4"
               >
-                  🎪 「{meetup.title}」の開催確定を押してください
+                  🎪 「{meetup.title}」Please click "Confirm Event".
               </Link>
           ))}
 
@@ -951,13 +951,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                 )}
                 {moodError === 'logout' ? (
                   <div className="py-6 text-center space-y-2">
-                    <p className="text-gray-400 text-[11px] font-bold">🔒 Logged out（ログアウト中）かもしれません</p>
+                    <p className="text-gray-400 text-[11px] font-bold">🔒 You may be logged out.</p>
                     <Link to="/login" className="text-xs font-bold text-pink-500 hover:underline">
                       Loginはこちら →
                     </Link>
                   </div>
                 ) : moodError === 'failed' ? (
-                  <p className="text-red-400 text-[11px] font-bold text-center py-4">Loading Failed…Logged Out（ログアウト中）かもしれません</p>
+                  <p className="text-red-400 text-[11px] font-bold text-center py-4">Loading Failed…Logged Out</p>
                 ) : (
                   <div className="space-y-10">
                     {Object.keys(groupedLogs).sort().reverse().map(month => (
@@ -1000,7 +1000,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
           {!isMe && (
             <div className="bg-gray-50 rounded-[32px] p-8 text-center text-gray-400 text-sm">
               <EyeOff size={32} className="mx-auto mb-3 opacity-30" />
-              <p className="font-bold">プロフィールのみ公開にしています</p>
+              <p className="font-bold">Set the profile to be public only.</p>
             </div>
           )}
         </div>
