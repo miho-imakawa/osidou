@@ -93,7 +93,7 @@ const TagManagerSection: React.FC<TagManagerSectionProps> = ({
                         />
                     ))}
                 </div>
-                <input type="text" placeholder="タグ名（例: 推し活）" maxLength={15} value={newTagLabel}
+                <input type="text" placeholder="Tag Name(Example: Fandom Activities)" maxLength={15} value={newTagLabel}
                     onChange={e => setNewTagLabel(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
                     className="flex-1 min-w-[120px] px-3 py-1.5 bg-gray-50 rounded-xl border-none text-xs focus:ring-2 focus:ring-pink-400 outline-none"
