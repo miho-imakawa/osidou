@@ -118,7 +118,7 @@ const buildMonthlyReport = (logs: MoodLog[]) => {
     if (recent.length === 0) return null;
 
     // 曜日別平均
-    const DAY_JP = ['日', '月', '火', '水', '木', '金', '土'];
+    const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     const buckets: Record<number, number[]> = {};
     for (let i = 0; i < 7; i++) buckets[i] = [];
     const catCount: Record<string, number> = {};
@@ -131,7 +131,7 @@ const buildMonthlyReport = (logs: MoodLog[]) => {
 
     const weekdayAvg = Object.entries(buckets)
         .map(([day, scores]) => ({
-            day: DAY_JP[Number(day)],
+            day: DAY_LABELS[Number(day)],
             avg: scores.length
                 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
                 : null,
