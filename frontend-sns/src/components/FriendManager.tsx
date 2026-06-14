@@ -40,13 +40,13 @@ const UserSearch: React.FC<{ currentUserId: number | null }> = ({ currentUserId 
         try {
             await sendFriendRequest(receiverId);
             setStatus(prev => ({ ...prev, [receiverId]: 'sent' }));
-            alert(`${name} に申請しました`);
+            alert(`${name} has sent a friend request`);
         } catch (err: any) {
             if (err.response?.status === 402 && err.response.data.detail?.requires_setup) {
                 // 人数超過 → SetupIntent（カード登録）へ誘導
                 const { msg } = err.response.data.detail;
 
-                if (window.confirm(`${msg}\n\nカード登録画面に移動しますか？`)) {
+                if (window.confirm(`${msg}\n\nDo you want to proceed to the card registration screen?`)) {
                     try {
                         const res = await authApi.post('/api/stripe/friend-manager-setup-intent', {
                             requesterId: currentUserId,
@@ -56,7 +56,7 @@ const UserSearch: React.FC<{ currentUserId: number | null }> = ({ currentUserId 
                             window.location.href = res.data.checkout_url;
                         }
                     } catch {
-                        alert('エラーが発生しました。もう一度お試しください。');
+                        alert('An error occurred. Please try again.');
                     }
                 } else {
                     // キャンセル時はボタンをリセット

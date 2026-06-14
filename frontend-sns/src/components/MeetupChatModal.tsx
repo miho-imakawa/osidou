@@ -161,7 +161,7 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
       // 新着が上に来るので、送信後はスクロールをトップへ
       messagesTopRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch {
-      alert("送信に失敗しました。");
+      alert("Sending failed.");
     }
   };
 
@@ -181,7 +181,7 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
         )
       );
     } catch {
-      console.error("リアクション送信に失敗しました");
+      console.error("Failed to send reaction.");
     }
   };
 
@@ -189,7 +189,7 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
   // 💡 No Show 処理（変更なし）
   // ==========================================
   const handleNoShow = async (targetUserId: number, nickname: string) => {
-    if (!window.confirm(`${nickname} さんをNo Showとしてマークしますか？\n参加費100%が課金されます。`)) return;
+    if (!window.confirm(`${nickname} Do you want to mark this as No Show?\n100% of the participation fee will be charged.`)) return;
     try {
       const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-noshow`, {
         method: 'POST',
@@ -203,18 +203,18 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
       });
       const result = await res.json();
       if (result.status === 'noshow_charged') {
-        alert(`¥${result.amount} を課金しました。`);
+        alert(`¥${result.amount} has been charged.`);
       } else {
-        alert('カード未登録のためスキップしました。');
+        alert('This step was skipped because the card was not registered.');
       }
       fetchParticipants();
     } catch {
-      alert('No Show処理に失敗しました。');
+      alert('No Show processing failed.');
     }
   };
 
   const handleOrganizerNoShow = async () => {
-    if (!window.confirm('主催者が来ていないことを報告しますか？\n課金済みの場合は返金されます。')) return;
+    if (!window.confirm('Should we report that the organizer is not present?\nIf you have already been charged, you will receive a refund.')) return;
     try {
       const res = await fetch(`${BACKEND_URL}/api/stripe/meetup-noshow`, {
         method: 'POST',
@@ -226,9 +226,9 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
         }),
       });
       const result = await res.json();
-      alert(`報告を受け付けました。${result.refunded > 0 ? ` ${result.refunded}名に返金しました。` : ''}`);
+      alert(`Your report has been received.${result.refunded > 0 ? ` A refund has been issued to${result.refunded}` : ''}`);
     } catch {
-      alert('報告に失敗しました。');
+      alert('Report failed.');
     }
   };
 
@@ -256,7 +256,7 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
         {isOrganizer && participants.length > 0 && (
           <div className="px-4 py-3 bg-orange-50/50 border-b shrink-0">
             <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-2">
-              参加者チェック（No Show マーク）
+              Participant check (No Show mark)
             </p>
             <div className="flex flex-wrap gap-2">
               {participants.map((p) => (
@@ -269,7 +269,7 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
                   <button
                     onClick={() => handleNoShow(p.user_id, p.author_nickname || `User-${p.user_id}`)}
                     className="text-[9px] font-black text-red-400 hover:text-red-600 transition-colors"
-                    title="No Showマーク"
+                    title="No Show mark"
                   >
                     <AlertTriangle size={11} />
                   </button>
@@ -287,7 +287,7 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
               className="text-[10px] font-black text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
             >
               <AlertTriangle size={12} />
-              主催者が来ていない場合は報告する
+              Report if the organizer is not present.
             </button>
           </div>
         )}
@@ -318,7 +318,7 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
                     setStampPickerFor(stampPickerFor === m.id ? null : m.id)
                   }
                   className="text-base opacity-40 hover:opacity-100 active:scale-95 transition-all leading-none shrink-0"
-                  title="スタンプ"
+                  title="Stamp"
                 >
                   😊
                 </button>
@@ -362,7 +362,7 @@ const MeetupChatModal: React.FC<MeetupChatModalProps> = ({
           <input
             value={newMsg}
             onChange={(e) => setNewMsg(e.target.value)}
-            placeholder="参加者限定メッセージ..."
+            placeholder="Messages for participants only..."
             className="flex-1 px-4 py-2 bg-gray-100 rounded-full text-sm outline-none focus:ring-2 focus:ring-orange-200"
           />
           <button type="submit" className="p-2 bg-orange-600 text-white rounded-full">

@@ -831,7 +831,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
               <h2 className="font-bold flex items-center gap-2 text-gray-400 uppercase tracking-widest text-[10px]">
                 <MessageSquare className="text-pink-600" size={14}/> Communities
                 {connectStatus?.is_ready && (
-                  <span className="ml-1 text-[14px]" title="HOST登録済み">👑</span>
+                  <span className="ml-1 text-[14px]" title="Registered as HOST">👑</span>
                 )}
               </h2>
               <div className="flex flex-wrap gap-2">
@@ -870,7 +870,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                     className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-full hover:bg-orange-100 transition-all"
                   >
                     <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${meetup.user_id === displayProfile.id ? 'bg-orange-500 text-white' : 'bg-orange-200 text-orange-700'}`}>
-                      {meetup.user_id === displayProfile.id ? "主催" : "参加"}
+                      {meetup.user_id === displayProfile.id ? "Organizer" : "Participation"}
                     </span>
                     <span className="font-bold text-gray-700 text-[11px] max-w-[120px] truncate">
                       {meetup.content.split('\n')[0]}
@@ -953,7 +953,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ profile: myProfile, fetchProf
                   <div className="py-6 text-center space-y-2">
                     <p className="text-gray-400 text-[11px] font-bold">🔒 You may be logged out.</p>
                     <Link to="/login" className="text-xs font-bold text-pink-500 hover:underline">
-                      Loginはこちら →
+                      Login →
                     </Link>
                   </div>
                 ) : moodError === 'failed' ? (
