@@ -992,10 +992,10 @@ English follows Japanese.
 ---
 
 Important Notice:
-Please note that "Oshidou" is a text-only platform. Photo and image uploads are not supported.
+Please note that "Osidou" is a text-only platform. Photo and image uploads are not supported.
 
 App Overview:
-The Oshidou application consists of the following four main pages:
+The Osidou application consists of the following four main pages:
 
 【HOME】 Update your own status and see the recent "Feelings" of your friends.
 
@@ -1007,7 +1007,7 @@ The Oshidou application consists of the following four main pages:
 
 Our Concept & Operations:
 We created this application with the goal of fostering gentle, trust-based connections with reliable people.
-To ensure sustainable operations, we have established a fee structure that includes features such as an "Ad-free Plan," "MEET UP" events, "Advertisements," and "Corporate usage of friend logs."
+To ensure sustainable operations, we have established a fee structure that includes features such as an "Ad-free Plan," "MEET UP" events, and "Advertisements." Community-related information (such as interests and general location) may be used for anonymized statistical purposes. Your Friend Log and Feeling Log contents are never shared, sold, or used for corporate or marketing purposes.
 
 Privacy & Security:
 Information registered on your MY PAGE may be used for service improvements and as statistical data. This information includes your email address, age, location (prefecture/city), and gender. We manage all personal data with strict security measures and will not provide it to third parties without your consent, except as required by law.
